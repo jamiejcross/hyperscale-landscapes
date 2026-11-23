@@ -15,3 +15,7 @@ cache/
 !examples/**/*.stl
 # OS
 .DS_Store
+
+# Offline test fixtures are small and must be committed
+!pipeline/tests/fixtures/cache/
+!pipeline/tests/fixtures/cache/**
