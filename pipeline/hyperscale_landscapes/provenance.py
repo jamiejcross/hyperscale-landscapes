@@ -26,6 +26,7 @@ SOURCES: dict[str, dict] = {
     "copernicus-30m": {
         "name": "Copernicus DEM GLO-30",
         "licence": "Copernicus DEM licence (free, attribution required)",
+        "short": "Elevation: Copernicus DEM © DLR, Airbus; EU/ESA",
         "attribution": ("Elevation: Copernicus DEM GLO-30 © DLR e.V. 2010–2014 "
                         "and © Airbus Defence and Space GmbH 2014–2018, provided "
                         "under COPERNICUS by the European Union and ESA"),
@@ -35,6 +36,7 @@ SOURCES: dict[str, dict] = {
     "scottish-lidar": {
         "name": "Scottish Public Sector LiDAR (Scottish Remote Sensing Portal)",
         "licence": "OGL-UK-3.0",
+        "short": "Elevation: Scottish Government LiDAR (OGL v3)",
         "attribution": ("Elevation: Scottish Government LiDAR. Contains public "
                         "sector information licensed under the Open Government "
                         "Licence v3.0"),
@@ -75,11 +77,16 @@ def lookup(source: str) -> dict:
             "url": None, "status": "unknown"}
 
 
-def attribution_line(sources: dict[str, str]) -> str:
-    """Short, de-duplicated attribution string for captions and the 3MF."""
+def attribution_line(sources: dict[str, str], short: bool = False) -> str:
+    """De-duplicated attribution string for captions and the 3MF.
+
+    ``short=True`` uses the abbreviated form where one exists (for text
+    engraved on the model; the full wording is always in the manifest).
+    """
     seen, parts = set(), []
     for src in sources.values():
-        text = lookup(src).get("attribution") or ""
+        rec = lookup(src)
+        text = (rec.get("short") if short else None) or rec.get("attribution") or ""
         if text and text not in seen:
             seen.add(text); parts.append(text)
     return "; ".join(parts)

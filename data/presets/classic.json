@@ -1,0 +1,9 @@
+{ "id": "classic", "name": "Classic (four colours)",
+  "description": "The original multi-extruder layout: land, water, roads, buildings. New layers are left out.",
+  "objects": [
+    { "name": "Land",      "slot": 1, "colour": "#8B7355", "layers": ["terrain"] },
+    { "name": "Water",     "slot": 2, "colour": "#4488CC", "layers": ["water"] },
+    { "name": "Roads",     "slot": 3, "colour": "#3A3A3A", "layers": ["roads"] },
+    { "name": "Buildings", "slot": 4, "colour": "#C8C8C8", "layers": ["buildings"] }
+  ],
+  "insert": { "name": "Proposed data centre", "slot": 4 } }

@@ -97,6 +97,17 @@ class BuildOptions:
     out_dir: str = "output"
     cache_dir: str | None = None
     colours: dict = field(default_factory=lambda: dict(DEFAULT_COLOURS))
+    # Phase 2
+    preset: str = "power-and-place"  # see data/presets/
+    features: bool = True             # power, rail, residues, receptors, land cover
+    pegs: bool = True                 # pylons and wind turbines as pegs
+    labels: bool = True               # engraved base labels
+    footprint: str | None = None      # GeoJSON of the proposed facility
+    insert_height_m: float | None = None
+    insert_height_source: str | None = None
+    footprint_precision: str | None = None   # exact / digitised / approximate
+    planning_ref: str | None = None
+    magnets: bool = True
 
     @property
     def bbox_id(self) -> str:
@@ -112,7 +123,7 @@ def exaggeration_note(opts: BuildOptions) -> str:
     return t + f"; buildings ×{opts.building_exag:g}"
 
 
-def _build_core(opts, out_dir: Path, cache_dir: Path):
+def _build_core(opts, out_dir: Path, cache_dir: Path, hook=None):
 
     bbox = BBox(opts.min_lat, opts.max_lat, opts.min_lon, opts.max_lon)
 
@@ -494,6 +505,7 @@ def _build_core(opts, out_dir: Path, cache_dir: Path):
     _progress(14, "Extruding buildings")
     log.info("Extruding %d buildings...", len(buildings_in))
     bld_meshes = []
+    bld_info = []   # (footprint polygon, source record) per kept building
     filtered_river = 0
     filtered_outside = 0
     skipped = 0
@@ -583,6 +595,7 @@ def _build_core(opts, out_dir: Path, cache_dir: Path):
         if not bm.is_watertight:
             skipped += 1; continue
         bld_meshes.append(bm)
+        bld_info.append((poly, b))
 
     _tick(f"  Buildings: {n_bld_total}/{n_bld_total}")
     log.info("Buildings: %d kept; %d in river; %d outside; %d invalid",
@@ -607,6 +620,7 @@ def _build_core(opts, out_dir: Path, cache_dir: Path):
     # mutually intersecting shells that triggered slicer warnings, and
     # cuts the face count substantially (shared junctions meshed once).
     road_meshes = []
+    road_network = None
     road_skipped = 0
     strips = []
     for rd in roads_in:
@@ -736,120 +750,297 @@ def _build_core(opts, out_dir: Path, cache_dir: Path):
     log.info("Sea water: %d slab(s)", sea_mesh_count)
     log.info("Total water: %d slab(s) (%d skipped)", len(water_meshes), water_skipped)
 
+    # ---- 13c. Extra layers, insert and labels (Phase 2 hook) ----
+    # Everything here is built in the same world units as the core layers,
+    # so it is scaled and translated identically below.
+    extra_layers: dict[str, list] = {}
+    separate: dict[str, trimesh.Trimesh] = {}
+    hook_info: dict = {}
+    if hook is not None:
+        ctx = dict(opts=opts, bbox=bbox, cache_dir=cache_dir,
+                   project_arr=project_arr, sample_elev=sample_elev,
+                   terrain_bbox=TERRAIN_BBOX, river_shape=river_shape,
+                   road_network=road_network, world_to_mm=WORLD_TO_MM,
+                   interior_spacing=INTERIOR_SPACING, simplify_tol=SIMPLIFY_TOL_M,
+                   width_m=WIDTH_M, height_m=HEIGHT_M, base_bottom=BASE_BOTTOM,
+                   elev_z=elev_z, elev_water_z=elev_water_z, cell_m=cell_m,
+                   west=west, south=south, m_per_deg_lon=M_PER_DEG_LON,
+                   sources=sources, n_sea=len(sea_polys))
+        res = hook(ctx, terrain=terrain, bld_meshes=bld_meshes, bld_info=bld_info,
+                   road_meshes=road_meshes, water_meshes=water_meshes)
+        terrain = res.get("terrain", terrain)
+        bld_meshes = res.get("bld_meshes", bld_meshes)
+        road_meshes = res.get("road_meshes", road_meshes)
+        water_meshes = res.get("water_meshes", water_meshes)
+        extra_layers = res.get("layers", {})
+        separate = res.get("separate", {})
+        hook_info = res.get("info", {})
+
     # ---- 14. Concatenate per-type meshes ----
     _progress(17, "Assembling final mesh")
-    buildings_mesh = (trimesh.util.concatenate(bld_meshes)
-                      if bld_meshes else trimesh.Trimesh())
+
+    def _cat(meshes):
+        meshes = [m for m in meshes if m is not None and len(m.faces)]
+        return trimesh.util.concatenate(meshes) if meshes else trimesh.Trimesh()
+
+    buildings_mesh = _cat(bld_meshes)
     # Buildings are already clean per-shell (validated at creation).
     # No global vertex-merge or decimation: both can open closed bodies,
     # and the face count is small relative to the terrain.
-    roads_mesh = (trimesh.util.concatenate(road_meshes)
-                  if road_meshes else trimesh.Trimesh())
-    water_mesh = (trimesh.util.concatenate(water_meshes)
-                  if water_meshes else trimesh.Trimesh())
-    roads_mesh = clean_mesh(roads_mesh, "Roads", merge=False)
-    water_mesh = clean_mesh(water_mesh, "Water", merge=False)
+    roads_mesh = clean_mesh(_cat(road_meshes), "Roads", merge=False)
+    water_mesh = clean_mesh(_cat(water_meshes), "Water", merge=False)
+    layer_meshes = {"terrain": terrain, "buildings": buildings_mesh,
+                    "roads": roads_mesh, "water": water_mesh}
+    for name, meshes in extra_layers.items():
+        layer_meshes[name] = clean_mesh(_cat(meshes), name, merge=False)
 
     # ---- 15. Scale to print size ----
     _progress(18, "Scaling to print size")
-    all_pieces = [m for m in [terrain, buildings_mesh, roads_mesh, water_mesh]
-                  if len(m.vertices) > 0]
-    all_verts = np.vstack([m.vertices for m in all_pieces])
-    global_min = all_verts.min(axis=0)
-    global_max = all_verts.max(axis=0)
-    global_ext = global_max - global_min
+    # The print outline is set by the core layers only; the removable insert
+    # (and anything else in `separate`) is transformed with them but never
+    # widens the plate.
+    core = [m for m in (terrain, buildings_mesh, roads_mesh, water_mesh)
+            if len(m.vertices) > 0]
+    all_verts = np.vstack([m.vertices for m in core])
+    global_ext = all_verts.max(axis=0) - all_verts.min(axis=0)
     scale = opts.print_size / max(global_ext[0], global_ext[1])
-
-    for m in [terrain, buildings_mesh, roads_mesh, water_mesh]:
-        if len(m.vertices) == 0:
-            continue
+    everything = [m for m in list(layer_meshes.values()) + list(separate.values())
+                  if len(m.vertices) > 0]
+    for m in everything:
         m.apply_scale(scale)
-
-    scaled_pieces = [m for m in [terrain, buildings_mesh, roads_mesh, water_mesh]
-                     if len(m.vertices) > 0]
-    all_scaled_verts = np.vstack([m.vertices for m in scaled_pieces])
-    origin = all_scaled_verts.min(axis=0)
-
-    for m in [terrain, buildings_mesh, roads_mesh, water_mesh]:
-        if len(m.vertices) == 0:
-            continue
+    origin = np.vstack([m.vertices for m in core]).min(axis=0)
+    for m in everything:
         m.apply_translation(-origin)
-
-    for m in [terrain, buildings_mesh, roads_mesh, water_mesh]:
-        if len(m.vertices) > 0:
-            trimesh.repair.fix_normals(m)
+        trimesh.repair.fix_normals(m)
 
     # Final dedupe in print-mm space: no two shells may share a vertex
     # position at export precision, or position-welding importers create
     # non-manifold edges.
-    buildings_mesh = nudge_duplicate_vertices(buildings_mesh, "Buildings")
-    roads_mesh = nudge_duplicate_vertices(roads_mesh, "Roads")
-    water_mesh = nudge_duplicate_vertices(water_mesh, "Water")
+    for name in list(layer_meshes):
+        if name != "terrain":
+            layer_meshes[name] = nudge_duplicate_vertices(layer_meshes[name], name)
 
     log.info("Scaled to print size: scale=%.6f", scale)
-    for name, m in [("Land", terrain), ("Buildings", buildings_mesh),
-                    ("Roads", roads_mesh), ("Water", water_mesh)]:
+    for name, m in layer_meshes.items():
         if len(m.vertices) > 0:
             log.info("  %s: %d verts, %d faces, extents %s",
                      name, len(m.vertices), len(m.faces), m.extents)
 
+    counts = {"buildings": len(bld_meshes), "roads": len(road_meshes),
+              "water": len(water_meshes)}
+    for name, meshes in extra_layers.items():
+        counts[name] = len([m for m in meshes if m is not None and len(m.faces)])
     return {
         "sources": sources, "bbox": bbox,
-        "terrain": terrain, "buildings": buildings_mesh,
-        "roads": roads_mesh, "water": water_mesh,
-        "counts": {"buildings": len(bld_meshes), "roads": len(road_meshes),
-                   "water": len(water_meshes)},
+        "layers": layer_meshes, "separate": separate, "info": hook_info,
+        "terrain": layer_meshes["terrain"], "buildings": layer_meshes["buildings"],
+        "roads": layer_meshes["roads"], "water": layer_meshes["water"],
+        "counts": counts,
         "filtered": {"buildings_in_river": filtered_river,
                      "buildings_outside": filtered_outside,
                      "buildings_invalid": skipped},
         "scale_mm_per_m": float(scale),
+        "origin_mm": [float(x) for x in origin],
         "width_m": float(WIDTH_M), "height_m": float(HEIGHT_M),
         "elevation_range_m": [float(elev_grid.min()), float(elev_grid.max())],
         "cell_m": float(cell_m),
+        "n_sea": len(sea_polys),
     }
+
+
+def _load_footprint(path: str):
+    """Union of every polygon in a GeoJSON file (lon/lat)."""
+    from shapely.geometry import shape as _shape
+    gj = json.loads(Path(path).read_text())
+    feats = (gj["features"] if gj.get("type") == "FeatureCollection"
+             else [gj] if gj.get("type") == "Feature" else [{"geometry": gj}])
+    geoms = [_shape(f["geometry"]) for f in feats if f.get("geometry")]
+    geoms = [g for g in geoms if g.geom_type in ("Polygon", "MultiPolygon")]
+    if not geoms:
+        raise ValueError(f"No polygon found in {path}")
+    return unary_union(geoms)
+
+
+def _phase2_hook(ctx, *, terrain, bld_meshes, bld_info, road_meshes, water_meshes):
+    """New layers, the data-centre insert and the base labels (Phase 2)."""
+    from .geometry import labels as lbl
+    from .geometry.insert import build_insert, cut_all
+    from .geometry.layers import _project_geom, build_layers
+    from .geometry.union import subtract
+    from .providers import features as feat_provider
+
+    opts = ctx["opts"]
+    info: dict = {}
+    layers: dict = {}
+    separate: dict = {}
+    w2mm = ctx["world_to_mm"]
+
+    if opts.features:
+        _progress(16, "Fetching power, rail, residues and receptors")
+        fr = feat_provider.fetch(ctx["bbox"], ctx["cache_dir"], force=opts.force)
+        ctx["sources"]["features"] = fr.source
+        info["feature_list"] = fr.data
+        layers, bld_meshes, linfo = build_layers(ctx, fr.data, bld_meshes, bld_info,
+                                                 pegs=opts.pegs)
+        info.update(linfo)
+
+    # ---- Insert and recess ----
+    if opts.footprint:
+        if not opts.insert_height_m:
+            raise ValueError("A footprint needs --insert_height_m (and its source)")
+        fp_world = _project_geom(_load_footprint(opts.footprint), ctx["project_arr"])
+        insert, recess, magnets, iinfo = build_insert(ctx, fp_world, opts.insert_height_m,
+                                                      magnets=opts.magnets)
+        iinfo.update({"height_source": opts.insert_height_source,
+                      "footprint_precision": opts.footprint_precision,
+                      "planning_ref": opts.planning_ref})
+        # Subtract one solid at a time: the magnet cylinders overlap the
+        # recess prism, and a concatenation of overlapping shells is not a
+        # valid manifold (it left an inverted sliver of recess floor).
+        terrain = subtract(terrain, recess)
+        for m in magnets:
+            terrain = subtract(terrain, m)
+        # Remove buildings standing in the footprint (they would be cleared),
+        # and cut roads, water and pads back to the recess edge.
+        keep_b = [m for m in bld_meshes]
+        bld_meshes = cut_all(keep_b, recess)
+        road_meshes = cut_all(road_meshes, recess)
+        water_meshes = cut_all(water_meshes, recess)
+        for k in list(layers):
+            layers[k] = cut_all(layers[k], recess)
+        separate["insert"] = insert
+        info["insert"] = iinfo
+        log.info("Insert: %.0f m² footprint, %.1f mm tall, %d magnet holes",
+                 iinfo["footprint_area_m2"], iinfo["insert_height_mm"], iinfo["magnet_holes"])
+
+    # ---- Engraved base labels ----
+    if opts.labels:
+        plate_w = ctx["width_m"] * w2mm
+        plate_h = ctx["height_m"] * w2mm
+        attrib = provenance.attribution_line(
+            {k: v for k, v in ctx["sources"].items()
+             if not (k == "coastline" and not ctx.get("n_sea"))}, short=True)
+        spec = [(opts.name or "Terrain model", lbl.NAME_MM),
+                (exaggeration_note(opts), lbl.TEXT_MM),
+                (attrib, lbl.TEXT_MM)]
+        if "insert" in info:
+            spec.append((f"Proposed footprint {opts.footprint_precision or 'approximate'}"
+                         + (f"; source: {opts.planning_ref}" if opts.planning_ref else ""),
+                         lbl.TEXT_MM))
+        spec.append((f"Made {time.strftime('%d %b %Y')} with Hyperscale Landscapes",
+                     lbl.TEXT_MM))
+        label_mm, report = lbl.layout(spec, plate_w, plate_h, w2mm, ctx["width_m"])
+        cutter = lbl.engrave_cutter(label_mm, w2mm, ctx["base_bottom"])
+        if cutter is not None:
+            terrain = subtract(terrain, cutter)
+        info["base_label"] = report
+
+    return {"terrain": terrain, "bld_meshes": bld_meshes, "road_meshes": road_meshes,
+            "water_meshes": water_meshes, "layers": layers, "separate": separate,
+            "info": info}
+
+
+def _pause_heights(meshes: dict, base_mm: float) -> list[dict]:
+    """Suggested filament-change heights for single-extruder colour."""
+    out = [{"z_mm": round(base_mm, 2), "change_to": "land",
+            "why": "top of the solid base"}]
+    for key, label in (("water", "water"), ("roads", "roads")):
+        m = meshes.get(key)
+        if m is None or not len(m.faces):
+            continue
+        tops = m.triangles_center[m.face_normals[:, 2] > 0.9][:, 2]
+        if len(tops):
+            out.append({"z_mm": round(float(np.median(tops)), 2), "change_to": label,
+                        "why": f"median height of the {label} surfaces"})
+    return sorted(out, key=lambda d: d["z_mm"])
+
+
+def _features_geojson(feature_list, path: Path, attribution: str):
+    fc = {"type": "FeatureCollection",
+          "attribution": attribution,
+          "features": [{"type": "Feature", "geometry": f["geometry"],
+                        "properties": {"layer": f["layer"], "kind": f["kind"],
+                                       "status": f["status"], "osm": f["osm"],
+                                       **f["tags"]}} for f in feature_list]}
+    path.write_text(json.dumps(fc, ensure_ascii=False))
 
 
 def build(opts: BuildOptions) -> dict:
     """Run the full build and return the manifest (also written to disk)."""
+    from .paths import load_preset
+
     t_start = time.time()
     out_dir = Path(opts.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     cache_dir = Path(opts.cache_dir) if opts.cache_dir else default_cache_dir()
     cache_dir.mkdir(parents=True, exist_ok=True)
+    preset = load_preset(opts.preset)
 
-    r = _build_core(opts, out_dir, cache_dir)
-    terrain, buildings_mesh = r["terrain"], r["buildings"]
-    roads_mesh, water_mesh = r["roads"], r["water"]
+    r = _build_core(opts, out_dir, cache_dir, hook=_phase2_hook)
+    meshes = r["layers"]
+    terrain = meshes["terrain"]
     sources = r["sources"]
-
-    # ---- Export as multi-object 3MF ----
-    _progress(19, "Exporting 3MF")
-    c = {**DEFAULT_COLOURS, **(opts.colours or {})}
-    parts = [Part("Land", terrain, c["land"], 1),
-             Part("Water", water_mesh, c["water"], 2),
-             Part("Roads", roads_mesh, c["roads"], 3),
-             Part("Buildings", buildings_mesh, c["buildings"], 4)]
-    attribution = provenance.attribution_line(sources)
+    info = r["info"]
+    attrib_sources = {k: v for k, v in sources.items()
+                      if not (k == "coastline" and not r.get("n_sea"))}
+    attribution = provenance.attribution_line(attrib_sources)
     title = opts.name or f"Terrain {opts.bbox_id}"
-    out_3mf = out_dir / f"terrain_{opts.bbox_id}.3mf"
-    export_3mf(out_3mf, parts, title=title, bambu=opts.bambu_metadata,
-               metadata={
-                   "Designer": "Hyperscale Landscapes " + __version__,
-                   "Description": exaggeration_note(opts),
-                   "Copyright": attribution,
-                   "LicenseTerms": "Map data ODbL 1.0; see manifest for all sources",
-                   "CreationDate": time.strftime("%Y-%m-%d"),
-               })
 
-    # ---- Optional single-colour union STL ----
+    # ---- Group layers into print objects by preset ----
+    _progress(19, "Exporting 3MF")
+    legacy = {"terrain": "land"}
+    parts = []
+    objects = {}
+    for obj in preset["objects"]:
+        ms = [meshes[l] for l in obj["layers"] if l in meshes and len(meshes[l].faces)]
+        colour = obj["colour"]
+        if preset["id"] == "classic":   # honour --colour_* for the classic layout
+            key = legacy.get(obj["layers"][0], obj["layers"][0])
+            colour = (opts.colours or {}).get(key, colour)
+        mesh = trimesh.util.concatenate(ms) if ms else trimesh.Trimesh()
+        parts.append(Part(obj["name"], mesh, colour, obj["slot"]))
+        objects[obj["name"]] = {
+            "slot": obj["slot"], "colour": colour, "layers": obj["layers"],
+            "faces": int(len(mesh.faces)),
+            "watertight": bool(mesh.is_watertight) if len(mesh.faces) else None}
+    insert = r["separate"].get("insert")
+    sep_parts = []
+    if insert is not None:
+        ins = preset.get("insert", {"name": "Proposed data centre", "slot": 1})
+        sep_parts.append(Part(ins["name"], insert, "#FFFFFF", ins["slot"]))
+
+    meta = {"Designer": "Hyperscale Landscapes " + __version__,
+            "Description": exaggeration_note(opts),
+            "Copyright": attribution,
+            "LicenseTerms": "Map data ODbL 1.0; see manifest for all sources",
+            "CreationDate": time.strftime("%Y-%m-%d")}
+    out_3mf = None
+    if not preset.get("single"):
+        out_3mf = out_dir / f"terrain_{opts.bbox_id}.3mf"
+        export_3mf(out_3mf, parts, title=title, bambu=opts.bambu_metadata,
+                   metadata=meta, separate=sep_parts)
+
+    # ---- Single-colour union STL (preset or --stl) ----
     union_stats = None
     out_stl = None
-    if opts.stl:
+    out_insert_stl = None
+    if opts.stl or preset.get("single"):
         from .geometry.union import union_solids
         _progress(19, "Boolean union for single-colour STL")
-        merged, union_stats = union_solids(terrain, [buildings_mesh, roads_mesh])
+        single = load_preset("single-colour")["objects"][0]["layers"]
+        extras = [meshes[l] for l in single if l != "terrain" and l in meshes]
+        merged, union_stats = union_solids(terrain, extras)
         out_stl = out_dir / f"terrain_{opts.bbox_id}.stl"
         merged.export(str(out_stl))
+        if insert is not None:
+            out_insert_stl = out_dir / f"insert_{opts.bbox_id}.stl"
+            insert.export(str(out_insert_stl))
+
+    # ---- Features sidecar for the viewer and artefacts ----
+    out_geojson = None
+    if info.get("feature_list") is not None:
+        out_geojson = out_dir / f"features_{opts.bbox_id}.geojson"
+        _features_geojson(info["feature_list"], out_geojson, attribution)
 
     # ---- Printability check (land is the structural body) ----
     _progress(20, "Checking printability")
@@ -857,22 +1048,27 @@ def build(opts: BuildOptions) -> dict:
     log.info("Overhang faces: %d, area: %.2f mm² -> %s", n_oh, a_oh,
              "OK, print without supports" if checks.support_free(n_oh, a_oh)
              else "inspect in slicer")
+    # Only the land body is checked: every other layer is a draped slab or peg
+    # whose underside is buried in the terrain, so its downward faces never
+    # print as overhangs.
 
     # ---- Manifest ----
     _progress(21, "Writing manifest")
-    meshes = {"land": terrain, "buildings": buildings_mesh,
-              "roads": roads_mesh, "water": water_mesh}
-    objects = {}
+    layer_stats = {}
     for k, m in meshes.items():
-        objects[k] = {"faces": int(len(m.faces)), "vertices": int(len(m.vertices)),
-                      "watertight": bool(m.is_watertight) if len(m.faces) else None}
+        layer_stats[k] = {"faces": int(len(m.faces)), "vertices": int(len(m.vertices)),
+                          "watertight": bool(m.is_watertight) if len(m.faces) else None}
         if k in r["counts"]:
-            objects[k]["count"] = r["counts"][k]
+            layer_stats[k]["count"] = r["counts"][k]
     manifest = {
-        "schema": "hyperscale-landscapes/manifest@2",
+        "schema": "hyperscale-landscapes/manifest@3",
         "generator": f"hyperscale-landscapes {__version__}",
         "name": opts.name or None,
-        "outputs": {"3mf": str(out_3mf), "stl": str(out_stl) if out_stl else None},
+        "preset": preset["id"],
+        "outputs": {"3mf": str(out_3mf) if out_3mf else None,
+                    "stl": str(out_stl) if out_stl else None,
+                    "insert_stl": str(out_insert_stl) if out_insert_stl else None,
+                    "features_geojson": str(out_geojson) if out_geojson else None},
         "bbox": {"min_lat": opts.min_lat, "max_lat": opts.max_lat,
                  "min_lon": opts.min_lon, "max_lon": opts.max_lon},
         "options": {k: v for k, v in asdict(opts).items()
@@ -884,12 +1080,21 @@ def build(opts: BuildOptions) -> dict:
         "world": {"width_m": r["width_m"], "height_m": r["height_m"],
                   "cell_m": r["cell_m"], "scale_mm_per_m": r["scale_mm_per_m"],
                   "elevation_range_m": r["elevation_range_m"]},
-        "objects": objects,
+        "print_objects": objects,
+        "layers": layer_stats,
+        # Backwards-compatible view (manifest@2 consumers)
+        "objects": {"land": layer_stats["terrain"], "buildings": layer_stats["buildings"],
+                    "roads": layer_stats["roads"], "water": layer_stats["water"]},
+        "features": info.get("features", {}),
+        "receptor_buildings": info.get("receptor_buildings"),
+        "insert": info.get("insert"),
+        "base_label": info.get("base_label"),
+        "pause_heights_mm": _pause_heights(meshes, opts.base),
         "filtered": r["filtered"],
         "union": union_stats,
         "stats": {
-            "total_vertices": sum(o["vertices"] for o in objects.values()),
-            "total_faces": sum(o["faces"] for o in objects.values()),
+            "total_vertices": sum(o["vertices"] for o in layer_stats.values()),
+            "total_faces": sum(o["faces"] for o in layer_stats.values()),
             "terrain_watertight": bool(terrain.is_watertight),
             "overhang_faces": n_oh,
             "overhang_area_mm2": round(a_oh, 4),

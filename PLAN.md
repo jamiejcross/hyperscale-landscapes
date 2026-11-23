@@ -2,7 +2,7 @@
 
 *Phase 0 output. Written 23 November 2026, after reading `BRIEF.md` and every source it lists.*
 
-> **Status (23 Nov 2026): approved by JC.** D1–D10 are accepted as recommended. Auchtertool ships with **no insert at all** until a sourced footprint exists. ORCIDs: Jamie Cross 0000-0002-0721-0786; Alex Nading 0000-0002-1731-321X. Phase 1 is under way. The GitHub repo will not be created or pushed until JC says so.
+> **Status (23 Nov 2026): approved by JC.** D1–D10 are accepted as recommended. Auchtertool ships with **no insert at all** until a sourced footprint exists. ORCIDs: Jamie Cross 0000-0002-0721-0786; Alex Nading 0000-0002-1731-321X. Phase 1 committed (0018b87). Phase 2 under way. The GitHub repo will not be created or pushed until JC says so.
 
 ---
 

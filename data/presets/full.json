@@ -1,0 +1,13 @@
+{ "id": "full", "name": "Full",
+  "description": "Up to eight objects, for printers with more filament slots, or for painting by hand.",
+  "objects": [
+    { "name": "Land",      "slot": 1, "colour": "#8B7355", "layers": ["terrain"] },
+    { "name": "Water",     "slot": 2, "colour": "#4488CC", "layers": ["water"] },
+    { "name": "Roads",     "slot": 3, "colour": "#3A3A3A", "layers": ["roads"] },
+    { "name": "Rail",      "slot": 4, "colour": "#1A1A1A", "layers": ["rail"] },
+    { "name": "Power",     "slot": 5, "colour": "#F28C28", "layers": ["power"] },
+    { "name": "Industrial residues", "slot": 6, "colour": "#6E4B6B", "layers": ["residues"] },
+    { "name": "Buildings", "slot": 7, "colour": "#C8C8C8", "layers": ["buildings"] },
+    { "name": "Schools, care and community", "slot": 8, "colour": "#2E8B57", "layers": ["receptors"] }
+  ],
+  "insert": { "name": "Proposed data centre", "slot": 7 } }

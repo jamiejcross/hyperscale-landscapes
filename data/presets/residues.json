@@ -1,0 +1,9 @@
+{ "id": "residues", "name": "Residues",
+  "description": "Four colours: land, water, industrial residues, and buildings with roads and rail.",
+  "objects": [
+    { "name": "Land",      "slot": 1, "colour": "#8B7355", "layers": ["terrain"] },
+    { "name": "Water",     "slot": 2, "colour": "#4488CC", "layers": ["water"] },
+    { "name": "Industrial residues", "slot": 3, "colour": "#6E4B6B", "layers": ["residues"] },
+    { "name": "Buildings, roads and rail", "slot": 4, "colour": "#C8C8C8", "layers": ["buildings", "receptors", "roads", "rail", "power"] }
+  ],
+  "insert": { "name": "Proposed data centre", "slot": 4 } }

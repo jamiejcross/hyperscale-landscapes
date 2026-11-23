@@ -124,7 +124,7 @@ def _fetch_osm(bbox: BBox, cache_dir: Path) -> list[dict]:
     """Fetch building footprints from OSM Overpass API."""
 
     cache_file = cache_dir / (
-        f"osm_buildings_{bbox.min_lat:.4f}_{bbox.max_lat:.4f}"
+        f"osm_buildings_v2_{bbox.min_lat:.4f}_{bbox.max_lat:.4f}"
         f"_{bbox.min_lon:.4f}_{bbox.max_lon:.4f}.json"
     )
 
@@ -183,7 +183,10 @@ def _fetch_osm(bbox: BBox, cache_dir: Path) -> list[dict]:
             except ValueError:
                 pass
 
-        buildings.append({"coords": coords, "height": h})
+        # Building *type* only (used for the receptors layer); never names.
+        buildings.append({"coords": coords, "height": h,
+                          "kind": tags.get("building", "yes"),
+                          "amenity": tags.get("amenity")})
 
     log.info("OSM returned %d buildings", len(buildings))
 

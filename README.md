@@ -16,9 +16,9 @@ references. This toolkit turns a site into evidence people can hold and share:
 Every model and image states its data sources and its vertical
 exaggeration, because these are used as evidence.
 
-> **Status: early development (Phase 1 of 7).** The Python command-line tool
-> builds multi-colour print files. The browser app, the new layers and the
-> beginners' guides are still to come. See [PLAN.md](PLAN.md).
+> **Status: early development (Phase 2 of 7).** The Python command-line tool
+> builds multi-colour print files with power, residue and receptor layers. The browser app, the digital artefacts and
+> the beginners' guides are still to come. See [PLAN.md](PLAN.md).
 
 ## For organisers
 
@@ -35,11 +35,36 @@ hyperscale build --site auchtertool-cato
 hyperscale build --min_lat 56.0916 --max_lat 56.1064 --min_lon -3.3054 --max_lon -3.2457 --stl
 ```
 
+### Presets, layers and the insert
+
+```bash
+hyperscale build --site auchtertool-cato --preset residues
+hyperscale build --polygon proposal.geojson --footprint proposal.geojson \
+                 --insert_height_m 24 --insert_height_source "Planning statement, p. 12" \
+                 --footprint_precision "digitised from images" --planning_ref 25/01234/EIA
+```
+
+| Preset | Filament slots |
+|---|---|
+| `power-and-place` (default) | Land · Water · Power, roads and rail · Buildings |
+| `residues` | Land · Water · Industrial residues · Buildings, roads and rail |
+| `full` | up to eight objects |
+| `classic` | Land · Water · Roads · Buildings (the original layout) |
+| `single-colour` | one watertight STL |
+
+A proposed facility is printed as a **separate, removable block**, at true height by
+default. It sits in a recess with 0.2 mm clearance and optional 6 × 2 mm magnet holes.
+The underside of the base is engraved with the site name, the height exaggeration,
+the data sources, the date, a north arrow and a scale bar. Turn the model over to
+read them.
+
 Outputs go to `./output/`:
 
 - `terrain_*.3mf`: one object each for Land, Water, Roads and Buildings, pre-assigned to filament slots 1–4
 - `terrain_*.stl`: with `--stl`, a single watertight body for one-colour printing
-- `manifest_*.json`: statistics, printability check, and full data provenance
+- `insert_*.stl`: the removable data-centre block, when a footprint is given
+- `features_*.geojson`: power, rail, residues, receptors and land cover, for the viewer
+- `manifest_*.json`: statistics, printability check, pause heights for single-extruder colour changes, and full data provenance
 
 Downloads are cached in your user cache folder (`~/.cache/hyperscale-landscapes`
 on Linux, `~/Library/Caches/hyperscale-landscapes` on macOS).

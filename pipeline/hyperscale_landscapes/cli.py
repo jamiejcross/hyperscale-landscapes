@@ -14,27 +14,14 @@ import argparse
 import json
 import logging
 import math
-import os
 import sys
 from pathlib import Path
 
+from .paths import data_dir
 from .pipeline import BuildOptions, DEFAULT_COLOURS, build
 from .providers.roads import ROAD_TYPES_BY_PROFILE
 
 M_PER_DEG_LAT = 111_320.0
-
-
-def data_dir() -> Path:
-    """Locate the shared ``data/`` folder (repo checkout or HYPERSCALE_DATA)."""
-    env = os.environ.get("HYPERSCALE_DATA")
-    if env:
-        return Path(env)
-    here = Path(__file__).resolve()
-    for parent in here.parents:
-        cand = parent / "data" / "sites"
-        if cand.is_dir():
-            return parent / "data"
-    return Path.cwd() / "data"
 
 
 def load_sites() -> list[dict]:
@@ -44,7 +31,7 @@ def load_sites() -> list[dict]:
     return json.loads(idx.read_text())["sites"]
 
 
-def site_bbox(site_id: str) -> tuple[dict, str]:
+def site_bbox(site_id: str) -> tuple[dict, str, dict]:
     path = data_dir() / "sites" / f"{site_id}.geojson"
     if not path.exists():
         known = ", ".join(s["id"] for s in load_sites()) or "none"
@@ -54,7 +41,17 @@ def site_bbox(site_id: str) -> tuple[dict, str]:
     bb = props.get("model_bbox")
     if not bb:
         sys.exit(f"Site '{site_id}' has no model_bbox yet; see data/sites/TODO.md")
-    return bb, props.get("name") or site_id
+    insert = {}
+    if feat.get("geometry"):
+        # A sourced footprint exists: build the insert from the site record.
+        refs = props.get("planning_refs") or []
+        insert = {"footprint": str(path),
+                  "insert_height_m": props.get("stated_height_m"),
+                  "insert_height_source": props.get("massing_source"),
+                  "footprint_precision": props.get("footprint_precision"),
+                  "planning_ref": (refs[0].get("ref") if refs and isinstance(refs[0], dict)
+                                   else (refs[0] if refs else None))}
+    return bb, props.get("name") or site_id, insert
 
 
 def polygon_bbox(path: Path, pad_m: float) -> dict:
@@ -122,6 +119,22 @@ def _build_parser() -> argparse.ArgumentParser:
     b.add_argument("--out_dir", default="output")
     b.add_argument("--cache_dir", default=None)
     b.add_argument("--force", action="store_true", help="Re-fetch cached data")
+    b.add_argument("--preset", default="power-and-place",
+                   help="Print preset: power-and-place, residues, full, classic, single-colour")
+    b.add_argument("--no_features", action="store_true",
+                   help="Leave out power, rail, residues and receptors")
+    b.add_argument("--no_pegs", action="store_true", help="No pylon or turbine pegs")
+    b.add_argument("--no_labels", action="store_true", help="No engraved base labels")
+    ins = b.add_argument_group("data-centre insert")
+    ins.add_argument("--footprint", help="GeoJSON polygon of the proposed facility")
+    ins.add_argument("--insert_height_m", type=float,
+                     help="Height of the facility in metres (stated or estimated)")
+    ins.add_argument("--insert_height_source",
+                     help="Where the height comes from, e.g. a planning document")
+    ins.add_argument("--footprint_precision",
+                     choices=["exact from plans", "digitised from images", "approximate"])
+    ins.add_argument("--planning_ref", help="Planning reference for captions")
+    ins.add_argument("--no_magnets", action="store_true")
     b.add_argument("-q", "--quiet", action="store_true")
 
     s = sub.add_parser("sites", help="Curated sites")
@@ -144,8 +157,10 @@ def main(argv=None) -> int:
     name = args.name
     opts_extra = {}
     if args.site:
-        bb, site_name = site_bbox(args.site)
+        bb, site_name, site_insert = site_bbox(args.site)
         name = name or site_name
+        if site_insert and not args.footprint:
+            opts_extra.update({k: v for k, v in site_insert.items() if v is not None})
     elif args.bbox:
         data = json.loads(args.bbox.read_text())
         bb = data.get("bbox", data)
@@ -170,6 +185,8 @@ def main(argv=None) -> int:
            and k not in ("min_lat", "max_lat", "min_lon", "max_lon", "name")},
         name=name,
         bambu_metadata=not args.no_bambu_metadata,
+        features=not args.no_features, pegs=not args.no_pegs,
+        labels=not args.no_labels, magnets=not args.no_magnets,
     )
     for k, v in opts_extra.items():
         if k in fields:
@@ -178,14 +195,20 @@ def main(argv=None) -> int:
     span_km = max((opts.max_lat - opts.min_lat) * M_PER_DEG_LAT,
                   (opts.max_lon - opts.min_lon) * M_PER_DEG_LAT
                   * math.cos(math.radians((opts.min_lat + opts.max_lat) / 2))) / 1000
+    if opts.footprint and not opts.insert_height_m:
+        sys.exit("--footprint needs --insert_height_m (and ideally --insert_height_source)")
+    if opts.footprint and not opts.insert_height_source:
+        logging.warning("No source given for the insert height; it will be "
+                        "recorded as unsourced in the manifest.")
     if span_km > 3.0:
         logging.warning("Area is %.1f km across: above ~3 km, buildings stop "
                         "being legible at A1 plate size.", span_km)
 
     m = build(opts)
     st = m["stats"]
-    print(json.dumps({"3mf": m["outputs"]["3mf"], "stl": m["outputs"]["stl"],
-                      "objects": {k: v.get("count", v["faces"]) for k, v in m["objects"].items()},
+    print(json.dumps({"outputs": {k: v for k, v in m["outputs"].items() if v},
+                      "print_objects": {k: v["faces"] for k, v in m["print_objects"].items()},
+                      "features": {k: sum(v.values()) for k, v in m["features"].items()},
                       "overhang_faces": st["overhang_faces"],
                       "support_free": st["support_free"],
                       "disclosure": m["disclosure"],

@@ -15,6 +15,12 @@ Sources marked *to verify* must be checked before the first public release.
 | Overture Maps (opt-in only) | buildings / roads fallback | mixed by theme | © Overture Maps Foundation; © OpenStreetMap contributors | to verify |
 | Curated sites (`data/sites/`) | site metadata | CC BY 4.0 | Hyperscale Landscapes contributors | — |
 
+## Fonts
+
+| Font | Used for | Licence | Status |
+|---|---|---|---|
+| Aileron Regular (dotcolon.net), embedded in Pillow | text engraved on the model base | CC0 1.0 (believed) | to verify |
+
 ## Not integrated: licence unclear (for review)
 
 These sources are listed in the brief but are **not used**. They will stay out of the code
