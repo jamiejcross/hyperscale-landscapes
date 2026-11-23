@@ -1,0 +1,6 @@
+{
+  "schema": "hyperscale-landscapes/sites-index@1",
+  "sites": [
+    { "id": "auchtertool-cato", "name": "Auchtertool (Cato), Fife", "status": null, "file": "auchtertool-cato.geojson" }
+  ]
+}

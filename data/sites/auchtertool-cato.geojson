@@ -1,0 +1,22 @@
+{
+  "type": "Feature",
+  "geometry": null,
+  "properties": {
+    "id": "auchtertool-cato",
+    "name": "Auchtertool (Cato), Fife",
+    "developer": null,
+    "local_authority": "Fife Council",
+    "status": null,
+    "planning_refs": [],
+    "stated_capacity_mw": null,
+    "stated_height_m": null,
+    "stated_floor_area_m2": null,
+    "footprint_precision": null,
+    "massing_source": null,
+    "sources": [],
+    "last_verified": null,
+    "licence": "CC-BY-4.0",
+    "notes": "No footprint and no insert until a sourced footprint exists (decided by JC, 23 Nov 2026). model_bbox is the study area of JC's Mossmorran/Auchtertool terrain build (Nov 2026); it is a modelling extent, not a site boundary.",
+    "model_bbox": { "min_lat": 56.09158, "max_lat": 56.10642, "min_lon": -3.30543, "max_lon": -3.24569 }
+  }
+}

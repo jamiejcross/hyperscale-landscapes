@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use Hyperscale Landscapes, please cite it as below."
+title: "Hyperscale Landscapes: an open-source terrain toolkit for data centre organising"
+type: software
+license: GPL-3.0-or-later
+repository-code: "https://github.com/jamiejcross/hyperscale-landscapes"
+authors:
+  - family-names: Cross
+    given-names: Jamie
+    affiliation: University of Glasgow
+    orcid: "https://orcid.org/0000-0002-0721-0786"
+  - family-names: Nading
+    given-names: Alex
+    affiliation: Cornell University
+    orcid: "https://orcid.org/0000-0002-1731-321X"
+keywords: [data centres, hyperscale, terrain, 3D printing, OpenStreetMap, Scotland, community organising]

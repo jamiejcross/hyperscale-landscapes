@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+build/
+dist/
+# Outputs and caches (never commit builds; publish large files as release assets)
+output/
+cache/
+*.3mf
+*.stl
+!examples/**/*.3mf
+!examples/**/*.stl
+# OS
+.DS_Store

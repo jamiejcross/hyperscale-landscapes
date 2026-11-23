@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hyperscale-landscapes"
+dynamic = ["version"]
+description = "3D-printable terrain models and digital artefacts for communities near proposed hyperscale data centres"
+readme = "README.md"
+license = "GPL-3.0-or-later"
+requires-python = ">=3.10"
+authors = [{ name = "Jamie Cross" }, { name = "Alex Nading" }]
+dependencies = [
+  "numpy>=1.24",
+  "scipy>=1.10",
+  "shapely>=2.0",
+  "trimesh>=4.0",
+  "networkx",
+  "mapbox_earcut>=1.0",
+  "triangle>=20230923",   # constrained Delaunay; the earcut shim is a last resort
+  "manifold3d>=2.4",
+  "fast_simplification",
+  "pyshp>=2.3",
+  "platformdirs>=3",
+]
+
+[project.optional-dependencies]
+uk = ["rasterio>=1.3", "pyproj>=3.5"]          # Scottish LiDAR, Copernicus COG reads
+overture = ["duckdb>=1.0"]
+render = ["playwright>=1.45"]
+dev = ["pytest>=8", "pyflakes", "check-jsonschema", "lxml"]
+
+[project.scripts]
+hyperscale = "hyperscale_landscapes.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "hyperscale_landscapes.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["hyperscale_landscapes*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["network: needs internet (skipped in CI)", "slow: full-size builds"]
