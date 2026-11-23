@@ -16,15 +16,21 @@ references. This toolkit turns a site into evidence people can hold and share:
 Every model and image states its data sources and its vertical
 exaggeration, because these are used as evidence.
 
-> **Status: early development (Phase 2 of 7).** The Python command-line tool
-> builds multi-colour print files with power, residue and receptor layers. The browser app, the digital artefacts and
-> the beginners' guides are still to come. See [PLAN.md](PLAN.md).
+> **Status: early development (Phase 3 of 7).** The browser app and the Python
+> command-line tool both build multi-colour print files with power, residue and
+> receptor layers. The digital artefacts (GIFs, images, viewers)
+> and the beginners' guides are still to come. See [PLAN.md](PLAN.md).
 
 ## For organisers
 
-You will not need to install anything. The browser app (coming in Phase 3)
-will run entirely in your browser. Until then, ask a maker or researcher to
-run the command-line tool for you.
+You don't need to install anything. Open the web app, pick a curated site or
+draw an area, preview it in 3D, and download a print file. It all runs in
+your browser. The browser's print files are lower resolution than the
+command-line tool's. For exhibitions or planning hearings, ask a maker or
+researcher to run the command-line tool.
+
+To run the web app locally: `python3 -m http.server --directory web`, then open
+<http://localhost:8000>.
 
 ## For technical users
 

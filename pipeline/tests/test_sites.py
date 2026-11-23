@@ -22,3 +22,16 @@ def test_no_personal_data_fields():
 def test_auchtertool_has_no_invented_footprint():
     f = json.loads((DATA / "auchtertool-cato.geojson").read_text())
     assert f["geometry"] is None        # no footprint until sourced (JC, 23 Nov 2026)
+
+
+def test_curated_bundles_are_small_and_valid():
+    import gzip
+    idx = json.loads((DATA / "index.json").read_text())
+    for s in idx["sites"]:
+        if not s.get("bundle"):
+            continue
+        p = DATA / s["bundle"]
+        assert p.stat().st_size < 5_000_000, s["id"]
+        b = json.loads(gzip.decompress(p.read_bytes()))
+        assert b["schema"] == "hyperscale-landscapes/site-bundle@1"
+        assert b["osm"]["elements"] and b["elevation"]["tiles"]

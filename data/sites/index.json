@@ -1,6 +1,13 @@
 {
   "schema": "hyperscale-landscapes/sites-index@1",
   "sites": [
-    { "id": "auchtertool-cato", "name": "Auchtertool (Cato), Fife", "status": null, "file": "auchtertool-cato.geojson" }
+    {
+      "id": "auchtertool-cato",
+      "name": "Auchtertool (Cato), Fife",
+      "status": null,
+      "file": "auchtertool-cato.geojson",
+      "bundle": "auchtertool-cato.bundle.json.gz",
+      "bundle_fetched": "2026-11-23"
+    }
   ]
 }

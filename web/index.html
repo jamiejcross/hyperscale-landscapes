@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hyperscale Landscapes</title>
+<meta name="description" content="Make 3D-printable models and images of the landscape around a proposed data centre. Runs entirely in your browser.">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M2 26 L11 12 L17 20 L22 14 L30 26Z' fill='%238B7355'/%3E%3Crect x='18' y='19' width='8' height='7' fill='%23D55E00'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="css/app.css">
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/three.module.min.js",
+  "three/addons/": "./vendor/three/addons/"
+} }
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site">
+  <h1 data-i18n="app.title">Hyperscale Landscapes</h1>
+  <p data-i18n="app.tagline"></p>
+</header>
+
+<main id="main">
+  <section class="step" id="pick" aria-labelledby="pick-h">
+    <h2 id="pick-h" data-i18n="step.pick"></h2>
+    <div class="pick-grid">
+      <div class="pick-controls">
+        <fieldset>
+          <legend data-i18n="pick.sites"></legend>
+          <ul id="sites" class="sites"></ul>
+          <p class="hint" data-i18n="pick.sites.help"></p>
+        </fieldset>
+        <form id="search" class="row" role="search">
+          <label for="q" data-i18n="pick.search"></label>
+          <div class="inline"><input id="q" type="search" autocomplete="off" required><button data-i18n="pick.search.button"></button></div>
+          <p class="hint" data-i18n="pick.search.privacy"></p>
+          <ul id="results" class="results" aria-live="polite"></ul>
+        </form>
+        <fieldset>
+          <legend data-i18n="pick.draw"></legend>
+          <div class="inline">
+            <button type="button" id="draw-box" data-i18n="pick.draw.box"></button>
+            <button type="button" id="draw-poly" data-i18n="pick.draw.polygon"></button>
+            <button type="button" id="draw-finish" data-i18n="pick.draw.finish" hidden></button>
+          </div>
+        </fieldset>
+        <div class="row">
+          <label for="upload" data-i18n="pick.upload"></label>
+          <input id="upload" type="file" accept=".geojson,.json,.kml,.kmz">
+          <p class="hint" data-i18n="pick.upload.help"></p>
+        </div>
+        <details>
+          <summary data-i18n="pick.coords"></summary>
+          <form id="coords" class="coords">
+            <label>South <input name="minLat" type="number" step="any" required></label>
+            <label>North <input name="maxLat" type="number" step="any" required></label>
+            <label>West <input name="minLon" type="number" step="any" required></label>
+            <label>East <input name="maxLon" type="number" step="any" required></label>
+            <button data-i18n="pick.coords.apply"></button>
+          </form>
+        </details>
+      </div>
+      <div id="map" class="map" aria-label="Map for choosing an area"></div>
+    </div>
+    <p id="area" class="status" aria-live="polite"></p>
+  </section>
+
+  <section class="step" id="size" aria-labelledby="size-h">
+    <h2 id="size-h" data-i18n="step.size"></h2>
+    <form id="options" class="options">
+      <label><span data-i18n="size.print"></span>
+        <select name="printSize"><option value="150" selected>150 mm</option><option value="200">200 mm</option><option value="120">120 mm</option></select></label>
+      <label><span data-i18n="size.exag"></span>
+        <select name="zExag"><option value="1">×1 (true)</option><option value="1.5">×1.5</option><option value="2" selected>×2</option><option value="3">×3</option></select></label>
+      <label><span data-i18n="size.preset"></span>
+        <select name="preset" id="preset"></select></label>
+      <p class="hint" id="exag-note"></p>
+      <fieldset class="insert">
+        <legend data-i18n="insert.legend"></legend>
+        <p class="hint" data-i18n="insert.help"></p>
+        <div class="inline">
+          <button type="button" id="draw-footprint">Draw footprint</button>
+          <label class="file">Upload footprint <input id="footprint-file" type="file" accept=".geojson,.json,.kml,.kmz"></label>
+          <button type="button" id="clear-footprint" hidden>Remove</button>
+        </div>
+        <label><span data-i18n="insert.height"></span> <input name="insertHeight" type="number" min="1" max="200" step="0.5"></label>
+        <label><span data-i18n="insert.source"></span> <input name="insertSource" type="text" placeholder="e.g. Planning statement, p. 12"></label>
+        <label><span data-i18n="insert.precision"></span>
+          <select name="precision">
+            <option value="approximate" data-i18n="insert.precision.approximate"></option>
+            <option value="digitised from images" data-i18n="insert.precision.digitised"></option>
+            <option value="exact from plans" data-i18n="insert.precision.exact"></option>
+          </select></label>
+        <label><span data-i18n="insert.ref"></span> <input name="planningRef" type="text"></label>
+      </fieldset>
+      <button id="build" class="primary" data-i18n="build.button" disabled></button>
+      <p id="build-status" class="status" role="status" aria-live="polite"></p>
+    </form>
+  </section>
+
+  <section class="step" id="preview" aria-labelledby="preview-h" hidden>
+    <h2 id="preview-h" data-i18n="step.preview"></h2>
+    <div class="preview-grid">
+      <div id="view" class="view"></div>
+      <aside class="layers">
+        <h3 data-i18n="preview.layers"></h3>
+        <ul id="layer-list"></ul>
+        <h3 data-i18n="preview.views"></h3>
+        <div class="inline">
+          <button type="button" data-view="oblique" data-i18n="view.oblique"></button>
+          <button type="button" data-view="top" data-i18n="view.top"></button>
+          <button type="button" data-view="low" data-i18n="view.low"></button>
+        </div>
+        <label class="check"><input type="checkbox" id="spin"> <span data-i18n="view.spin"></span></label>
+      </aside>
+    </div>
+    <p id="caption" class="caption"></p>
+  </section>
+
+  <section class="step" id="export" aria-labelledby="export-h" hidden>
+    <h2 id="export-h" data-i18n="step.export"></h2>
+    <div class="inline downloads">
+      <button type="button" id="dl-3mf" class="primary" data-i18n="export.3mf"></button>
+      <button type="button" id="dl-stl" data-i18n="export.stl"></button>
+      <button type="button" id="dl-insert" data-i18n="export.insert" hidden></button>
+    </div>
+    <p class="hint" data-i18n="export.3mf.help"></p>
+    <p class="note" data-i18n="export.lowres"></p>
+    <p id="pauses" class="hint"></p>
+    <p><a href="https://github.com/jamiejcross/hyperscale-landscapes/tree/main/docs" data-i18n="export.newprint"></a></p>
+  </section>
+</main>
+
+<footer class="site">
+  <p><span data-i18n="footer.attr"></span> · <a href="privacy.html" data-i18n="footer.privacy"></a> ·
+     <a href="https://github.com/jamiejcross/hyperscale-landscapes/blob/main/DATA_LICENCES.md" data-i18n="footer.sources"></a> ·
+     <a href="https://github.com/jamiejcross/hyperscale-landscapes" data-i18n="footer.code"></a></p>
+</footer>
+<script src="vendor/leaflet/leaflet.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -12,8 +12,30 @@ Sources marked *to verify* must be checked before the first public release.
 | Copernicus DEM GLO-30 | elevation (global default) | Copernicus DEM licence | Copernicus DEM GLO-30 © DLR e.V. 2010–2014 and © Airbus Defence and Space GmbH 2014–2018, provided under COPERNICUS by the European Union and ESA | to verify |
 | Scottish Public Sector LiDAR | elevation (Scotland) | OGL v3.0 | Contains public sector information licensed under the Open Government Licence v3.0 | to verify |
 | GSHHG (Wessel & Smith) | coastline | LGPL 3.0 | Coastline: GSHHG (Wessel & Smith) | to verify |
+| AWS Terrain Tiles (Mapzen / tilezen) | elevation (browser tier) | composite: SRTM and GMTED2010 (public domain, USGS), ETOPO1 (public domain, NOAA), UK Environment Agency LiDAR (OGL v3) | Elevation: Mapzen Terrain Tiles (SRTM and GMTED2010 courtesy of the U.S. Geological Survey; ETOPO1, NOAA; UK: © Environment Agency 2015) | to verify: which source covers Scotland (the joerd attribution page does not say) |
 | Overture Maps (opt-in only) | buildings / roads fallback | mixed by theme | © Overture Maps Foundation; © OpenStreetMap contributors | to verify |
 | Curated sites (`data/sites/`) | site metadata | CC BY 4.0 | Hyperscale Landscapes contributors | — |
+
+## Services used by the browser app
+
+| Service | Use | Terms |
+|---|---|---|
+| OpenStreetMap tiles | background map in the area picker | OSMF Tile Usage Policy (attribution shown; light use) |
+| Nominatim | place search, on submit only | Nominatim Usage Policy (max 1 request/s, no autocomplete) |
+| Overpass API | features for drawn areas | public instances; polite rate limit (1 request per 1.5 s) |
+
+## Bundled software (web/vendor)
+
+| Library | Version | Licence |
+|---|---|---|
+| three.js | 0.170.0 | MIT |
+| Leaflet | 1.9.4 | BSD-2-Clause |
+| fflate | 0.8.2 | MIT |
+| earcut | 3.0.1 | ISC |
+| @tmcw/togeojson | 5.8.1 | BSD-2-Clause |
+| gifenc | 1.0.3 | MIT |
+
+Licence texts are in `web/vendor/licences/`.
 
 ## Fonts
 

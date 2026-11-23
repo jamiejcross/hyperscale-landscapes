@@ -1,0 +1,24 @@
+[out:json][timeout:180];
+(
+  way["building"]({{bbox}});
+  way["highway"]({{bbox}});
+  way["waterway"~"^(river|canal|stream|drain|ditch)$"]({{bbox}});
+  nwr["natural"="water"]({{bbox}});
+  nwr["water"]({{bbox}});
+  nwr["power"]({{bbox}});
+  nwr["construction:power"]({{bbox}});
+  nwr["proposed:power"]({{bbox}});
+  nwr["generator:source"]({{bbox}});
+  nwr["plant:source"]({{bbox}});
+  way["railway"]({{bbox}});
+  way["disused:railway"]({{bbox}});
+  way["abandoned:railway"]({{bbox}});
+  nwr["historic"~"^(mine|mine_shaft|mine_adit|industrial|kiln|ruins|charcoal_pile|bunker)$"]({{bbox}});
+  nwr["man_made"~"^(spoil_heap|mineshaft|adit|works|gasometer|chimney|storage_tank|wastewater_plant|kiln|slurry_tank|silo)$"]({{bbox}});
+  nwr["landuse"]({{bbox}});
+  nwr["natural"~"^(wood|heath|scrub|wetland|grassland|bare_rock|scree|moor|fell)$"]({{bbox}});
+  nwr["amenity"~"^(school|kindergarten|college|university|hospital|clinic|doctors|prison|community_centre|place_of_worship|library|social_facility|nursing_home|childcare)$"]({{bbox}});
+  nwr["social_facility"]({{bbox}});
+  nwr["healthcare"]({{bbox}});
+);
+out tags geom({{bbox}});
