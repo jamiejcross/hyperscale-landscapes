@@ -14,6 +14,12 @@ proposed data centres. Accuracy and care matter more than speed.
 - **Disclose exaggeration.** Any export path you add must carry the caption
   and attribution (see `provenance.py` and `exaggeration_note`).
 - **British English** in code comments, the UI and the docs.
+- **Neutral, descriptive wording** in layer texts, captions and the UI. State
+  what the data shows and what it can affect; avoid value judgements and
+  arguments ("not empty land", "matter most"). Give figures only with a
+  source.
+- **Scots terms, glossed on first use** for readers outside Scotland, e.g.
+  "bings (spoil heaps)", "burns (streams)".
 
 ## Suggesting a site
 

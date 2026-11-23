@@ -1,85 +1,132 @@
 {
   "schema": "hyperscale-landscapes/layers@1",
-  "note": "Single registry shared by the Python pipeline and the web app. 'why' texts are drafts awaiting JC's review (status field). Screen colours start from the Okabe–Ito colour-blind-safe set; see tests/test_palette.py.",
+  "note": "Single registry shared by the Python pipeline and the web app. 'why' texts reviewed by JC (23 Nov 2026); keep them neutral and descriptive, and gloss Scots terms on first use, e.g. 'bings (spoil heaps)'. Screen colours start from the Okabe–Ito colour-blind-safe set; see tests/test_palette.py.",
   "layers": [
     {
-      "id": "terrain", "name": "Terrain",
-      "colour_screen": "#B9A888", "print_default": "#8B7355",
-      "why": "The shape of the land decides where water runs, what can be seen from where, and how much earthmoving a large flat building platform would need.",
-      "why_status": "draft — needs JC review",
-      "sources": ["elevation"]
+      "id": "terrain",
+      "name": "Terrain",
+      "colour_screen": "#B9A888",
+      "print_default": "#8B7355",
+      "why": "The shape of the land determines where water runs, what can be seen from where, and how much earthmoving a large flat building platform would need.",
+      "why_status": "reviewed by JC, 23 Nov 2026",
+      "sources": [
+        "elevation"
+      ]
     },
     {
-      "id": "water", "name": "Water",
-      "colour_screen": "#0072B2", "print_default": "#4488CC",
-      "why": "Data centres need water for cooling and change how rain drains from a site. Rivers, burns, ponds and reservoirs show where that water would come from and go to.",
-      "why_status": "draft — needs JC review",
-      "sources": ["water", "coastline"]
+      "id": "water",
+      "name": "Water",
+      "colour_screen": "#0072B2",
+      "print_default": "#4488CC",
+      "why": "Many data centres use water for cooling, and any large site changes how rain drains from the land. Rivers, burns (streams), ponds and reservoirs show where water would come from and go to.",
+      "why_status": "reviewed by JC, 23 Nov 2026",
+      "sources": [
+        "water",
+        "coastline"
+      ]
     },
     {
-      "id": "buildings", "name": "Buildings",
-      "colour_screen": "#D9D9D9", "print_default": "#C8C8C8",
-      "why": "Footprints and heights of existing buildings give a sense of scale against which a proposed facility can be judged.",
-      "why_status": "draft — needs JC review",
-      "sources": ["buildings"]
+      "id": "buildings",
+      "name": "Buildings",
+      "colour_screen": "#D9D9D9",
+      "print_default": "#C8C8C8",
+      "why": "Footprints and heights of existing buildings give a sense of scale against which a proposed facility can be judged. Many heights are estimates.",
+      "why_status": "reviewed by JC, 23 Nov 2026",
+      "sources": [
+        "buildings"
+      ]
     },
     {
-      "id": "roads", "name": "Roads",
-      "colour_screen": "#555555", "print_default": "#3A3A3A",
+      "id": "roads",
+      "name": "Roads",
+      "colour_screen": "#555555",
+      "print_default": "#3A3A3A",
       "why": "Roads carry construction traffic and connect a site to the places around it.",
-      "why_status": "draft — needs JC review",
-      "sources": ["roads"]
+      "why_status": "reviewed by JC, 23 Nov 2026",
+      "sources": [
+        "roads"
+      ]
     },
     {
-      "id": "rail", "name": "Railways",
-      "colour_screen": "#000000", "print_default": "#3A3A3A",
-      "disused_style": "dashed", "colour_screen_disused": "#8C6D46",
-      "why": "Working and disused railways trace earlier industries, such as coal, oil and steel. Their routes often decide where later development goes.",
-      "why_status": "draft — needs JC review",
-      "sources": ["features"]
+      "id": "rail",
+      "name": "Railways",
+      "colour_screen": "#000000",
+      "print_default": "#3A3A3A",
+      "disused_style": "dashed",
+      "colour_screen_disused": "#8C6D46",
+      "why": "Working and disused railways trace earlier industries, such as coal, oil and steel, and their routes have shaped where later development went.",
+      "why_status": "reviewed by JC, 23 Nov 2026",
+      "sources": [
+        "features"
+      ]
     },
     {
-      "id": "power", "name": "Power",
-      "colour_screen": "#E69F00", "print_default": "#F28C28",
+      "id": "power",
+      "name": "Power",
+      "colour_screen": "#E69F00",
+      "print_default": "#F28C28",
       "proposed_style": "hatched-outline",
-      "why": "Substations, high-voltage lines, battery storage and generators often explain why a site is chosen. A data centre's demand for electricity is measured in tens or hundreds of megawatts.",
-      "why_status": "draft — needs JC review",
-      "sources": ["features"]
+      "why": "Substations, high-voltage lines, battery storage and generators often explain why a site is chosen. Large data centres can draw tens to hundreds of megawatts.",
+      "why_status": "reviewed by JC, 23 Nov 2026",
+      "sources": [
+        "features"
+      ]
     },
     {
-      "id": "residues", "name": "Industrial residues",
-      "colour_screen": "#CC79A7", "print_default": "#6E4B6B",
-      "why": "Mines, bings, quarries, landfill and old works are what earlier industries left behind. They are part of the landscape, not empty land, and they can affect ground stability and contamination.",
-      "why_status": "draft — needs JC review",
-      "sources": ["features"]
+      "id": "residues",
+      "name": "Industrial residues",
+      "colour_screen": "#CC79A7",
+      "print_default": "#6E4B6B",
+      "why": "Mines, bings (spoil heaps), quarries, landfill and old works are what earlier industries left behind. They are part of the landscape and can affect ground stability and contamination.",
+      "why_status": "reviewed by JC, 23 Nov 2026",
+      "sources": [
+        "features"
+      ]
     },
     {
-      "id": "receptors", "name": "Schools, care and community",
-      "colour_screen": "#56B4E9", "print_default": "#2E8B57",
-      "why": "Schools, care homes, hospitals and community buildings are where noise, light, traffic and air quality matter most. Only the type of building is shown, never names or addresses of homes.",
-      "why_status": "draft — needs JC review",
-      "sources": ["features", "buildings"]
+      "id": "receptors",
+      "name": "Schools, care and community",
+      "colour_screen": "#56B4E9",
+      "print_default": "#2E8B57",
+      "why": "Planning assessments treat schools, care homes, hospitals and community buildings as sensitive to noise, light, traffic and air quality. Only the type of building is shown, never names or addresses of homes.",
+      "why_status": "reviewed by JC, 23 Nov 2026",
+      "sources": [
+        "features",
+        "buildings"
+      ]
     },
     {
-      "id": "landcover", "name": "Land cover",
-      "colour_screen": "#A6C48A", "print": false,
-      "why": "Farmland, woodland, heath and industrial ground together describe a worked landscape, neither an idyll nor a wasteland.",
-      "why_status": "draft — needs JC review",
-      "sources": ["features"]
+      "id": "landcover",
+      "name": "Land cover",
+      "colour_screen": "#A6C48A",
+      "print": false,
+      "why": "Farmland, woodland, heath and industrial ground show how the land is used now.",
+      "why_status": "reviewed by JC, 23 Nov 2026",
+      "sources": [
+        "features"
+      ]
     },
     {
-      "id": "planning", "name": "Planning allocations",
-      "colour_screen": "#F0E442", "print": false,
-      "why": "Local development plans zone land, for example as 'employment land'. Seeing those zones shows how a site came to be described as available.",
-      "why_status": "draft — needs JC review",
-      "sources": ["upload"]
+      "id": "planning",
+      "name": "Planning allocations",
+      "colour_screen": "#F0E442",
+      "print": false,
+      "why": "Local development plans zone land, for example as 'employment land'. Seeing those zones shows how the plan describes the site.",
+      "why_status": "reviewed by JC, 23 Nov 2026",
+      "sources": [
+        "upload"
+      ]
     },
     {
-      "id": "site", "name": "Proposed data centre",
-      "colour_screen": "#D55E00", "print_default": "#FFFFFF",
-      "why": "The proposed footprint and its stated height, shown as a removable block. Its precision is stated on every export.",
-      "why_status": "draft — needs JC review",
-      "sources": ["site"]
+      "id": "site",
+      "name": "Proposed data centre",
+      "colour_screen": "#D55E00",
+      "print_default": "#FFFFFF",
+      "why": "The proposed footprint and its stated height, shown as a removable block. Heights are as stated by the developer, or an estimate whose source is recorded. Its precision is stated on every export.",
+      "why_status": "reviewed by JC, 23 Nov 2026",
+      "sources": [
+        "site"
+      ]
     }
   ]
 }
