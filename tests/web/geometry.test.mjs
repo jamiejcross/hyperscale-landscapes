@@ -1,7 +1,7 @@
 // Node tests for the browser geometry (run: node --test tests/web).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { slabFromMask, extrude, concat } from '../../web/js/geom/model.js';
+import { slabFromMask, extrude, concat, clipRing } from '../../web/js/geom/model.js';
 import { classify, status } from '../../web/js/data/overpass.js';
 
 // Watertight = every edge used exactly twice, once in each direction.
@@ -70,4 +70,18 @@ test('diagonal-only contacts are bridged so slabs stay watertight', async () => 
   assert.equal(m[1], 0, 'never takes a cell owned by another layer');
   const s = slabFromMask(grid, m, () => 1, () => 0);
   assert.ok(watertight(s));
+});
+
+test('clipRing splits an outline that leaves the margin and comes back', () => {
+  // Both legs of a U cross the margin line y = 1.
+  const U = [[0, 0], [1.5, 0], [1.5, 3], [2.5, 3], [2.5, 0], [4, 0], [4, 4], [0, 4]];
+  const out = clipRing(U, 1, 1, 10, 10);
+  assert.equal(out.length, 1);                       // the bridge at the top keeps it one piece
+  const W = clipRing([[2, -1], [3, 3], [4, -1], [5, 3], [6, -1]], -10, 0, 10, 10);
+  assert.equal(W.length, 2);                         // a W crossing y = 0 becomes two pieces
+  for (const r of W) {
+    assert.ok(r.every(([, y]) => y >= 0));
+    assert.ok(watertight(extrude([r], 0, 1)));
+  }
+  assert.equal(clipRing([[0, 0], [0.5, 0], [0.5, 0.5]], 1, 1, 10, 10).length, 0);
 });

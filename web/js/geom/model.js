@@ -28,6 +28,7 @@ export const MM = {
   raise: { water: 0.3, roads: 0.5, power: 0.4, powerLine: 0.35, rail: 0.4, railDisused: 0.25, residues: 0.3 },
   peg: 1.2, turbinePeg: 1.4, outline: 0.6, pointDisc: 1.6,
   buildingMin: 0.6, buildingBury: 1.0,
+  edge: 0.5,            // terrain-only margin round the model: no layer reaches the sides
   floorMin: 1.0,
   engrave: 0.4,
   waterDepth: 0.8,      // terrain is cut this far below sea and loch level
@@ -489,13 +490,22 @@ export function buildModel({ bbox, elev, osm, opts }) {
     const outer = rings[0];
     const inside = outer.some(([x, y]) => x >= 0 && y >= 0 && x <= grid.Wmm && y <= grid.Hmm);
     if (!inside || Math.abs(ringArea(outer)) < 0.04) continue;      // < 0.2 x 0.2 mm
-    // clip to the plate by clamping (buildings at the edge are rare and small)
-    const clamped = rings.map(r => r.map(([x, y]) => [Math.min(Math.max(x, 0), grid.Wmm), Math.min(Math.max(y, 0), grid.Hmm)]));
+    // Clip to the plate, inside the terrain-only edge margin, so a building's
+    // buried base never shows on the side of the model. A hole that reaches
+    // the margin is dropped (the courtyard is filled) rather than opened up.
+    const e = MM.edge, ok = r => r.length >= 3 && Math.abs(ringArea(r)) >= 0.04;
+    const inRect = r => r.every(([x, y]) => x > e && y > e && x < grid.Wmm - e && y < grid.Hmm - e);
+    const holes = rings.slice(1).filter(r => inRect(r) && ok(r));
+    const pieces = clipRing(outer, e, e, grid.Wmm - e, grid.Hmm - e).filter(ok);
+    if (!pieces.length) continue;
     let cxm = 0, cym = 0; outer.forEach(([x, y]) => { cxm += x; cym += y; }); cxm /= outer.length; cym /= outer.length;
     const t = b.tags || {};
     const receptor = b.receptor || RECEPTOR_BUILDINGS.has(t.building) || receptorAreas.some(rs => pointInPolygon(cxm, cym, rs))
-      || receptorPoints.some(([px, py]) => pointInPolygon(px, py, clamped));
-    footprints.push({ rings: clamped, tags: t, receptor, centre: [cxm, cym] });
+      || receptorPoints.some(([px, py]) => pointInPolygon(px, py, rings));
+    for (const piece of pieces) {
+      const own = holes.filter(h => pointInPolygon(h[0][0], h[0][1], [piece]));
+      footprints.push({ rings: [piece, ...own], tags: t, receptor, centre: [cxm, cym] });
+    }
     fillPolys(bCanvas, grid, { type: 'Polygon', coordinates: b.geometry.coordinates });
   }
   const buildingMask = maskOf(bCanvas);
@@ -550,6 +560,12 @@ export function buildModel({ bbox, elev, osm, opts }) {
   const masks = {};
   const order = ['water', 'roads', 'power', 'powerLine', 'rail', 'railDisused', 'residues'];
   const taken = new Uint8Array(cx * cy);
+  // Keep a terrain-only margin round the edge. A layer that reached the edge
+  // would share the side plane with the terrain and flicker through it.
+  const em = Math.max(1, Math.round(MM.edge / grid.dx));
+  for (let j = 0; j < cy; j++) for (let i = 0; i < cx; i++) {
+    if (i < em || j < em || i >= cx - em || j >= cy - em) taken[j * cx + i] = 3;
+  }
   const pegcut = layerCanvas.pegcut ? maskOf(layerCanvas.pegcut) : null;
   for (let k = 0; k < taken.length; k++) {
     if (buildingMask[k]) taken[k] = 2;                   // buildings punch through overlays
@@ -651,6 +667,69 @@ export function buildModel({ bbox, elev, osm, opts }) {
 }
 
 function clamp(v, a, b) { return Math.min(Math.max(v, a), b); }
+
+// Clip a polygon ring to an axis-aligned rectangle. Returns zero or more
+// simple rings: an outline that leaves the rectangle and comes back (a U
+// crossing the edge) splits into separate pieces rather than being joined
+// along the edge, which would leave overlapping walls.
+export function clipRing(ring, x0, y0, x1, y1) {
+  let rs = [ring.slice()];
+  if (rs[0].length > 1 && rs[0][0][0] === rs[0].at(-1)[0] && rs[0][0][1] === rs[0].at(-1)[1]) rs[0].pop();
+  for (const [axis, c, sign] of [[0, x0, 1], [0, x1, -1], [1, y0, 1], [1, y1, -1]]) {
+    rs = rs.flatMap(r => clipHalf(r, axis, c, sign));
+  }
+  return rs.map(tidyRing).filter(r => r.length >= 3);
+}
+
+// Keep the part of a ring where sign * (p[axis] - c) > 0. The ring's inside
+// runs are joined in pairs along the cut line: sorted along the line, the
+// crossings bound the stretches of the line that lie within the polygon.
+function clipHalf(ring, axis, c, sign) {
+  const u = p => sign * (p[axis] - c), n = ring.length;
+  const ins = ring.map(p => u(p) > 0);
+  if (ins.every(Boolean)) return [ring];
+  if (!ins.some(Boolean)) return [];
+  const cross = (a, b) => { const k = u(a) / (u(a) - u(b)), q = [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k]; q[axis] = c; return q; };
+  const s0 = ins.indexOf(false), runs = [];
+  let run = null;
+  for (let m = 1; m <= n; m++) {
+    const k = (s0 + m) % n, prev = ring[(k + n - 1) % n];
+    if (ins[k] && !run) run = { pts: [cross(prev, ring[k]), ring[k]] };
+    else if (ins[k]) run.pts.push(ring[k]);
+    else if (run) { run.pts.push(cross(prev, ring[k])); runs.push(run); run = null; }
+  }
+  const t = p => p[1 - axis], marks = [];
+  runs.forEach((r, i) => { marks.push({ i, end: false, t: t(r.pts[0]) }, { i, end: true, t: t(r.pts.at(-1)) }); });
+  marks.sort((a, b) => a.t - b.t);
+  const next = new Map();                         // run that ends here -> run that starts at its partner
+  for (let k = 0; k + 1 < marks.length; k += 2) {
+    const [a, b] = [marks[k], marks[k + 1]];
+    if (a.end === b.end) return [ring.filter((_, k) => ins[k])];   // not a simple ring; keep what is inside
+    next.set(a.end ? a.i : b.i, a.end ? b.i : a.i);
+  }
+  const out = [], used = new Set();
+  for (let i = 0; i < runs.length; i++) {
+    if (used.has(i)) continue;
+    const pts = [];
+    for (let r = i; !used.has(r); r = next.get(r)) { used.add(r); pts.push(...runs[r].pts); }
+    out.push(pts);
+  }
+  return out;
+}
+
+// Drop repeated and collinear points (including zero-width spurs).
+function tidyRing(pts) {
+  pts = pts.slice();
+  for (let changed = true; changed && pts.length >= 3;) {
+    changed = false;
+    for (let k = 0; k < pts.length && pts.length >= 3; k++) {
+      const A = pts[(k + pts.length - 1) % pts.length], B = pts[k], C = pts[(k + 1) % pts.length];
+      const cr = (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0]);
+      if (Math.abs(cr) < 1e-9) { pts.splice(k, 1); k--; changed = true; }
+    }
+  }
+  return pts.length >= 3 ? pts : [];
+}
 
 // ---------------------------------------------------------------------------
 // Group layers into print objects by preset
