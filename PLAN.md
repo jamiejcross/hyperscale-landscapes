@@ -8,7 +8,7 @@
 > - **No data-centre block.** The removable insert, recess, magnet holes, footprint inputs and before/after views are removed from both tiers. Reason: a block risks being inaccurate, and leaves a hole in the ground when lifted out. Models show the land as it is; the site is named in captions and marked on the map in step 1. (`geometry/insert.py` and its test are no longer called; kept pending JC's decision on deletion.)
 > - **Strictly black and white.** The vermilion spot colour is replaced by black in the page, captions, cross-sections and the offline viewer.
 > - **Default model area 3.2 × 1.6 km** (east–west × north–south), centred on each site's pin, so nearby villages fall inside.
-> - **Satellite drape default: EOX 2025** (CC BY-NC-SA 4.0), graded for legibility; the project is non-commercial. Land cover and EOX 2016 remain options.
+> - **Satellite drape default: EOX 2025** (CC BY-NC-SA 4.0), graded for legibility; the project is non-commercial. Land cover and contours are the other surfaces; EOX 2016 was removed (JC, 24 Nov 2026).
 > - **LiDAR terrain.** The Python tier reads every Scottish LiDAR programme from the public `srsp-open-data` bucket at 2 m, newest survey first, filling gaps from Copernicus 30 m. Curated-site bundles carry a 4 m LiDAR grid, so the browser uses LiDAR for them; custom areas in the browser still use Terrarium tiles.
 >
 > **Field style, 24 Nov 2026** (JC's brief, inspired by slabmaps.com's "field" look; no slab code used):

@@ -1,7 +1,6 @@
 // Optional satellite drape: EOxCloudless (Sentinel-2 cloudless mosaics by
 // EOX IT Services GmbH). Licences checked 24 Nov 2026; see DATA_LICENCES.md.
 //
-//   2016: CC BY 4.0. Anything made with it can be shared freely.
 //   2025: CC BY-NC-SA 4.0. Exports must carry the licence notice, and the
 //         people who receive them may not use them commercially (EOX counts
 //         councils and government agencies as commercial users).
@@ -16,11 +15,6 @@ const ZOOM = 14;   // ~5 m per pixel at Scottish latitudes; the data are 10 m
 export const SURFACES = {
   landcover: { label: 'Land cover (OpenStreetMap)', attribution: null },
   contours: { label: 'Contours (from elevation data)', attribution: null },
-  'eox-2016': {
-    label: 'Satellite, 2016 (free to share)', layer: 's2cloudless_3857', licence: 'CC BY 4.0',
-    attribution: 'Satellite: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2016 & 2017), CC BY 4.0',
-    note: 'Imagery from 2016–17, at 10 m: recent buildings and sites may not show.',
-  },
   'eox-2025': {
     label: 'Satellite, 2025 (non-commercial)', layer: 's2cloudless-2025_3857', licence: 'CC BY-NC-SA 4.0',
     attribution: 'Satellite: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2025), CC BY-NC-SA 4.0',

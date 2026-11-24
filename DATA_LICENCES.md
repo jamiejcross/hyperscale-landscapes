@@ -16,14 +16,14 @@ Sources marked *to verify* must be checked before the first public release.
 | Overture Maps (opt-in only) | buildings / roads fallback | mixed by theme | © Overture Maps Foundation; © OpenStreetMap contributors | to verify |
 | Curated sites (`data/sites/`) | site metadata | CC BY 4.0 | Hyperscale Landscapes contributors | — |
 
-## Imagery (checked 24 Nov 2026; EOX 2025 is the default drape, EOX 2016 and OSM land cover are options)
+## Imagery (checked 24 Nov 2026; EOX 2025 is the only satellite drape; OSM land cover and contours are the other surfaces)
 
 The tool's exports (PNG, GIF, offline HTML) are forwarded freely, so imagery
 must allow embedding in exported files and redistribution by end users.
 
 | Source | Licence | Browser use | In redistributed exports | Resolution | Verdict |
 |---|---|---|---|---|---|
-| EOxCloudless **2016** (tiles.maps.eox.at, layer `s2cloudless_3857`) | CC BY 4.0 | yes; no key; CORS ok; fair use | yes, attribution visibly embedded | 10 m (imagery from 2016–17) | **fully open option** |
+| EOxCloudless **2016** (tiles.maps.eox.at, layer `s2cloudless_3857`) | CC BY 4.0 | yes; no key; CORS ok; fair use | yes, attribution visibly embedded | 10 m (imagery from 2016–17) | **not offered** (removed by JC, 24 Nov 2026) |
 | EOxCloudless **2018–2025** (`s2cloudless-2025_3857` etc.) | CC BY-NC-SA 4.0 | yes; no key; CORS ok; non-commercial apps only | yes, with attribution + CC BY-NC-SA notice; recipients bound by NC and ShareAlike; EOX counts government/agency use as commercial | 10 m | **current imagery, with conditions** |
 | Copernicus Sentinel-2 (raw scenes) | EU Copernicus legal notice: free, full and open, incl. distribution | via AWS COGs (CORS ok) but single, often cloudy scenes | yes; "Contains modified Copernicus Sentinel data [year]" | 10 m | possible later; more engineering |
 | Esri World Imagery | proprietary (Esri Master Agreement E204) | works without a key, but keyless use not expressly permitted | static images arguably for account holders; embedding tiles in forwarded HTML doubtful; open licensing of exports conflicts with B.1(k) | ~0.3 m | **not for exports** |
