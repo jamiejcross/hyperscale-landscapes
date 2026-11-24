@@ -25,7 +25,6 @@ MODULES = {
     "hl/studio": "js/scene/studio.js",
     "hl/caption": "js/scene/caption.js",
     "hl/turntable": "js/scene/turntable.js",
-    "hl/beforeafter": "js/scene/beforeafter.js",
     "gifenc": "vendor/gifenc.js",
 }
 
@@ -128,8 +127,7 @@ def write_viewer(path, *, layer_meshes: dict, opts, preset: dict, features,
     imports = {}
     for spec, rel in MODULES.items():
         text = ((w / rel).read_text().replace("from './caption.js'", "from 'hl/caption'")
-                .replace("from './turntable.js'", "from 'hl/turntable'")
-                .replace("from './beforeafter.js'", "from 'hl/beforeafter'"))
+                .replace("from './turntable.js'", "from 'hl/turntable'"))
         imports[spec] = _data_url(text)
     html = (w / "viewer.html").read_text()
     faces = "".join(
