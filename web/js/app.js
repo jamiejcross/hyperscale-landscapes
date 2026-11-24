@@ -9,6 +9,7 @@ import { loadElevation, ATTRIBUTION as ELEV_ATTRIBUTION } from './data/elevation
 import { readBoundary } from './data/upload.js';
 import { buildModel, printObjects, pauseHeights } from './geom/model.js';
 import { createScene, landcoverCanvas } from './scene/scene.js';
+import { contourCanvas } from './scene/contours.js';
 import { SURFACES, imageryCanvas } from './data/imagery.js';
 import { mountStudio } from './scene/studio.js';
 import { buildViewer } from './export/viewer.js';
@@ -239,26 +240,30 @@ function altText(model, osm) {
     `${n('residues')} industrial residue features, ${n('rail', k => /disused/.test(k))} disused railways.`;
 }
 
-// ---------------- Surface: land cover or satellite ----------------
+// ---------------- Surface: land cover, contours or satellite ----------------
 for (const [id, s] of Object.entries(SURFACES)) $('surface').append(new Option(s.label, id, id === state.surface, id === state.surface));
 async function applySurface(id) {
   const { model, osm, opts, form } = state.model;
   const note = $('surface-note');
   state.surface = id;
-  // Dark roads disappear into a photograph; draw them light over satellite.
   const roads = state.layers.roads.colour_screen;
-  scene.setScreenColours({ roads: id === 'landcover' ? roads : '#f2f2f2' });
+  // Dark roads disappear into a photograph; draw them light over satellite.
+  scene.setScreenColours({ roads: SURFACES[id]?.layer ? '#f2f2f2' : roads });
   try {
     if (id === 'landcover') {
       scene.setDrape(state.drape = landcoverCanvas(model.grid, osm.features));
       note.textContent = '';
+    } else if (id === 'contours') {
+      const c = contourCanvas(model.grid, state.model.elev);
+      scene.setDrape(state.drape = c.canvas);
+      note.textContent = `Contours every ${c.interval} m; heavier line every ${c.indexInterval} m. Drawn from the elevation data used for the model.`;
     } else {
       note.textContent = 'Loading satellite imagery from EOX…';
       scene.setDrape(state.drape = await imageryCanvas(id, state.bbox, model.grid));
       note.textContent = SURFACES[id].note;
     }
   } catch (err) {
-    note.textContent = `Satellite imagery could not be loaded (${err.message}). Showing land cover instead.`;
+    note.textContent = `${id === 'contours' ? 'Contours' : 'Satellite imagery'} could not be ${id === 'contours' ? 'drawn' : 'loaded'} (${err.message}). Showing land cover instead.`;
     state.surface = 'landcover'; $('surface').value = 'landcover';
     scene.setScreenColours({ roads });
     scene.setDrape(state.drape = landcoverCanvas(model.grid, osm.features));

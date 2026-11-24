@@ -15,6 +15,7 @@ const ZOOM = 14;   // ~5 m per pixel at Scottish latitudes; the data are 10 m
 
 export const SURFACES = {
   landcover: { label: 'Land cover (OpenStreetMap)', attribution: null },
+  contours: { label: 'Contours (from elevation data)', attribution: null },
   'eox-2016': {
     label: 'Satellite, 2016 (free to share)', layer: 's2cloudless_3857', licence: 'CC BY 4.0',
     attribution: 'Satellite: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2016 & 2017), CC BY 4.0',
