@@ -24,7 +24,8 @@ const dataURL = text => `data:text/javascript;base64,${b64(new TextEncoder().enc
 
 // Relative imports cannot resolve from a data: URL, so point them at the map.
 const rewrite = text => text.replaceAll("from './caption.js'", "from 'hl/caption'")
-  .replaceAll("from './turntable.js'", "from 'hl/turntable'");
+  .replaceAll("from './turntable.js'", "from 'hl/turntable'")
+  .replaceAll("from './scene.js'", "from 'hl/scene'");
 
 export async function buildViewer({ model, legend, colours, printColours, caption, sub, drape, zExag, slug, alt }) {
   // Pack every non-empty layer into one gzipped buffer.

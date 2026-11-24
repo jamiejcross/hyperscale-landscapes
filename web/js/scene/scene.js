@@ -2,9 +2,14 @@
 // defined: the app preview, the standalone viewer and (Phase 4) every
 // rendered artefact use it, so styling is identical everywhere.
 //
-// Lighting and materials follow JC's Mossmorran viewer: room environment,
-// hemisphere fill, a warm soft-shadow sun from the south-west, soil strata
-// on the sides, clearcoat water, and a shadow-catcher ground.
+// Two looks share the same geometry, switched by setLook() without a rebuild:
+//   mossmorran (default) follows JC's Mossmorran viewer: room environment,
+//     hemisphere fill, a warm soft-shadow sun from the south-west, soil strata
+//     on the sides, clearcoat water, and a shadow-catcher ground.
+//   field: a flat-shaded diorama on white (presentation only: print files,
+//     sections and every factual layer are unchanged).
+// Each mesh keeps one material per look, made the first time that look is
+// shown and disposed with the model.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/RoomEnvironment.js';
@@ -19,6 +24,7 @@ export const LANDCOVER_COLOURS = {
   'natural:bare_rock': '#B3ADA4', 'natural:scree': '#B3ADA4',
 };
 const LAND_BASE = '#BDB08E';
+export const LOOKS = { mossmorran: 'Mossmorran', field: 'Field' };
 
 export function createScene(container) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -32,7 +38,8 @@ export function createScene(container) {
 
   const scene = new THREE.Scene();
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  const roomEnv = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environment = roomEnv;
   scene.environmentIntensity = 0.35;
   scene.background = gradient([[0, '#7fa6c9'], [0.55, '#c9d9e4'], [1, '#e9e4da']]);
 
@@ -69,7 +76,7 @@ export function createScene(container) {
   new ResizeObserver(resize).observe(container);
   resize();
 
-  const view = { az: 225, el: 32, strength: 3.0, fill: 1.0, heightScale: 1, fov: 28, background: 'sky', print: false };
+  const view = { az: 225, el: 32, strength: 3.0, fill: 1.0, heightScale: 1, fov: 28, background: 'sky', print: false, look: 'mossmorran' };
 
   // Sun: azimuth clockwise from north, height above the horizon; it warms
   // towards orange as it drops (as in the Mossmorran viewer).
@@ -79,7 +86,8 @@ export function createScene(container) {
     sun.position.set(Math.sin(az) * Math.cos(el) * r, Math.sin(el) * r, -Math.cos(az) * Math.cos(el) * r);
     sun.intensity = strength; hemi.intensity = fill;
     const warm = THREE.MathUtils.clamp((elDeg - 3) / 30, 0, 1);
-    sun.color.setRGB(1, 0.78 + 0.18 * warm, 0.58 + 0.33 * warm);
+    if (view.look === 'field') sun.color.set(0xffffff);      // field: neutral light, the colours are in the materials
+    else sun.color.setRGB(1, 0.78 + 0.18 * warm, 0.58 + 0.33 * warm);
     const sc = sun.shadow.camera;
     sc.left = sc.bottom = -span * 0.75; sc.right = sc.top = span * 0.75; sc.near = 1; sc.far = span * 6;
     sc.updateProjectionMatrix();
@@ -93,36 +101,76 @@ export function createScene(container) {
     return g;
   }
 
+  // ---- Materials, one set per look ----
+  let drapeTex = null;           // the land-cover or satellite drape, shared by both looks
+  const MAKE = {
+    mossmorran(mesh) {
+      const { kind, colour } = mesh.userData;
+      if (kind === 'terrain') return new THREE.MeshStandardMaterial({ map: drapeTex, color: drapeTex ? 0xffffff : LAND_BASE, roughness: 0.92 });
+      if (kind === 'terrain-sides') return new THREE.MeshStandardMaterial({ map: strataTexture(renderer), roughness: 0.96 });
+      if (kind === 'water') return new THREE.MeshPhysicalMaterial({ color: 0x24506a, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.6 });
+      return new THREE.MeshStandardMaterial({ color: colour, roughness: 0.8 });
+    },
+    // Field, first pass (step 1): flat Lambert stand-ins; toon shading,
+    // shaded slab walls and the ink pass replace these in the next steps.
+    field(mesh) {
+      const { kind, colour } = mesh.userData;
+      if (kind === 'terrain') return new THREE.MeshLambertMaterial({ map: drapeTex, color: drapeTex ? 0xffffff : LAND_BASE });
+      if (kind === 'terrain-sides') return new THREE.MeshLambertMaterial({ color: 0xf4f2ee });
+      if (kind === 'water') return new THREE.MeshLambertMaterial({ color: 0x7fbcc4, transparent: true, opacity: 0.5 });
+      return new THREE.MeshLambertMaterial({ color: colour });
+    },
+  };
+  function lookMaterial(mesh, look = view.look) {
+    const L = mesh.userData.looks;
+    if (!L[look]) {
+      L[look] = MAKE[look](mesh);
+      if (mesh.userData.override.color) L[look].color.set(mesh.userData.override.color);   // screen recolouring
+    }
+    return L[look];
+  }
+  // What a mesh shows: its print colour when print colours are on, else its look.
+  function applyMaterial(mesh) {
+    mesh.material = view.print && mesh.userData.printMaterial ? mesh.userData.printMaterial : lookMaterial(mesh);
+  }
+  function disposeMesh(mesh) {
+    mesh.geometry.dispose();
+    const mats = [...Object.values(mesh.userData.looks), mesh.userData.printMaterial].filter(Boolean);
+    for (const m of mats) {
+      for (const t of [m.map, m.gradientMap]) if (t && t !== drapeTex) t.dispose();
+      m.dispose();
+    }
+  }
+
   // layers: {id: mesh}; colours: {id: '#rrggbb'}; landcover: canvas or null
   function setModel({ layers, colours, landcover, grid }) {
-    for (const k of Object.keys(meshes)) { inner.remove(meshes[k]); meshes[k].geometry.dispose(); delete meshes[k]; }
+    for (const k of Object.keys(meshes)) { inner.remove(meshes[k]); disposeMesh(meshes[k]); delete meshes[k]; }
+    drapeTex?.dispose();
+    drapeTex = landcover ? canvasTexture(landcover, renderer) : null;
     span = Math.max(grid.Wmm, grid.Hmm);
     let zmax = 0;
+    const add = (id, g, kind, colour) => {
+      const mesh = new THREE.Mesh(g);
+      mesh.userData = { kind, colour, looks: {}, override: {} };
+      mesh.castShadow = kind !== 'water'; mesh.receiveShadow = true;
+      mesh.name = id;
+      applyMaterial(mesh);
+      inner.add(mesh); meshes[id] = mesh;
+      return mesh;
+    };
     for (const [id, m] of Object.entries(layers)) {
       if (!m || !m.indices.length) continue;
       const g = geometry(m);
-      let mat;
       if (id === 'terrain') {
-        // Top and bottom take the land-cover drape; the sides are split off
-        // into their own geometry with soil strata, as in the Mossmorran viewer.
+        // Top and bottom take the drape; the sides are split off into their
+        // own geometry (soil strata in the Mossmorran look).
         const { capsIdx, walls } = splitWalls(m);
         g.setIndex(new THREE.BufferAttribute(capsIdx, 1));
         g.setAttribute('uv', planarUV(m.positions, grid));
-        mat = new THREE.MeshStandardMaterial({ map: landcover ? canvasTexture(landcover, renderer) : null,
-          color: landcover ? 0xffffff : LAND_BASE, roughness: 0.92 });
-        const side = new THREE.Mesh(walls, new THREE.MeshStandardMaterial({ map: strataTexture(renderer), roughness: 0.96 }));
-        side.castShadow = side.receiveShadow = true; side.name = 'terrain-sides';
-        inner.add(side); meshes['terrain-sides'] = side;
-      } else if (id === 'water') {
-        mat = new THREE.MeshPhysicalMaterial({ color: 0x24506a, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.6 });
-      } else {
-        mat = new THREE.MeshStandardMaterial({ color: colours[id] || colours[id.replace('Disused', '')] || '#cccccc', roughness: 0.8 });
+        add('terrain-sides', walls, 'terrain-sides');
       }
-      const mesh = new THREE.Mesh(g, mat);
-      mesh.userData.mapMaterial = mat;
-      mesh.castShadow = id !== 'water'; mesh.receiveShadow = true;
-      mesh.name = id;
-      inner.add(mesh); meshes[id] = mesh;
+      const kind = id === 'terrain' || id === 'water' ? id : 'layer';
+      add(id, g, kind, colours[id] || colours[id.replace('Disused', '')] || '#cccccc');
       for (let k = 2; k < m.positions.length; k += 3) zmax = Math.max(zmax, m.positions[k]);
     }
     H = zmax;
@@ -136,10 +184,37 @@ export function createScene(container) {
   // Swap the drape on the land top (land cover or satellite) without rebuilding.
   function setDrape(canvas) {
     const m = meshes.terrain; if (!m) return;
-    m.material.map?.dispose();
-    m.material.map = canvas ? canvasTexture(canvas, renderer) : null;
-    m.material.color.set(canvas ? 0xffffff : LAND_BASE);
-    m.material.needsUpdate = true;
+    drapeTex?.dispose();
+    drapeTex = canvas ? canvasTexture(canvas, renderer) : null;
+    for (const mat of Object.values(m.userData.looks)) {
+      mat.map = drapeTex;
+      mat.color.set(canvas ? 0xffffff : LAND_BASE);
+      mat.needsUpdate = true;
+    }
+  }
+
+  // ---- Looks ----
+  // Switch the whole look (materials, lights, environment, tone mapping,
+  // shadow type, background) without rebuilding any geometry.
+  let mossBackground = view.background;
+  function setLook(look) {
+    if (!LOOKS[look] || look === view.look) return;
+    const field = look === 'field';
+    if (field) mossBackground = view.background;
+    view.look = look;
+    for (const m of Object.values(meshes)) applyMaterial(m);
+    scene.environment = field ? null : roomEnv;
+    renderer.toneMapping = field ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
+    if (field) { hemi.color.set(0xffffff); hemi.groundColor.set(0xc9c5bd); }
+    else { hemi.color.set(0xcfe3ff); hemi.groundColor.set(0x5a4a35); }
+    // A new shadow type needs a fresh shadow map and recompiled shaders.
+    renderer.shadowMap.type = field ? THREE.VSMShadowMap : THREE.PCFSoftShadowMap;
+    sun.shadow.radius = field ? 6 : 1; sun.shadow.blurSamples = field ? 12 : 8;
+    sun.shadow.bias = field ? -0.0002 : -0.0004;
+    sun.shadow.map?.dispose(); sun.shadow.map = null;
+    scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
+    setBackground(field ? 'white' : mossBackground);
+    setSun();
   }
 
 
@@ -189,6 +264,7 @@ export function createScene(container) {
   };
   function setBackground(name) {
     view.background = name;
+    if (scene.background?.isTexture) scene.background.dispose();
     scene.background = (BACKGROUNDS[name] || BACKGROUNDS.sky)();
     ground.material.opacity = name === 'dark' ? 0.45 : 0.28;
   }
@@ -198,19 +274,21 @@ export function createScene(container) {
   // buildings over a satellite drape so they don't fight the photograph.
   function setScreenColours(colours = {}) {
     for (const [id, c] of Object.entries(colours)) {
-      const m = meshes[id]; if (m) (m.userData.mapMaterial || m.material).color.set(c);
+      const m = meshes[id]; if (!m) continue;
+      m.userData.override.color = c;                  // also applies to looks made later
+      for (const mat of Object.values(m.userData.looks)) mat.color.set(c);
     }
   }
   function setPrintColours(on, colours = {}) {
     view.print = on;
     for (const [id, m] of Object.entries(meshes)) {
-      if (!m.userData.mapMaterial) continue;
-      if (!on) { m.material = m.userData.mapMaterial; continue; }
       const c = colours[id] || colours[id.replace('Disused', '')];
-      if (!c) continue;
-      m.userData.printMaterial ||= new THREE.MeshStandardMaterial({ roughness: 0.6 });
-      m.userData.printMaterial.color.set(c);
-      m.material = m.userData.printMaterial;
+      if (on && c) {
+        m.userData.printMaterial ||= new THREE.MeshStandardMaterial({ roughness: 0.6 });
+        m.userData.printMaterial.color.set(c);
+      }
+      if (!c && m.userData.printMaterial) { m.userData.printMaterial.dispose(); m.userData.printMaterial = null; }
+      applyMaterial(m);
     }
   }
   function setShadow(on) { ground.visible = on; }
@@ -273,7 +351,7 @@ export function createScene(container) {
   }
   function orbitEnd() { if (orbitBase) camera.position.copy(orbitBase.pos); camera.lookAt(controls.target); orbitBase = null; }
 
-  return { renderer, scene, camera, controls, view, meshes, focalMm, setModel, setDrape, setVisible, setView, setSpin,
+  return { renderer, scene, camera, controls, view, meshes, focalMm, setModel, setDrape, setLook, setVisible, setView, setSpin,
     setSun, setFov, setHeightScale, setBackground, setPrintColours, setScreenColours, setShadow, grab,
     pause, resume, renderAt, orbitStart, orbitTo, orbitEnd };
 }

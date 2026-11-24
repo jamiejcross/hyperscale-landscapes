@@ -127,7 +127,8 @@ def write_viewer(path, *, layer_meshes: dict, opts, preset: dict, features,
     imports = {}
     for spec, rel in MODULES.items():
         text = ((w / rel).read_text().replace("from './caption.js'", "from 'hl/caption'")
-                .replace("from './turntable.js'", "from 'hl/turntable'"))
+                .replace("from './turntable.js'", "from 'hl/turntable'")
+                .replace("from './scene.js'", "from 'hl/scene'"))
         imports[spec] = _data_url(text)
     html = (w / "viewer.html").read_text()
     faces = "".join(

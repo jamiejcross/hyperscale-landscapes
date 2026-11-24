@@ -2,6 +2,7 @@
 // sun, height, background, screengrab), shared by the app's preview and the
 // downloadable offline viewer.  Saved images always carry the caption strip.
 import { withCaption } from './caption.js';
+import { LOOKS } from './scene.js';
 import { SIZES, makeGIF, makeVideo, videoType } from './turntable.js';
 
 const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'N'];
@@ -11,6 +12,12 @@ export function mountStudio(el, scene, host) {
   //         printColours(): {layerId: hex}, onChange?(view), alt?(): string }
   el.classList.add('studio');
   el.innerHTML = `
+    <fieldset><legend>Style</legend>
+      <select name="look" aria-label="Style">
+        ${Object.entries(LOOKS).map(([k, label]) => `<option value="${k}"${k === scene.view.look ? ' selected' : ''}>${label}</option>`).join('')}
+      </select>
+      <p class="hint">Changes how the model is drawn on screen and in saved images. Print files are not affected.</p>
+    </fieldset>
     <fieldset><legend>Camera</legend>
       <div class="inline">
         <button type="button" data-view="oblique">Oblique</button>
@@ -84,6 +91,11 @@ export function mountStudio(el, scene, host) {
   q('fovV').value = `${scene.focalMm(28)} mm`;
   q('spin').addEventListener('change', e => scene.setSpin(e.target.checked));
   q('bg').addEventListener('change', e => scene.setBackground(e.target.value));
+  q('look').addEventListener('change', e => {
+    scene.setLook(e.target.value);
+    q('bg').value = scene.view.background;     // each look brings its own background
+    update();
+  });
   el.addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) scene.setView(b.dataset.view); });
 
   // The captioned image, without downloading it (also used by artefact exports).
