@@ -122,6 +122,7 @@ def write_viewer(path, *, layer_meshes: dict, opts, preset: dict, features,
         "alt": (f"Oblique 3D view of a terrain model of {name}. {disclosure}. "
                 f"Shows {report.get('buildings', 0)} buildings."),
         "drape": landcover_drape(features or [], bb),
+        "drapeKind": "landcover",
     }
     w = web_dir()
     imports = {}

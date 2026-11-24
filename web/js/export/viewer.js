@@ -27,7 +27,7 @@ const rewrite = text => text.replaceAll("from './caption.js'", "from 'hl/caption
   .replaceAll("from './turntable.js'", "from 'hl/turntable'")
   .replaceAll("from './scene.js'", "from 'hl/scene'");
 
-export async function buildViewer({ model, legend, colours, printColours, caption, sub, drape, zExag, slug, alt }) {
+export async function buildViewer({ model, legend, colours, printColours, caption, sub, drape, drapeKind = null, zExag, slug, alt }) {
   // Pack every non-empty layer into one gzipped buffer.
   const parts = [], layout = {}, ids = [];
   let offset = 0;
@@ -51,7 +51,7 @@ export async function buildViewer({ model, legend, colours, printColours, captio
     layers: ids, layout, geom,
     grid: { Wmm: model.grid.Wmm, Hmm: model.grid.Hmm },
     colours, printColours, legend, caption, sub, zExag, slug, alt,
-    drape: drape ? drape.toDataURL('image/jpeg', 0.85) : null,
+    drape: drape ? drape.toDataURL('image/jpeg', 0.85) : null, drapeKind,
   };
 
   const [template, ...sources] = await Promise.all([

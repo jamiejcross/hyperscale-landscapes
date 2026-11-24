@@ -93,7 +93,8 @@ export function mountStudio(el, scene, host) {
   q('bg').addEventListener('change', e => scene.setBackground(e.target.value));
   q('look').addEventListener('change', e => {
     scene.setLook(e.target.value);
-    q('bg').value = scene.view.background;     // each look brings its own background
+    q('bg').value = scene.view.background;     // each look brings its own background and lens
+    q('fov').value = Math.round(scene.view.fov); q('fovV').value = `${scene.focalMm(scene.view.fov)} mm`;
     update();
   });
   el.addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) scene.setView(b.dataset.view); });

@@ -26,6 +26,25 @@ export const LANDCOVER_COLOURS = {
 const LAND_BASE = '#BDB08E';
 export const LOOKS = { mossmorran: 'Mossmorran', field: 'Field' };
 
+// Field style: a flatter, paler land-cover palette (same classes as above),
+// plus the slab and water colours. Presentation only.
+export const FIELD_LANDCOVER_COLOURS = {
+  'landuse:farmland': '#D9D3B0', 'landuse:meadow': '#CBD5B0', 'landuse:grass': '#CBD5B0',
+  'landuse:forest': '#A3B58F', 'natural:wood': '#A3B58F', 'natural:scrub': '#B8C29E',
+  'natural:heath': '#CDBFAE', 'natural:moor': '#CDBFAE', 'natural:grassland': '#CBD5B0',
+  'natural:wetland': '#B9C7C2', 'landuse:residential': '#E2DDD4', 'landuse:farmyard': '#D8CFBE',
+  'landuse:cemetery': '#C5CDB8', 'landuse:allotments': '#CFD3AE', 'landuse:recreation_ground': '#CBD5B0',
+  'landuse:commercial': '#DCD6D6', 'landuse:retail': '#DCD6D6', 'landuse:railway': '#D3CEC6',
+  'natural:bare_rock': '#D0CCC6', 'natural:scree': '#D0CCC6',
+};
+const FIELD_LAND_BASE = '#DAD3BC';
+const FIELD = {
+  wallLight: '#f4f2ee', wallDark: '#c9c5bd', base: '#9b968c',
+  water: '#7fbcc4', waterOpacity: 0.5,
+  tones: [0.62, 0.84, 1.0],      // three toon steps (shadow side, mid, lit)
+  fov: 20, minEl: 12, maxEl: 70,  // camera
+};
+
 export function createScene(container) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -76,6 +95,8 @@ export function createScene(container) {
   new ResizeObserver(resize).observe(container);
   resize();
 
+  // Measured: at 0.9 a lit, level surface renders at its own colour (±2/255).
+  const FIELD_SUN = 0.9, FIELD_FILL = 0.9;
   const view = { az: 225, el: 32, strength: 3.0, fill: 1.0, heightScale: 1, fov: 28, background: 'sky', print: false, look: 'mossmorran' };
 
   // Sun: azimuth clockwise from north, height above the horizon; it warms
@@ -84,13 +105,16 @@ export function createScene(container) {
     Object.assign(view, { az: azDeg, el: elDeg, strength, fill });
     const az = THREE.MathUtils.degToRad(azDeg), el = THREE.MathUtils.degToRad(elDeg), r = span * 2.5;
     sun.position.set(Math.sin(az) * Math.cos(el) * r, Math.sin(el) * r, -Math.cos(az) * Math.cos(el) * r);
-    sun.intensity = strength; hemi.intensity = fill;
+    // Field lights are scaled so a lit, level surface shows its own colour.
+    sun.intensity = strength * (view.look === 'field' ? FIELD_SUN : 1);
+    hemi.intensity = fill * (view.look === 'field' ? FIELD_FILL : 1);
     const warm = THREE.MathUtils.clamp((elDeg - 3) / 30, 0, 1);
     if (view.look === 'field') sun.color.set(0xffffff);      // field: neutral light, the colours are in the materials
     else sun.color.setRGB(1, 0.78 + 0.18 * warm, 0.58 + 0.33 * warm);
     const sc = sun.shadow.camera;
     sc.left = sc.bottom = -span * 0.75; sc.right = sc.top = span * 0.75; sc.near = 1; sc.far = span * 6;
     sc.updateProjectionMatrix();
+    shadeWalls();
   }
 
   function geometry(m) {
@@ -106,21 +130,55 @@ export function createScene(container) {
   const MAKE = {
     mossmorran(mesh) {
       const { kind, colour } = mesh.userData;
-      if (kind === 'terrain') return new THREE.MeshStandardMaterial({ map: drapeTex, color: drapeTex ? 0xffffff : LAND_BASE, roughness: 0.92 });
+      if (kind === 'terrain' || kind === 'terrain-base') return new THREE.MeshStandardMaterial({ map: drapeTex, color: drapeTex ? 0xffffff : LAND_BASE, roughness: 0.92 });
       if (kind === 'terrain-sides') return new THREE.MeshStandardMaterial({ map: strataTexture(renderer), roughness: 0.96 });
       if (kind === 'water') return new THREE.MeshPhysicalMaterial({ color: 0x24506a, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.6 });
       return new THREE.MeshStandardMaterial({ color: colour, roughness: 0.8 });
     },
-    // Field, first pass (step 1): flat Lambert stand-ins; toon shading,
-    // shaded slab walls and the ink pass replace these in the next steps.
+    // Field: three-step toon shading on everything lit; the slab walls are
+    // flat colours, light or dark by which way they face the sun.
     field(mesh) {
       const { kind, colour } = mesh.userData;
-      if (kind === 'terrain') return new THREE.MeshLambertMaterial({ map: drapeTex, color: drapeTex ? 0xffffff : LAND_BASE });
-      if (kind === 'terrain-sides') return new THREE.MeshLambertMaterial({ color: 0xf4f2ee });
-      if (kind === 'water') return new THREE.MeshLambertMaterial({ color: 0x7fbcc4, transparent: true, opacity: 0.5 });
-      return new THREE.MeshLambertMaterial({ color: colour });
+      const toon = o => new THREE.MeshToonMaterial({ gradientMap: toonRamp(), ...o });
+      if (kind === 'terrain') { const t = fieldDrape(); return toon({ map: t, color: t ? 0xffffff : FIELD_LAND_BASE }); }
+      if (kind === 'terrain-base') return new THREE.MeshBasicMaterial({ color: FIELD.base });
+      if (kind === 'terrain-sides') return new THREE.MeshBasicMaterial({ vertexColors: true });
+      if (kind === 'water') return toon({ color: FIELD.water, transparent: true, opacity: FIELD.waterOpacity, depthWrite: false });
+      return toon({ color: colour });
     },
   };
+  // One shared ramp texture for every toon material.
+  let ramp = null;
+  function toonRamp() {
+    if (!ramp) {
+      ramp = new THREE.DataTexture(new Uint8Array(FIELD.tones.map(v => Math.round(v * 255))), FIELD.tones.length, 1, THREE.RedFormat);
+      ramp.minFilter = ramp.magFilter = THREE.NearestFilter; ramp.generateMipmaps = false; ramp.needsUpdate = true;
+    }
+    return ramp;
+  }
+  // The field drape: land cover redrawn in the field palette; any other drape
+  // (satellite, contours) is used as it is.
+  let drapeKind = null, fieldDrapeTex = null;
+  function fieldDrape() {
+    if (drapeKind !== 'landcover' || !drapeTex) return drapeTex;
+    fieldDrapeTex ||= canvasTexture(recolour(drapeTex.image, paletteMap()), renderer);
+    return fieldDrapeTex;
+  }
+  // Light or dark slab walls by facing direction relative to the sun.
+  function shadeWalls() {
+    const m = meshes['terrain-sides']; if (!m) return;
+    const g = m.geometry, n = g.attributes.normal, N = n.count;
+    const col = g.attributes.color || g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(N * 3), 3)).attributes.color;
+    const light = new THREE.Color(FIELD.wallLight), dark = new THREE.Color(FIELD.wallDark), c = new THREE.Color();
+    const sx = sun.position.x, sz = sun.position.z, sl = Math.hypot(sx, sz) || 1;
+    for (let i = 0; i < N; i++) {
+      // model (x, y, z-up) -> world (x, z, -y)
+      const d = (n.getX(i) * sx - n.getY(i) * sz) / sl;
+      c.copy(dark).lerp(light, THREE.MathUtils.smoothstep(d, -0.15, 0.15));
+      col.setXYZ(i, c.r, c.g, c.b);
+    }
+    col.needsUpdate = true;
+  }
   function lookMaterial(mesh, look = view.look) {
     const L = mesh.userData.looks;
     if (!L[look]) {
@@ -137,16 +195,17 @@ export function createScene(container) {
     mesh.geometry.dispose();
     const mats = [...Object.values(mesh.userData.looks), mesh.userData.printMaterial].filter(Boolean);
     for (const m of mats) {
-      for (const t of [m.map, m.gradientMap]) if (t && t !== drapeTex) t.dispose();
+      if (m.map && m.map !== drapeTex && m.map !== fieldDrapeTex) m.map.dispose();
       m.dispose();
     }
   }
 
-  // layers: {id: mesh}; colours: {id: '#rrggbb'}; landcover: canvas or null
-  function setModel({ layers, colours, landcover, grid }) {
+  // layers: {id: mesh}; colours: {id: '#rrggbb'}; landcover: the drape canvas
+  // or null; drapeKind: 'landcover' when it is the land-cover map (the field
+  // style redraws that in its own palette), else anything.
+  function setModel({ layers, colours, landcover, grid, drapeKind: kind = null }) {
     for (const k of Object.keys(meshes)) { inner.remove(meshes[k]); disposeMesh(meshes[k]); delete meshes[k]; }
-    drapeTex?.dispose();
-    drapeTex = landcover ? canvasTexture(landcover, renderer) : null;
+    setDrapeTextures(landcover, kind);
     span = Math.max(grid.Wmm, grid.Hmm);
     let zmax = 0;
     const add = (id, g, kind, colour) => {
@@ -164,16 +223,22 @@ export function createScene(container) {
       if (id === 'terrain') {
         // Top and bottom take the drape; the sides are split off into their
         // own geometry (soil strata in the Mossmorran look).
-        const { capsIdx, walls } = splitWalls(m);
+        const { capsIdx, baseIdx, walls } = splitWalls(m);
         g.setIndex(new THREE.BufferAttribute(capsIdx, 1));
         g.setAttribute('uv', planarUV(m.positions, grid));
         add('terrain-sides', walls, 'terrain-sides');
+        // The underside: its own mesh so the field style can colour it.
+        const base = new THREE.BufferGeometry();
+        base.setAttribute('position', g.attributes.position); base.setAttribute('uv', g.attributes.uv);
+        base.setIndex(new THREE.BufferAttribute(baseIdx, 1)); base.computeVertexNormals();
+        add('terrain-base', base, 'terrain-base');
       }
       const kind = id === 'terrain' || id === 'water' ? id : 'layer';
       add(id, g, kind, colours[id] || colours[id.replace('Disused', '')] || '#cccccc');
       for (let k = 2; k < m.positions.length; k += 3) zmax = Math.max(zmax, m.positions[k]);
     }
     H = zmax;
+    shadeWalls();
     inner.position.set(-grid.Wmm / 2, -grid.Hmm / 2, 0);
     ground.scale.set(span * 8, span * 8, 1);
     setSun();
@@ -182,25 +247,34 @@ export function createScene(container) {
   }
 
   // Swap the drape on the land top (land cover or satellite) without rebuilding.
-  function setDrape(canvas) {
-    const m = meshes.terrain; if (!m) return;
-    drapeTex?.dispose();
+  function setDrapeTextures(canvas, kind) {
+    drapeTex?.dispose(); fieldDrapeTex?.dispose(); fieldDrapeTex = null;
     drapeTex = canvas ? canvasTexture(canvas, renderer) : null;
-    for (const mat of Object.values(m.userData.looks)) {
-      mat.map = drapeTex;
-      mat.color.set(canvas ? 0xffffff : LAND_BASE);
-      mat.needsUpdate = true;
+    drapeKind = kind;
+  }
+  // kind: 'landcover' for the land-cover map, else anything (see setModel).
+  function setDrape(canvas, kind = null) {
+    setDrapeTextures(canvas, kind);
+    for (const id of ['terrain', 'terrain-base']) {
+      const m = meshes[id]; if (!m) continue;
+      for (const [look, mat] of Object.entries(m.userData.looks)) {
+        if (look === 'field' && id === 'terrain-base') continue;      // flat colour
+        const t = look === 'field' ? fieldDrape() : drapeTex;
+        mat.map = t;
+        mat.color.set(t ? 0xffffff : look === 'field' ? FIELD_LAND_BASE : LAND_BASE);
+        mat.needsUpdate = true;
+      }
     }
   }
 
   // ---- Looks ----
   // Switch the whole look (materials, lights, environment, tone mapping,
   // shadow type, background) without rebuilding any geometry.
-  let mossBackground = view.background;
+  let mossBackground = view.background, mossFov = view.fov;
   function setLook(look) {
     if (!LOOKS[look] || look === view.look) return;
     const field = look === 'field';
-    if (field) mossBackground = view.background;
+    if (field) { mossBackground = view.background; mossFov = camera.fov; }
     view.look = look;
     for (const m of Object.values(meshes)) applyMaterial(m);
     scene.environment = field ? null : roomEnv;
@@ -215,19 +289,55 @@ export function createScene(container) {
     scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
     setBackground(field ? 'white' : mossBackground);
     setSun();
+    // Camera: a long lens, elevation held between 12° and 70°; back to the
+    // previous lens and free elevation on the way out.
+    const deg = THREE.MathUtils.degToRad;
+    controls.minPolarAngle = field ? deg(90 - FIELD.maxEl) : 0;
+    controls.maxPolarAngle = field ? deg(90 - FIELD.minEl) : Math.PI * 0.495;
+    setFov(field ? FIELD.fov : mossFov);
+    if (field) fit();
+    controls.update();
+  }
+  // Move the camera along its line of sight until the model's bounding box
+  // just fits the view (with a small margin).
+  function fit(margin = 0.92) {
+    camera.position.copy(fitPosition(camera.position.clone().sub(controls.target), controls.target, margin));
+  }
+  // Camera position looking along `offset` (camera minus target) at `target`
+  // that just fits the model's bounding box.
+  function fitPosition(offset, target, margin = 0.92) {
+    model.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(model, true), pts = [];
+    for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) pts.push(new THREE.Vector3(x, y, z));
+    const dir = offset.clone().normalize(), cam = camera.clone();
+    const fits = d => {
+      cam.position.copy(target).addScaledVector(dir, d); cam.lookAt(target);
+      cam.updateMatrixWorld(); cam.updateProjectionMatrix();
+      return pts.every(p => { const q = p.clone().project(cam); return Math.abs(q.x) <= margin && Math.abs(q.y) <= margin && q.z < 1; });
+    };
+    let lo = span * 0.2, hi = span * 40;
+    for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (fits(mid)) hi = mid; else lo = mid; }
+    return target.clone().addScaledVector(dir, hi);
   }
 
 
 
   function setVisible(id, on) {
-    for (const k of [id, `${id}Disused`, `${id}-sides`]) if (meshes[k]) meshes[k].visible = on;
+    for (const k of [id, `${id}Disused`, `${id}-sides`, `${id}-base`]) if (meshes[k]) meshes[k].visible = on;
   }
 
   function setView(name, animate = true) {
     const d = span * 1.95;
     const views = { oblique: [0.55, 0.62, 0.85], reverse: [-0.55, 0.62, -0.85], low: [0.25, 0.18, 1.0], top: [0, 1, 0.0001] };
-    const v = new THREE.Vector3(...(views[name] || views.oblique)).normalize().multiplyScalar(d);
+    let v = new THREE.Vector3(...(views[name] || views.oblique)).normalize().multiplyScalar(d);
     const target = new THREE.Vector3(0, H * 0.3, 0);
+    if (view.look === 'field') {
+      // Hold the elevation between 12° and 70°, then fit the model to the view.
+      const sph = new THREE.Spherical().setFromVector3(v), deg = THREE.MathUtils.degToRad;
+      sph.phi = THREE.MathUtils.clamp(sph.phi, deg(90 - FIELD.maxEl), deg(90 - FIELD.minEl));
+      if (name === 'top') sph.theta = 0;
+      v = fitPosition(new THREE.Vector3().setFromSpherical(sph), target);
+    }
     if (!animate || matchMedia('(prefers-reduced-motion: reduce)').matches) {
       camera.position.copy(v); controls.target.copy(target); controls.update(); return;
     }
@@ -356,9 +466,10 @@ export function createScene(container) {
     pause, resume, renderAt, orbitStart, orbitTo, orbitEnd };
 }
 
-// Separate wall triangles (|normal z| small) from the top/bottom caps.
+// Separate wall triangles (|normal z| small) from the top cap and the
+// underside (normal pointing down).
 function splitWalls({ positions: P, indices: I }) {
-  const caps = [], wallPos = [], wallUV = [];
+  const caps = [], base = [], wallPos = [], wallUV = [];
   let zmax = 0;
   for (let k = 2; k < P.length; k += 3) zmax = Math.max(zmax, P[k]);
   for (let t = 0; t < I.length; t += 3) {
@@ -367,7 +478,7 @@ function splitWalls({ positions: P, indices: I }) {
     const nz = ux * vy - uy * vx;
     const len = Math.hypot(nz, (P[b + 1] - P[a + 1]) * (P[c + 2] - P[a + 2]) - (P[b + 2] - P[a + 2]) * (P[c + 1] - P[a + 1]),
       (P[b + 2] - P[a + 2]) * (P[c] - P[a]) - (P[b] - P[a]) * (P[c + 2] - P[a + 2])) || 1;
-    if (Math.abs(nz / len) > 0.2) { caps.push(I[t], I[t + 1], I[t + 2]); continue; }
+    if (Math.abs(nz / len) > 0.2) { (nz > 0 ? caps : base).push(I[t], I[t + 1], I[t + 2]); continue; }
     for (const v of [a, b, c]) {
       wallPos.push(P[v], P[v + 1], P[v + 2]);
       // u runs along the edge of the model; v is height
@@ -378,7 +489,7 @@ function splitWalls({ positions: P, indices: I }) {
   walls.setAttribute('position', new THREE.Float32BufferAttribute(wallPos, 3));
   walls.setAttribute('uv', new THREE.Float32BufferAttribute(wallUV, 2));
   walls.computeVertexNormals();
-  return { capsIdx: new Uint32Array(caps), walls };
+  return { capsIdx: new Uint32Array(caps), baseIdx: new Uint32Array(base), walls };
 }
 
 // Soil strata for the sides (from the Mossmorran viewer): irregular bands
@@ -401,6 +512,35 @@ function strataTexture(renderer) {
   const tg = g.createLinearGradient(0, 0, 0, Hh * 0.06); tg.addColorStop(0, '#2f3a1c'); tg.addColorStop(1, 'rgba(47,42,28,0)');
   g.fillStyle = tg; g.fillRect(0, 0, W, Hh * 0.06);
   const t = canvasTexture(c, renderer); t.wrapS = THREE.RepeatWrapping; return t;
+}
+
+// Redraw a land-cover canvas in another palette: each pixel takes the target
+// colour of the nearest source colour (so anti-aliased edges and JPEG noise
+// in an offline viewer's drape map cleanly).
+function paletteMap() {
+  const pairs = [[LAND_BASE, FIELD_LAND_BASE], ...Object.entries(LANDCOVER_COLOURS).map(([k, c]) => [c, FIELD_LANDCOVER_COLOURS[k]])];
+  const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  return pairs.map(([a, b]) => [rgb(a), rgb(b)]);
+}
+function recolour(img, map) {
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+  const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+  const id = g.getImageData(0, 0, c.width, c.height), d = id.data, memo = new Map();
+  for (let i = 0; i < d.length; i += 4) {
+    const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
+    let out = memo.get(key);
+    if (!out) {
+      let best = Infinity;
+      for (const [s, t] of map) {
+        const e = (d[i] - s[0]) ** 2 + (d[i + 1] - s[1]) ** 2 + (d[i + 2] - s[2]) ** 2;
+        if (e < best) { best = e; out = t; }
+      }
+      memo.set(key, out);
+    }
+    d[i] = out[0]; d[i + 1] = out[1]; d[i + 2] = out[2];
+  }
+  g.putImageData(id, 0, 0);
+  return c;
 }
 
 function planarUV(P, grid) {

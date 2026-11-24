@@ -179,7 +179,7 @@ function showPreview() {
   const colours = Object.fromEntries(Object.values(state.layers).map(l => [l.id, l.colour_screen]));
   colours.railDisused = state.layers.rail.colour_screen_disused;
   state.drape = landcoverCanvas(model.grid, osm.features);
-  scene.setModel({ layers: model.layers, colours, grid: model.grid, landcover: state.drape });
+  scene.setModel({ layers: model.layers, colours, grid: model.grid, landcover: state.drape, drapeKind: 'landcover' });
   const ul = $('layer-list'); ul.textContent = '';
   const shown = ['terrain', 'water', 'buildings', 'roads', 'rail', 'power', 'residues', 'receptors'];
   for (const id of shown) {
@@ -251,7 +251,7 @@ async function applySurface(id) {
   scene.setScreenColours({ roads: SURFACES[id]?.layer ? '#f2f2f2' : roads });
   try {
     if (id === 'landcover') {
-      scene.setDrape(state.drape = landcoverCanvas(model.grid, osm.features));
+      scene.setDrape(state.drape = landcoverCanvas(model.grid, osm.features), 'landcover');
       note.textContent = '';
     } else if (id === 'contours') {
       const c = contourCanvas(model.grid, state.model.elev);
@@ -266,7 +266,7 @@ async function applySurface(id) {
     note.textContent = `${id === 'contours' ? 'Contours' : 'Satellite imagery'} could not be ${id === 'contours' ? 'drawn' : 'loaded'} (${err.message}). Showing land cover instead.`;
     state.surface = 'landcover'; $('surface').value = 'landcover';
     scene.setScreenColours({ roads });
-    scene.setDrape(state.drape = landcoverCanvas(model.grid, osm.features));
+    scene.setDrape(state.drape = landcoverCanvas(model.grid, osm.features), 'landcover');
   }
   refreshCaption();
 }
@@ -319,7 +319,7 @@ $('dl-viewer').onclick = async () => {
     const blob = await buildViewer({
       model, legend, colours, printColours: printColourMap(), caption, zExag: opts.zExag, slug: slug(),
       sub: `${state.bbox.minLat.toFixed(3)}–${state.bbox.maxLat.toFixed(3)}°N, ${Math.abs(state.bbox.maxLon).toFixed(3)}–${Math.abs(state.bbox.minLon).toFixed(3)}°W · ${w.toFixed(1)} × ${h.toFixed(1)} km · from the ${opts.printSize} mm print model`,
-      drape: state.drape,
+      drape: state.drape, drapeKind: state.surface === 'landcover' ? 'landcover' : state.surface,
       alt: draftAlt({ name: state.name, report: model.report, exaggeration: t('caption.exag', { x: opts.zExag }), surface: SURFACES[state.surface].label.toLowerCase() }),
     });
     save(blob, `${slug()}-viewer.html`);
