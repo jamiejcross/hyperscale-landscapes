@@ -16,11 +16,13 @@ const arr = k => { const [o, n, t] = D.layout[k]; const C = T[t]; return new C(b
 const layers = {};
 for (const id of D.layers) layers[id] = { positions: arr(`${id}_p`), indices: arr(`${id}_i`) };
 const insert = D.layout.site_p ? { positions: arr('site_p'), indices: arr('site_i') } : null;
+const before = {};
+for (const k of ['terrain', 'buildings']) if (D.layout[`before_${k}_p`]) before[k] = { positions: arr(`before_${k}_p`), indices: arr(`before_${k}_i`) };
 
 // ---- scene
 const scene = createScene($('view'));
 const drape = D.drape ? await new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = D.drape; }) : null;
-scene.setModel({ layers, insert, colours: D.colours, grid: D.grid, landcover: drape && toCanvas(drape) });
+scene.setModel({ layers, insert, before: Object.keys(before).length ? before : null, colours: D.colours, grid: D.grid, landcover: drape && toCanvas(drape) });
 function toCanvas(img) { const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0); return c; }
 
 // ---- panel: title, layers, studio, caption
@@ -57,5 +59,15 @@ addEventListener('keydown', e => {
   if (k === 'p') studio.grab();
 });
 $('showui').onclick = () => document.body.classList.remove('hidden');
+// Keep the model centred in the space beside the panel (as in the Mossmorran viewer).
+function offsetView() {
+  const panel = document.body.classList.contains('hidden') || document.body.classList.contains('clean') ? 0 : $('panel').offsetWidth;
+  const cam = scene.camera, w = innerWidth, h = innerHeight;
+  if (panel && w > 700) cam.setViewOffset(w, h, -panel / 2, 0, w, h); else cam.clearViewOffset();
+  cam.updateProjectionMatrix();
+}
+new MutationObserver(offsetView).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+addEventListener('resize', offsetView);
+offsetView();
 $('loading').remove();
 window.__ready = true;

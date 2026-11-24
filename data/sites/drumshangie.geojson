@@ -43,11 +43,11 @@
     "licence": "CC-BY-4.0",
     "notes": "Drumshangie Moss and the former Drumshangie coal mine; APRS notes the area includes the memorial to the Stanrigg pit disaster.",
     "model_bbox": {
-      "min_lat": 55.87988,
-      "max_lat": 55.89785,
-      "min_lon": -3.9577,
-      "max_lon": -3.92566
+      "min_lat": 55.88348,
+      "max_lat": 55.89426,
+      "min_lon": -3.96731,
+      "max_lon": -3.91605
     },
-    "model_bbox_note": "2 km square centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

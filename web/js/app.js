@@ -13,6 +13,7 @@ import { SURFACES, imageryCanvas } from './data/imagery.js';
 import { mountStudio } from './scene/studio.js';
 import { buildViewer } from './export/viewer.js';
 import { computeSection, sectionSVG, svgToPNG } from './export/section.js';
+import { fontFaceCSS } from './fonts.js';
 import { captionLines, altText as draftAlt } from './scene/caption.js';
 import { write3MF } from './export/threemf.js';
 import { writeSTL } from './export/stl.js';
@@ -56,36 +57,22 @@ function setFootprint(gj) {
   picker.showFootprint(gj);
 }
 
-// Curated sites, grouped by council, with a filter and a short fact panel.
+// Curated sites: one dropdown, grouped by council, and a short fact panel.
 const SITES = await listSites();
 const esc = v => String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-function renderSites(filter = '') {
-  const box = $('sites'); box.textContent = '';
-  const q = filter.trim().toLowerCase();
-  const groups = {};
-  for (const s of SITES) {
-    if (q && !`${s.name} ${s.local_authority}`.toLowerCase().includes(q)) continue;
-    (groups[s.local_authority || 'Other'] ||= []).push(s);
-  }
+{
+  const sel = $('site-select'), groups = {};
+  for (const s of SITES) (groups[s.local_authority || 'Other'] ||= []).push(s);
   for (const [la, list] of Object.entries(groups)) {
-    const h = document.createElement('h4'); h.textContent = la; box.append(h);
-    const ul = document.createElement('ul');
-    for (const s of list) {
-      const li = document.createElement('li'), b = document.createElement('button');
-      b.type = 'button'; b.dataset.site = s.id; b.setAttribute('aria-pressed', 'false');
-      b.innerHTML = `${esc(s.name)}${s.status ? ` <span class="status">· ${esc(s.status)}</span>` : ''}`;
-      b.onclick = () => chooseSite(s, b);
-      li.append(b); ul.append(li);
-    }
-    box.append(ul);
+    const og = document.createElement('optgroup'); og.label = la;
+    for (const s of list) og.append(new Option(s.status ? `${s.name} (${s.status})` : s.name, s.id));
+    sel.append(og);
   }
-  if (!box.children.length) box.textContent = 'No sites match.';
+  sel.onchange = () => { const s = SITES.find(x => x.id === sel.value); if (s) chooseSite(s); };
 }
-$('site-filter').oninput = e => renderSites(e.target.value);
-renderSites();
 
-async function chooseSite(entry, button) {
-  document.querySelectorAll('#sites button').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
+async function chooseSite(entry) {
+  $('site-select').value = entry.id;
   const { site, bundle } = await loadSite(entry);
   const p = site.properties, bb = p.model_bbox;
   picker.showBBox({ minLat: bb.min_lat, maxLat: bb.max_lat, minLon: bb.min_lon, maxLon: bb.max_lon });
@@ -219,7 +206,7 @@ function showPreview() {
   const colours = Object.fromEntries(Object.values(state.layers).map(l => [l.id, l.colour_screen]));
   colours.railDisused = state.layers.rail.colour_screen_disused;
   state.drape = landcoverCanvas(model.grid, osm.features);
-  scene.setModel({ layers: model.layers, insert: model.insert, colours, grid: model.grid, landcover: state.drape });
+  scene.setModel({ layers: model.layers, insert: model.insert, before: model.before, colours, grid: model.grid, landcover: state.drape });
   const ul = $('layer-list'); ul.textContent = '';
   const shown = ['terrain', 'water', 'buildings', 'roads', 'rail', 'power', 'residues', 'receptors', ...(model.insert ? ['site'] : [])];
   for (const id of shown) {
@@ -231,7 +218,7 @@ function showPreview() {
   }
   ul.querySelectorAll('input').forEach(i => { i.onchange = () => scene.setVisible(i.dataset.layer, i.checked); });
   const counts = model.report.counts;
-  studio.update();
+  studio.update();   // also enables before/after when there is a site block
   scene.renderer.domElement.setAttribute('aria-label', altText(model, osm));
   $('caption').textContent = captionText(opts, form) + ` Counts: ${counts.buildings} buildings, ${counts.receptors} schools, care or community buildings, ${counts.roads} roads.`;
   $('dl-insert').hidden = !model.insert;
@@ -390,12 +377,11 @@ function drawSection(line) {
   const n = sec.items;
   $('section-status').textContent = `${(sec.length / 1000).toFixed(2)} km; crosses ${n.buildings.length} buildings, ${n.points.length} roads, railways, watercourses or power lines.`;
 }
-function renderSection() {
+async function renderSection() {
   if (!state.section) return;
+  const fontCSS = await fontFaceCSS();
   const vex = +$('section-vex').value;
-  const colours = Object.fromEntries(Object.values(state.layers).map(l => [l.id, l.colour_screen]));
-  colours.road = '#555555'; colours.water = state.layers.water.colour_screen;
-  state.sectionSVG = sectionSVG(state.section, { vex, caption: sectionCaption(vex), colours });
+  state.sectionSVG = sectionSVG(state.section, { vex, caption: sectionCaption(vex), fontCSS });
   $('section-figure').innerHTML = state.sectionSVG;
   $('section-svg').disabled = $('section-png').disabled = false;
 }

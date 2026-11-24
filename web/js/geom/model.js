@@ -610,6 +610,7 @@ export function buildModel({ bbox, elev, osm, opts }) {
 
   // ---- Terrain top with the recess ----
   let floor = null;
+  const zBefore = Float32Array.from(zTop);   // the land as it is today, without the recess
   if (recess) {
     const rv = vertexTouches(grid, recess);
     let lo = Infinity, hi = -Infinity;
@@ -636,6 +637,8 @@ export function buildModel({ bbox, elev, osm, opts }) {
     botLand = v => (lv[v] ? MM.engrave : 0);
   }
   const land = slabFromMask(grid, full, v => zTop[v], botLand);
+  // For 'before' views only (never printed): the land without the recess.
+  const landBefore = recess ? slabFromMask(grid, full, v => zBefore[v], botLand) : null;
 
   // ---- Overlay slabs ----
   const slab = (id, raise) => masks[id] ? slabFromMask(grid, masks[id], v => H.z[v] + raise, v => H.z[v] - MM.bury) : null;
@@ -650,12 +653,12 @@ export function buildModel({ bbox, elev, osm, opts }) {
   };
 
   // ---- Buildings and receptors ----
-  const bl = [], rl = [];
+  const bl = [], rl = [], cleared = [];
   let inRecess = 0;
   for (const f of footprints) {
     if (recess) {
       const ci = Math.floor(f.centre[0] / grid.dx), cj = Math.floor((grid.Hmm - f.centre[1]) / grid.dy);
-      if (ci >= 0 && cj >= 0 && ci < cx && cj < cy && recess[cj * cx + ci]) { inRecess++; continue; }
+      if (ci >= 0 && cj >= 0 && ci < cx && cj < cy && recess[cj * cx + ci]) { inRecess++; f.cleared = true; }
     }
     const outer = f.rings[0];
     let lo = Infinity, hi = -Infinity;
@@ -664,7 +667,7 @@ export function buildModel({ bbox, elev, osm, opts }) {
     let h = parseFloat(t.height);
     if (Number.isNaN(h)) h = (parseFloat(t['building:levels']) || 2) * 3;
     const m = extrude(f.rings, lo - MM.buildingBury, hi + Math.max(h * opts.buildingExag * mmPerM, MM.buildingMin));
-    if (m) (f.receptor ? rl : bl).push(m);
+    if (m) (f.cleared ? cleared : f.receptor ? rl : bl).push(m);
   }
   layers.buildings = concat(bl);
   layers.receptors = concat(rl);
@@ -681,7 +684,9 @@ export function buildModel({ bbox, elev, osm, opts }) {
   report.counts = { buildings: bl.length, receptors: rl.length, roads: nRoads, pegs: pegMeshes.filter(Boolean).length, buildingsInRecess: inRecess };
   report.grid = { cols: nx, rows: grid.ny, cellMm: +grid.dx.toFixed(3) };
   report.elevation = { minM: H.elevMin, maxM: H.elevMax };
-  return { grid, layers, insert, report, heights: H.z };
+  // `before`: what the site looks like today, for before/after views (not printed).
+  const before = recess ? { terrain: landBefore, buildings: concat(cleared) } : null;
+  return { grid, layers, insert, before, report, heights: H.z };
 }
 
 function clamp(v, a, b) { return Math.min(Math.max(v, a), b); }

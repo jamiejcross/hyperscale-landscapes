@@ -28,7 +28,10 @@ function wrap(g, text, maxW) {
 // Returns a new canvas: the render with caption bands attached above and
 // below it (part of the same image, so they travel with it, without hiding
 // any of the model).
-const font = (px, weight = 400) => `${weight} ${px}px system-ui, -apple-system, "Segoe UI", Arial, sans-serif`;
+// Swiss style: one grotesque (Inter, vendored), black and white plus the
+// single spot colour, which marks the band as a rule.
+const font = (px, weight = 400) => `${weight} ${px}px Inter, "Helvetica Neue", Helvetica, Arial, sans-serif`;
+const SPOT = '#d55e00';
 
 // Layout of the caption bands for an image `W` pixels wide.
 function layout(W, caption) {
@@ -39,8 +42,8 @@ function layout(W, caption) {
   m.font = font(fs);
   const srcLines = wrap(m, caption.sources, W - 2 * pad);
   const footLines = wrap(m, caption.footer, W - 2 * pad);
-  m.font = font(titleFs, 650); const tw = m.measureText(caption.title).width;
-  m.font = font(fs, 600); const disc = `  ·  ${caption.disclosure}`;
+  m.font = font(titleFs, 700); const tw = m.measureText(caption.title).width;
+  m.font = font(fs, 700); const disc = `  ·  ${caption.disclosure}`;
   const discInline = pad + tw + m.measureText(disc).width < W - pad;
   const bandH = pad * 2 + Math.round(titleFs * 1.25) + lh * (srcLines.length + footLines.length + (discInline ? 0 : 1));
   const topH = Math.round(fs * 1.8);
@@ -57,14 +60,16 @@ export function withCaption(render, caption, { dark = false } = {}) {
   const out = document.createElement('canvas');
   out.width = W; out.height = topH + render.height + bandH;
   const g = out.getContext('2d');
-  const bg = dark ? '#16181b' : '#f7f5f0', fg = dark ? '#ecebe8' : '#22201c', muted = dark ? '#b8b4ac' : '#55504a';
+  const bg = dark ? '#000000' : '#ffffff', fg = dark ? '#ffffff' : '#000000', muted = dark ? '#b3b3b3' : '#5c5c5c';
   g.fillStyle = bg; g.fillRect(0, 0, W, out.height);
   g.drawImage(render, 0, topH);
 
-  // Bottom band: title and disclosure on one line, then sources, then footer.
+  // Bottom band: a spot-colour rule, then title and disclosure on one line,
+  // then sources, then footer.
+  g.fillStyle = SPOT; g.fillRect(0, topH + render.height, W, Math.max(3, Math.round(fs / 4)));
   let y = topH + render.height + pad + titleFs;
-  g.fillStyle = fg; g.font = font(titleFs, 650); g.fillText(caption.title, pad, y);
-  g.font = font(fs, 600);
+  g.fillStyle = fg; g.font = font(titleFs, 700); g.fillText(caption.title, pad, y);
+  g.font = font(fs, 700);
   if (discInline) g.fillText(disc, pad + tw, y);
   else { y += lh; g.fillText(caption.disclosure, pad, y); }
   y += Math.round(titleFs * 0.25);

@@ -43,11 +43,11 @@
     "licence": "CC-BY-4.0",
     "notes": "Green Belt farmland. APRS reports that no EIA is required.",
     "model_bbox": {
-      "min_lat": 55.90774,
-      "max_lat": 55.9257,
-      "min_lon": -3.34429,
-      "max_lon": -3.31223
+      "min_lat": 55.91133,
+      "max_lat": 55.92211,
+      "min_lon": -3.35391,
+      "max_lon": -3.30261
     },
-    "model_bbox_note": "2 km square centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

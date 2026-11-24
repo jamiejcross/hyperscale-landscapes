@@ -11,8 +11,9 @@ What is taken from the map:
     copied; figures are recorded as "reported by APRS" and are not yet
     checked against planning documents.
 Local authority comes from OpenStreetMap boundaries (Nominatim reverse
-lookup of the public site point).  The model_bbox is a 2 km square centred on
-the point: a modelling extent, not a site boundary.  No footprint is
+lookup of the public site point).  The model_bbox is centred on
+the point (3.2 km east–west by 1.2 km north–south): a modelling extent, not
+a site boundary.  No footprint is
 recorded for any site, so none has an insert.
 
     python tools/import_aprs_map.py map.kml local_authorities.json
@@ -30,7 +31,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SITES = ROOT / "data" / "sites"
 MAP_URL = "https://www.google.com/maps/d/viewer?mid=1iGmWc4tSHrLNwDRCFz86dLgBFWWw-Kg"
 ACCESSED = "2026-11-24"
-SIDE_KM = 2.0
+WIDTH_KM, HEIGHT_KM = 3.2, 1.2   # default model area: wide landscape strip (JC, 24 Nov 2026)
 
 # KML placemark name -> facts transcribed from APRS's description.
 # None = not stated on the map.  status uses the schema's vocabulary and is
@@ -94,9 +95,9 @@ FACTS = {
 }
 
 
-def bbox_around(lon, lat, side_km=SIDE_KM):
-    d_lat = side_km / 2 / 111.32
-    d_lon = d_lat / math.cos(math.radians(lat))
+def bbox_around(lon, lat, width_km=WIDTH_KM, height_km=HEIGHT_KM):
+    d_lat = height_km / 2 / 111.32
+    d_lon = width_km / 2 / 111.32 / math.cos(math.radians(lat))
     r = lambda v: round(v, 5)  # noqa: E731
     return {"min_lat": r(lat - d_lat), "max_lat": r(lat + d_lat),
             "min_lon": r(lon - d_lon), "max_lon": r(lon + d_lon)}
@@ -148,7 +149,8 @@ def main(kml_path, la_path):
             "licence": "CC-BY-4.0",
             "notes": f["notes"],
             "model_bbox": bbox_around(lon, lat),
-            "model_bbox_note": f"{SIDE_KM:g} km square centred on the APRS pin; a modelling extent, not a site boundary.",
+            "model_bbox_note": (f"{WIDTH_KM:g} × {HEIGHT_KM:g} km (east–west × north–south) centred on the APRS pin; "
+                                "a modelling extent, not a site boundary."),
         }
         path = SITES / f"{f['id']}.geojson"
         if f["id"] == "auchtertool-cato":

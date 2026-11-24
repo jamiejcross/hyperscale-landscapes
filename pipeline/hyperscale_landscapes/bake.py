@@ -49,6 +49,7 @@ def bake(site_id: str) -> dict:
             tiles[f"{z}/{x}/{y}"] = base64.b64encode(r.read()).decode()
     bundle = {"schema": "hyperscale-landscapes/site-bundle@1", "site": site_id,
               "query": "web-v2", "fetched": time.strftime("%Y-%m-%d"),
+              "bbox": bb,   # the app ignores a bundle whose area differs from the site's
               "attribution": "© OpenStreetMap contributors; elevation: Mapzen Terrain Tiles",
               "osm": osm, "elevation": {"zoom": ZOOM, "tiles": tiles}}
     out = sites / f"{site_id}.bundle.json.gz"

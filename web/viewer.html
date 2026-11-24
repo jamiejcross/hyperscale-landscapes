@@ -6,44 +6,48 @@
 <title>Terrain model</title>
 <!-- Offline viewer made with Hyperscale Landscapes. Everything it needs is
      inside this one file: open it in any modern browser, no internet needed. -->
+<!--FONTS-->
 <style>
-  :root { --panel: rgba(18,20,24,0.84); --line: rgba(255,255,255,0.13); --text: #e8e6e1; --muted: #a39f96; --accent: #8fbf7a; }
+  /* Swiss / International: one grotesque, black and white plus one spot colour. */
+  :root { --paper: rgba(255,255,255,0.94); --ink: #000; --grey: #5c5c5c; --rule: #000; --spot: #d55e00; }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1c20; color: var(--text);
-    font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Arial, sans-serif; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #fff; color: var(--ink);
+    font: 13px/1.4 Inter, "Helvetica Neue", Helvetica, Arial, sans-serif; }
   #view { position: fixed; inset: 0; }
   #view canvas { display: block; width: 100%; height: 100%; }
-  #panel { position: fixed; top: 14px; left: 14px; width: 300px; max-height: calc(100% - 28px); overflow-y: auto;
-    background: var(--panel); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
-  h1 { font-size: 15px; margin: 0 0 2px; }
-  #sub { color: var(--muted); font-size: 11.5px; margin-bottom: 8px; }
-  h2 { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 12px 0 6px; font-weight: 600; }
+  #panel { position: fixed; top: 0; left: 0; bottom: 0; width: 320px; overflow-y: auto;
+    background: var(--paper); border-right: 1px solid var(--rule); padding: 20px 18px; }
+  h1 { font-size: 26px; font-weight: 700; line-height: 1.02; letter-spacing: -0.02em; margin: 0 0 8px; }
+  #sub { color: var(--grey); font-size: 11.5px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 4px solid var(--spot); }
+  h2 { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; margin: 14px 0 6px; font-weight: 700; }
   ul { list-style: none; margin: 0; padding: 0; }
-  li { margin: 4px 0; }
-  details { color: var(--muted); font-size: 11.5px; margin-left: 22px; }
-  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  li { margin: 0; padding: 4px 0; border-bottom: 1px solid #e6e6e6; }
+  details { color: var(--grey); font-size: 11.5px; margin-left: 22px; }
+  .swatch { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; }
   .check { display: flex; gap: 6px; align-items: center; cursor: pointer; margin: 3px 0; }
-  input[type=checkbox], input[type=range] { accent-color: var(--accent); }
-  fieldset { border: 0; border-top: 1px solid var(--line); margin: 8px 0 0; padding: 8px 0 2px; }
-  legend { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 0 4px 0 0; }
-  .range { display: grid; grid-template-columns: 78px 1fr 44px; align-items: center; gap: 8px; margin: 4px 0; }
-  .range output { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; font-size: 11.5px; }
+  input[type=checkbox], input[type=range] { accent-color: var(--spot); }
+  fieldset { border: 0; border-top: 1px solid var(--rule); margin: 12px 0 0; padding: 8px 0 2px; min-width: 0; }
+  legend { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; padding: 0 4px 0 0; }
+  label { display: block; margin: 4px 0; }
+  .range { display: grid; grid-template-columns: 78px 1fr 44px; align-items: center; gap: 8px; }
+  .range output { color: var(--grey); text-align: right; font-variant-numeric: tabular-nums; font-size: 11.5px; }
   .inline { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
-  button, select { font: inherit; color: var(--text); background: rgba(255,255,255,0.07); border: 1px solid var(--line);
-    border-radius: 6px; padding: 5px 9px; cursor: pointer; }
-  button:hover, select:hover { background: rgba(255,255,255,0.14); }
-  button.primary { background: var(--accent); color: #14200f; border-color: transparent; font-weight: 600; }
-  .hint { color: var(--muted); font-size: 11px; }
-  #caption { color: var(--muted); font-size: 11px; border-top: 1px solid var(--line); padding-top: 8px; margin-top: 10px; }
-  #attr { position: fixed; right: 10px; bottom: 8px; max-width: 60%; font-size: 10.5px; color: rgba(255,255,255,0.7);
-    text-shadow: 0 1px 2px rgba(0,0,0,.7); text-align: right; pointer-events: none; }
-  #loading { position: fixed; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 14px; }
+  button, select { font: inherit; font-weight: 700; color: var(--ink); background: #fff; border: 1px solid var(--ink);
+    border-radius: 0; padding: 5px 9px; cursor: pointer; }
+  button:hover { background: var(--ink); color: #fff; }
+  button.primary { background: var(--ink); color: #fff; }
+  button.primary:hover { background: var(--spot); border-color: var(--spot); }
+  select { font-weight: 400; max-width: 100%; }
+  .hint { color: var(--grey); font-size: 11px; }
+  #caption { color: var(--grey); font-size: 11px; border-top: 1px solid var(--rule); padding-top: 8px; margin-top: 12px; }
+  #attr { position: fixed; right: 10px; bottom: 8px; max-width: 55%; font-size: 10.5px; color: #000;
+    background: rgba(255,255,255,0.85); padding: 3px 6px; text-align: right; pointer-events: none; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; font-size: 14px; }
   #showui { position: fixed; top: 14px; left: 14px; display: none; }
   body.hidden #panel { display: none; } body.hidden #showui { display: block; }
   body.clean #panel, body.clean #attr, body.clean #showui { display: none; }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  @media (max-width: 700px) { #panel { width: auto; right: 14px; max-height: 45%; top: auto; bottom: 14px; } }
+  :focus-visible { outline: 3px solid var(--spot); outline-offset: 2px; }
+  @media (max-width: 700px) { #panel { width: auto; right: 0; top: auto; max-height: 45%; border-right: 0; border-top: 1px solid var(--rule); } }
 </style>
 <!--IMPORTMAP-->
 </head>

@@ -31,7 +31,7 @@ everywhere).
    Ochiltree ("this application"), Cockenzie ("preferred supplier chosen"),
    Auchtertool ("EIA screening"). Please set these from the planning portals.
 7. **Auchtertool extent.** APRS's pin lies about 300 m north of the Mossmorran
-   study area used so far. The default model is now a 2 km square on the pin;
+   study area used so far. The default model is now a 3.2 × 1.2 km strip centred on the pin;
    your wider Mossmorran extent is kept as `model_bbox_wide`.
 
 ## Fields still empty, by site

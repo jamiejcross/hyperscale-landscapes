@@ -25,6 +25,7 @@ MODULES = {
     "hl/studio": "js/scene/studio.js",
     "hl/caption": "js/scene/caption.js",
     "hl/turntable": "js/scene/turntable.js",
+    "hl/beforeafter": "js/scene/beforeafter.js",
     "gifenc": "vendor/gifenc.js",
 }
 
@@ -137,9 +138,15 @@ def write_viewer(path, *, layer_meshes: dict, insert, opts, preset: dict, featur
     imports = {}
     for spec, rel in MODULES.items():
         text = ((w / rel).read_text().replace("from './caption.js'", "from 'hl/caption'")
-                .replace("from './turntable.js'", "from 'hl/turntable'"))
+                .replace("from './turntable.js'", "from 'hl/turntable'")
+                .replace("from './beforeafter.js'", "from 'hl/beforeafter'"))
         imports[spec] = _data_url(text)
     html = (w / "viewer.html").read_text()
+    faces = "".join(
+        '@font-face{font-family:"Inter";font-weight:%d;src:url(data:font/woff2;base64,%s) format("woff2")}'
+        % (wt, base64.b64encode((w / f"vendor/fonts/inter-latin-{wt}.woff2").read_bytes()).decode())
+        for wt in (400, 700))
+    html = html.replace("<!--FONTS-->", f"<style>{faces}</style>")
     html = html.replace("<!--IMPORTMAP-->", f'<script type="importmap">{json.dumps({"imports": imports})}</script>')
     html = html.replace("<!--DATA-->", '<script id="terrain-data" type="application/json">'
                         + json.dumps(D, ensure_ascii=False).replace("<", "\\u003c") + "</script>")

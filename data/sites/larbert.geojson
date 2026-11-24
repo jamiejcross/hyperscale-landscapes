@@ -43,11 +43,11 @@
     "licence": "CC-BY-4.0",
     "notes": "Glenbervie industrial estate; previously proposed at Plean. APRS reports a full planning application has been submitted.",
     "model_bbox": {
-      "min_lat": 56.02253,
-      "max_lat": 56.0405,
-      "min_lon": -3.86094,
-      "max_lon": -3.82878
+      "min_lat": 56.02613,
+      "max_lat": 56.03691,
+      "min_lon": -3.87058,
+      "max_lon": -3.81913
     },
-    "model_bbox_note": "2 km square centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

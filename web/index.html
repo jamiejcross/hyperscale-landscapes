@@ -27,14 +27,13 @@
 
 <main id="main">
   <section class="step" id="pick" aria-labelledby="pick-h">
-    <h2 id="pick-h" data-i18n="step.pick"></h2>
+    <h2 id="pick-h"><span class="num" aria-hidden="true">1</span><span data-i18n="step.pick"></span></h2>
     <div class="pick-grid">
       <div class="pick-controls">
         <fieldset>
           <legend data-i18n="pick.sites"></legend>
-          <label for="site-filter" class="visually-hidden">Filter sites</label>
-          <input id="site-filter" type="search" placeholder="Filter by name or council" autocomplete="off">
-          <div id="sites" class="sites"></div>
+          <label for="site-select" class="visually-hidden">Choose a curated site</label>
+          <select id="site-select"><option value="">Choose a site…</option></select>
           <p class="hint" data-i18n="pick.sites.help"></p>
           <div id="site-facts" class="site-facts" aria-live="polite" hidden></div>
         </fieldset>
@@ -74,7 +73,7 @@
   </section>
 
   <section class="step" id="size" aria-labelledby="size-h">
-    <h2 id="size-h" data-i18n="step.size"></h2>
+    <h2 id="size-h"><span class="num" aria-hidden="true">2</span><span data-i18n="step.size"></span></h2>
     <form id="options" class="options">
       <label><span data-i18n="size.print"></span>
         <select name="printSize"><option value="150" selected>150 mm</option><option value="200">200 mm</option><option value="120">120 mm</option></select></label>
@@ -107,7 +106,7 @@
   </section>
 
   <section class="step" id="preview" aria-labelledby="preview-h" hidden>
-    <h2 id="preview-h" data-i18n="step.preview"></h2>
+    <h2 id="preview-h"><span class="num" aria-hidden="true">3</span><span data-i18n="step.preview"></span></h2>
     <div class="preview-grid">
       <div id="view" class="view"></div>
       <aside class="layers">
@@ -142,7 +141,7 @@
   </section>
 
   <section class="step" id="export" aria-labelledby="export-h" hidden>
-    <h2 id="export-h" data-i18n="step.export"></h2>
+    <h2 id="export-h"><span class="num" aria-hidden="true">4</span><span data-i18n="step.export"></span></h2>
     <div class="inline downloads">
       <button type="button" id="dl-3mf" class="primary" data-i18n="export.3mf"></button>
       <button type="button" id="dl-stl" data-i18n="export.stl"></button>

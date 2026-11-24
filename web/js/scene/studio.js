@@ -3,6 +3,7 @@
 // downloadable offline viewer.  Saved images always carry the caption strip.
 import { withCaption } from './caption.js';
 import { SIZES, makeGIF, makeVideo, videoType } from './turntable.js';
+import { sideBySide, crossfadeGIF } from './beforeafter.js';
 
 const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'N'];
 
@@ -52,6 +53,14 @@ export function mountStudio(el, scene, host) {
       <p class="hint">Starts from the view on screen: point the camera at the site first. GIFs are kept under 8 MB. ${videoType()?.includes('mp4') ? 'Videos are MP4.' : 'Videos are WebM; WhatsApp needs MP4 (use Safari or a recent Chrome).'}</p>
       <p class="hint" name="animInfo" aria-live="polite"></p>
     </fieldset>
+    <fieldset name="baSet"><legend>Before and after</legend>
+      <div class="inline">
+        <button type="button" name="baPNG">Side by side (PNG)</button>
+        <button type="button" name="baGIF">Crossfade (GIF)</button>
+      </div>
+      <p class="hint" name="baHint">The same view today and with the proposed data centre. Point the camera at the site first.</p>
+      <p class="hint" name="baInfo" aria-live="polite"></p>
+    </fieldset>
     <fieldset><legend>Save an image</legend>
       <div class="inline">
         <select name="res" aria-label="Image size">
@@ -76,6 +85,11 @@ export function mountStudio(el, scene, host) {
     scene.setVisible('terrain-sides', q('sides').checked);
     scene.setShadow(q('shadow').checked);
     scene.setPrintColours(q('print').checked, host.printColours());
+    const hasSite = !!scene.meshes.site;
+    q('baPNG').disabled = q('baGIF').disabled = !hasSite;
+    q('baHint').textContent = hasSite
+      ? 'The same view today and with the proposed data centre. Point the camera at the site first.'
+      : 'Needs a footprint and height for the proposed building (step 2). None is mapped for the curated sites yet.';
     host.onChange?.(scene.view);
   }
   ['az', 'el', 'sun', 'fill', 'zex'].forEach(n => q(n).addEventListener('input', update));
@@ -134,6 +148,22 @@ export function mountStudio(el, scene, host) {
     finally { btns.forEach(b => { b.disabled = false; }); }
   }
   q('gif').addEventListener('click', () => runAnim('gif'));
+
+  // ---- before / after ----
+  q('baPNG').addEventListener('click', async () => {
+    const c = sideBySide(scene, host.caption(), { dark: scene.view.background === 'dark' });
+    const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+    download(blob, `${host.filename()}-before-after.png`);
+    q('baInfo').textContent = `${c.width} × ${c.height} px, ${(blob.size / 1e6).toFixed(1)} MB.`;
+  });
+  q('baGIF').addEventListener('click', async () => {
+    q('baGIF').disabled = true;
+    try {
+      const blob = await crossfadeGIF(scene, host.caption(), { dark: scene.view.background === 'dark', onProgress: m => { q('baInfo').textContent = m; } });
+      download(blob, `${host.filename()}-before-after.gif`);
+      q('baInfo').textContent = `GIF, ${(blob.size / 1e6).toFixed(1)} MB.`;
+    } finally { q('baGIF').disabled = false; }
+  });
   q('video').addEventListener('click', () => runAnim('video'));
   update();
   return { update, grab, compose, runAnim, animOpts, reset: update };

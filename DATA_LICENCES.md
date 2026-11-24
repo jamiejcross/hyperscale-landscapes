@@ -64,6 +64,7 @@ Licence texts are in `web/vendor/licences/`.
 | Font | Used for | Licence | Status |
 |---|---|---|---|
 | Aileron Regular (dotcolon.net), embedded in Pillow | text engraved on the model base | CC0 1.0 (believed) | to verify |
+| Inter 4 (400, 700), `web/vendor/fonts/` | web app, captions, cross-sections, offline viewer | SIL Open Font Licence 1.1 | verified (licence text in `web/vendor/licences/inter.LICENSE`) |
 
 ## Not integrated: licence unclear (for review)
 

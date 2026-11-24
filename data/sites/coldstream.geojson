@@ -43,11 +43,11 @@
     "licence": "CC-BY-4.0",
     "notes": "Farmland near Coldstream. APRS reports that no EIA is required.",
     "model_bbox": {
-      "min_lat": 55.67432,
-      "max_lat": 55.69228,
-      "min_lon": -2.37636,
-      "max_lon": -2.34449
+      "min_lat": 55.67791,
+      "max_lat": 55.68869,
+      "min_lon": -2.38592,
+      "max_lon": -2.33493
     },
-    "model_bbox_note": "2 km square centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

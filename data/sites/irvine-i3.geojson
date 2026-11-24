@@ -37,11 +37,11 @@
     "licence": "CC-BY-4.0",
     "notes": "APRS reports the site is not yet in planning and the pin is an approximate location within the i3 Business Park.",
     "model_bbox": {
-      "min_lat": 55.58949,
-      "max_lat": 55.60746,
-      "min_lon": -4.64381,
-      "max_lon": -4.61201
+      "min_lat": 55.59308,
+      "max_lat": 55.60386,
+      "min_lon": -4.65335,
+      "max_lon": -4.60247
     },
-    "model_bbox_note": "2 km square centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

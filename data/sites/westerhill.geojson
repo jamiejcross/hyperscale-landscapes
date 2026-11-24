@@ -43,11 +43,11 @@
     "licence": "CC-BY-4.0",
     "notes": "Green Belt farmland between Bishopbriggs and Lenzie. APRS reports that an EIA is required.",
     "model_bbox": {
-      "min_lat": 55.91199,
-      "max_lat": 55.92995,
-      "min_lon": -4.20564,
-      "max_lon": -4.17357
+      "min_lat": 55.91558,
+      "max_lat": 55.92636,
+      "min_lon": -4.21526,
+      "max_lon": -4.16396
     },
-    "model_bbox_note": "2 km square centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

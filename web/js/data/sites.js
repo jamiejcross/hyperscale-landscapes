@@ -14,6 +14,11 @@ export async function loadSite(entry) {
   if (entry.bundle) {
     const r = await fetch(`data/sites/${entry.bundle}`);
     if (r.ok) bundle = JSON.parse(strFromU8(gunzipSync(new Uint8Array(await r.arrayBuffer()))));
+    // A bundle baked for a different area (e.g. before the default extent
+    // changed) would leave gaps: ignore it and fetch live instead.
+    const a = bundle?.bbox, b = site.properties.model_bbox;
+    const same = a && ['min_lat', 'max_lat', 'min_lon', 'max_lon'].every(k => Math.abs(a[k] - b[k]) < 1e-6);
+    if (bundle && !same) bundle = null;
   }
   return { site, bundle };
 }

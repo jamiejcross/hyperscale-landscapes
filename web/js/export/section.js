@@ -176,7 +176,12 @@ export function computeSection({ line, bbox, elev, osm, footprint = null, insert
 // ---------------------------------------------------------------------------
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-export function sectionSVG(sec, { vex = 1, caption, colours, width = 1600, siteLabel = 'Proposed data centre' }) {
+// Swiss style: black, greys and white, with the one spot colour reserved for
+// the proposed data centre. Layers are told apart by label and tone.
+const INK = '#000000', GREY = '#5c5c5c', MID = '#9a9a9a', LIGHT = '#d9d9d9', SPOT = '#d55e00';
+const FONT = "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif";
+
+export function sectionSVG(sec, { vex = 1, caption, width = 1600, siteLabel = 'Proposed data centre', fontCSS = '' }) {
   const m = { l: 70, r: 30, t: 60, b: 50 };
   const pw = width - m.l - m.r;
   const kx = pw / sec.length;                         // px per metre, horizontal
@@ -193,57 +198,57 @@ export function sectionSVG(sec, { vex = 1, caption, colours, width = 1600, siteL
   const capLines = [caption.title + '  ·  ' + caption.disclosure, ...wrapText(caption.sources, 190), caption.footer];
   const capH = 16 + capLines.length * 18;
   const out = [];
-  out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${H + capH}" viewBox="0 0 ${width} ${H + capH}" font-family="system-ui, -apple-system, 'Segoe UI', Arial, sans-serif" font-size="13">`);
+  out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${H + capH}" viewBox="0 0 ${width} ${H + capH}" font-family="${FONT}" font-size="13">`);
   out.push(`<title>${esc(caption.title)}: cross-section</title>`);
+  if (fontCSS) out.push(`<style>${fontCSS}</style>`);
   out.push(`<rect width="100%" height="100%" fill="#ffffff"/>`);
-  out.push(`<text x="${m.l}" y="26" font-size="18" font-weight="650" fill="#22201c">${esc(caption.title)}: cross-section A–B</text>`);
-  out.push(`<text x="${m.l}" y="46" fill="#55504a">${(sec.length / 1000).toFixed(2)} km · vertical scale ${vex === 1 ? 'true (×1, not exaggerated)' : `exaggerated ×${vex}`} · heights in metres above sea level</text>`);
+  out.push(`<text x="${m.l}" y="28" font-size="22" font-weight="700" letter-spacing="-0.3" fill="${INK}">${esc(caption.title)}: cross-section A–B</text>`);
+  out.push(`<text x="${m.l}" y="48" fill="${GREY}">${(sec.length / 1000).toFixed(2)} km · vertical scale ${vex === 1 ? 'true (×1, not exaggerated)' : `exaggerated ×${vex}`} · heights in metres above sea level</text>`);
 
   // axes and grid
   const gstep = niceStep(Math.max((tallest - lo) / 4, 24 / ky));   // at least 24 px between gridlines
   for (let z = Math.ceil(lo / gstep) * gstep; z <= tallest + gstep; z += gstep) {
     if (Y(z) < top - 2) break;
-    out.push(`<line x1="${m.l}" x2="${m.l + pw}" y1="${Y(z)}" y2="${Y(z)}" stroke="#e4e0d8"/>`);
-    out.push(`<text x="${m.l - 8}" y="${Y(z) + 4}" text-anchor="end" fill="#55504a">${z} m</text>`);
+    out.push(`<line x1="${m.l}" x2="${m.l + pw}" y1="${Y(z)}" y2="${Y(z)}" stroke="${LIGHT}"/>`);
+    out.push(`<text x="${m.l - 8}" y="${Y(z) + 4}" text-anchor="end" fill="${GREY}">${z} m</text>`);
   }
   const xstep = niceStep(sec.length / 8);
   for (let s = 0; s <= sec.length; s += xstep) {
-    out.push(`<line x1="${X(s)}" x2="${X(s)}" y1="${top + ph}" y2="${top + ph + 5}" stroke="#55504a"/>`);
-    out.push(`<text x="${X(s)}" y="${top + ph + 20}" text-anchor="middle" fill="#55504a">${s >= 1000 ? `${(s / 1000).toFixed(s % 1000 ? 1 : 0)} km` : `${s} m`}</text>`);
+    out.push(`<line x1="${X(s)}" x2="${X(s)}" y1="${top + ph}" y2="${top + ph + 5}" stroke="${INK}"/>`);
+    out.push(`<text x="${X(s)}" y="${top + ph + 20}" text-anchor="middle" fill="${GREY}">${s >= 1000 ? `${(s / 1000).toFixed(s % 1000 ? 1 : 0)} km` : `${s} m`}</text>`);
   }
 
   // water (behind the ground line)
   for (const w of sec.items.water) {
     const z = Math.max(ground(sec, w.s0), 0);
-    out.push(`<rect x="${X(w.s0)}" y="${Y(z) - 3}" width="${Math.max(1, (w.s1 - w.s0) * kx)}" height="6" fill="${colours.water}"/>`);
+    out.push(`<rect x="${X(w.s0)}" y="${Y(z) - 3}" width="${Math.max(1, (w.s1 - w.s0) * kx)}" height="6" fill="${MID}"/>`);
   }
   // ground
   const pts = sec.profile.map(([s, z]) => `${X(s).toFixed(1)},${Y(z).toFixed(1)}`).join(' ');
-  out.push(`<polygon points="${X(0)},${top + ph} ${pts} ${X(sec.length)},${top + ph}" fill="#cdbf9f"/>`);
-  out.push(`<polyline points="${pts}" fill="none" stroke="#6f5a43" stroke-width="2"/>`);
+  out.push(`<polygon points="${X(0)},${top + ph} ${pts} ${X(sec.length)},${top + ph}" fill="${LIGHT}"/>`);
+  out.push(`<polyline points="${pts}" fill="none" stroke="${INK}" stroke-width="2"/>`);
   // residues, power and receptor spans as bands just under the ground line
   for (const sp of sec.items.spans) {
-    const c = colours[sp.layer];
-    out.push(`<rect x="${X(sp.s0)}" y="${Y(ground(sec, (sp.s0 + sp.s1) / 2)) + 3}" width="${Math.max(2, (sp.s1 - sp.s0) * kx)}" height="7" fill="${c}" opacity="0.85"/>`);
+    out.push(`<rect x="${X(sp.s0)}" y="${Y(ground(sec, (sp.s0 + sp.s1) / 2)) + 3}" width="${Math.max(2, (sp.s1 - sp.s0) * kx)}" height="7" fill="${INK}"/>`);
   }
   // buildings
   for (const b of sec.items.buildings)
-    out.push(`<rect x="${X(b.s0)}" y="${Y(b.top)}" width="${Math.max(1, (b.s1 - b.s0) * kx)}" height="${Math.max(1, (b.top - b.base) * ky)}" fill="${b.receptor ? colours.receptors : '#9a958c'}"/>`);
+    out.push(`<rect x="${X(b.s0)}" y="${Y(b.top)}" width="${Math.max(1, (b.s1 - b.s0) * kx)}" height="${Math.max(1, (b.top - b.base) * ky)}" fill="${b.receptor ? INK : MID}"/>`);
   // the proposed facility
   for (const b of sec.items.site)
-    out.push(`<rect x="${X(b.s0)}" y="${Y(b.top)}" width="${(b.s1 - b.s0) * kx}" height="${(b.top - b.base) * ky}" fill="${colours.site}" fill-opacity="0.55" stroke="${colours.site}" stroke-width="2" stroke-dasharray="6 3"/>`);
+    out.push(`<rect x="${X(b.s0)}" y="${Y(b.top)}" width="${(b.s1 - b.s0) * kx}" height="${(b.top - b.base) * ky}" fill="${SPOT}" fill-opacity="0.75" stroke="${SPOT}" stroke-width="2"/>`);
   // pylons
   for (const p of sec.items.points.filter(p => p.kind === 'pylon')) {
     const g = ground(sec, p.s);
-    out.push(`<line x1="${X(p.s)}" x2="${X(p.s)}" y1="${Y(g)}" y2="${Y(g + p.height)}" stroke="${colours.power}" stroke-width="3"/>`);
+    out.push(`<line x1="${X(p.s)}" x2="${X(p.s)}" y1="${Y(g)}" y2="${Y(g + p.height)}" stroke="${INK}" stroke-width="3"/>`);
   }
 
   // labels: one row each, greedily stacked so they do not overlap
   const labels = [
-    ...sec.items.site.map(b => ({ s: (b.s0 + b.s1) / 2, z: b.top, text: `${siteLabel} (${Math.round(b.top - b.base)} m)`, colour: colours.site, bold: true })),
-    ...sec.items.points.map(p => ({ s: p.s, z: ground(sec, p.s) + (p.height || 0), text: p.label, colour: colours[p.kind === 'pylon' ? 'power' : p.kind] || '#333' })),
-    ...sec.items.spans.map(sp => ({ s: (sp.s0 + sp.s1) / 2, z: ground(sec, (sp.s0 + sp.s1) / 2), text: sp.label, colour: colours[sp.layer] })),
-    ...mergeRuns(sec.items.buildings.filter(b => b.receptor)).map(r => ({ s: r, z: ground(sec, r), text: 'School / care / community', colour: colours.receptors })),
+    ...sec.items.site.map(b => ({ s: (b.s0 + b.s1) / 2, z: b.top, text: `${siteLabel} (${Math.round(b.top - b.base)} m)`, colour: SPOT, bold: true })),
+    ...sec.items.points.map(p => ({ s: p.s, z: ground(sec, p.s) + (p.height || 0), text: p.label, colour: GREY })),
+    ...sec.items.spans.map(sp => ({ s: (sp.s0 + sp.s1) / 2, z: ground(sec, (sp.s0 + sp.s1) / 2), text: sp.label, colour: GREY })),
+    ...mergeRuns(sec.items.buildings.filter(b => b.receptor)).map(r => ({ s: r, z: ground(sec, r), text: 'School / care / community', colour: GREY })),
   ].sort((a, b) => a.s - b.s);
   const rowsEnd = Array(labelRows).fill(-Infinity);
   for (const lb of labels) {
@@ -253,15 +258,15 @@ export function sectionSVG(sec, { vex = 1, caption, colours, width = 1600, siteL
     rowsEnd[row] = x + w;
     const ly = m.t + row * rowH + 12;
     out.push(`<line x1="${x}" x2="${x}" y1="${ly + 4}" y2="${Y(lb.z) - 2}" stroke="${lb.colour}" stroke-width="1" opacity="0.7"/>`);
-    out.push(`<text x="${x + 3}" y="${ly}" fill="#22201c"${lb.bold ? ' font-weight="650"' : ''}>${esc(lb.text)}</text>`);
+    out.push(`<text x="${x + 3}" y="${ly}" fill="${lb.bold ? SPOT : INK}"${lb.bold ? ' font-weight="700"' : ''}>${esc(lb.text)}</text>`);
   }
   // A and B
   out.push(`<text x="${X(0)}" y="${top + ph + 38}" font-weight="700">A</text>`);
   out.push(`<text x="${X(sec.length)}" y="${top + ph + 38}" font-weight="700" text-anchor="end">B</text>`);
 
   // caption band
-  out.push(`<rect x="0" y="${H}" width="${width}" height="${capH}" fill="#f7f5f0"/>`);
-  capLines.forEach((l, i) => out.push(`<text x="${m.l}" y="${H + 22 + i * 18}" fill="${i ? '#55504a' : '#22201c'}"${i ? '' : ' font-weight="600"'}>${esc(l)}</text>`));
+  out.push(`<rect x="0" y="${H}" width="${width}" height="4" fill="${SPOT}"/>`);
+  capLines.forEach((l, i) => out.push(`<text x="${m.l}" y="${H + 24 + i * 18}" fill="${i ? GREY : INK}"${i ? '' : ' font-weight="700"'}>${esc(l)}</text>`));
   out.push('</svg>');
   return out.join('\n');
 }

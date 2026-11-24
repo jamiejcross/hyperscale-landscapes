@@ -35,6 +35,10 @@ def test_curated_bundles_are_small_and_valid():
         b = json.loads(gzip.decompress(p.read_bytes()))
         assert b["schema"] == "hyperscale-landscapes/site-bundle@1"
         assert b["osm"]["elements"] and b["elevation"]["tiles"]
+        # A bundle must cover exactly the site's model area (the app ignores
+        # mismatched bundles and falls back to live requests).
+        site = json.loads((DATA / s["file"]).read_text())["properties"]
+        assert b.get("bbox") == site["model_bbox"], f"{s['id']}: bundle needs re-baking"
 
 
 def test_every_site_validates_against_the_schema():

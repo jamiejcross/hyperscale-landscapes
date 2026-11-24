@@ -43,11 +43,11 @@
     "licence": "CC-BY-4.0",
     "notes": "Green Belt farmland between Chapelhall and Holytown.",
     "model_bbox": {
-      "min_lat": 55.82199,
-      "max_lat": 55.83995,
-      "min_lon": -3.93737,
-      "max_lon": -3.90538
+      "min_lat": 55.82558,
+      "max_lat": 55.83636,
+      "min_lon": -3.94697,
+      "max_lon": -3.89578
     },
-    "model_bbox_note": "2 km square centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

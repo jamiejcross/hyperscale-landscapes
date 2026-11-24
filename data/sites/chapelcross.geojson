@@ -43,11 +43,11 @@
     "licence": "CC-BY-4.0",
     "notes": "Land north of the former Chapelcross nuclear site. APRS reports the planning application was validated on 28 September 2026, with an EIA.",
     "model_bbox": {
-      "min_lat": 55.00544,
-      "max_lat": 55.0234,
-      "min_lon": -3.24266,
-      "max_lon": -3.21133
+      "min_lat": 55.00903,
+      "max_lat": 55.01981,
+      "min_lon": -3.25206,
+      "max_lon": -3.20193
     },
-    "model_bbox_note": "2 km square centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

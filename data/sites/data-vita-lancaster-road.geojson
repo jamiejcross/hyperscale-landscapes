@@ -43,11 +43,11 @@
     "licence": "CC-BY-4.0",
     "notes": "Green Belt land about 500 m from the existing Data Vita site; part of the proposed AI Growth Zone.",
     "model_bbox": {
-      "min_lat": 55.82736,
-      "max_lat": 55.84532,
-      "min_lon": -3.9508,
-      "max_lon": -3.9188
+      "min_lat": 55.83095,
+      "max_lat": 55.84173,
+      "min_lon": -3.9604,
+      "max_lon": -3.90921
     },
-    "model_bbox_note": "2 km square centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

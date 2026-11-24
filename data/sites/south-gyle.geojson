@@ -43,11 +43,11 @@
     "licence": "CC-BY-4.0",
     "notes": "APRS reports that the City of Edinburgh Council planning sub-committee refused planning permission in principle in February 2026. The site had permission for offices.",
     "model_bbox": {
-      "min_lat": 55.92301,
-      "max_lat": 55.94097,
-      "min_lon": -3.32495,
-      "max_lon": -3.29288
+      "min_lat": 55.9266,
+      "max_lat": 55.93738,
+      "min_lon": -3.33458,
+      "max_lon": -3.28326
     },
-    "model_bbox_note": "2 km square centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

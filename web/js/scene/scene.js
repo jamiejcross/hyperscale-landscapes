@@ -94,7 +94,7 @@ export function createScene(container) {
   }
 
   // layers: {id: mesh}; colours: {id: '#rrggbb'}; landcover: canvas or null
-  function setModel({ layers, insert, colours, landcover, grid }) {
+  function setModel({ layers, insert, before = null, colours, landcover, grid }) {
     for (const k of Object.keys(meshes)) { inner.remove(meshes[k]); meshes[k].geometry.dispose(); delete meshes[k]; }
     span = Math.max(grid.Wmm, grid.Hmm);
     let zmax = 0;
@@ -127,6 +127,19 @@ export function createScene(container) {
       inner.add(mesh); meshes[id] = mesh;
       for (let k = 2; k < m.positions.length; k += 3) zmax = Math.max(zmax, m.positions[k]);
     }
+    // 'Before' meshes (land without the recess, buildings the site would
+    // clear): hidden unless a before/after view asks for them.
+    if (before?.terrain && meshes.terrain) {
+      const g = geometry(before.terrain);
+      g.setIndex(new THREE.BufferAttribute(splitWalls(before.terrain).capsIdx, 1));
+      g.setAttribute('uv', planarUV(before.terrain.positions, grid));
+      const m = new THREE.Mesh(g, meshes.terrain.material);
+      m.receiveShadow = true; m.visible = false; inner.add(m); meshes['before-terrain'] = m;
+    }
+    if (before?.buildings?.indices.length) {
+      const m = new THREE.Mesh(geometry(before.buildings), new THREE.MeshStandardMaterial({ color: colours.buildings || '#d9d9d9', roughness: 0.8 }));
+      m.castShadow = m.receiveShadow = true; m.visible = false; inner.add(m); meshes['before-buildings'] = m;
+    }
     H = zmax;
     inner.position.set(-grid.Wmm / 2, -grid.Hmm / 2, 0);
     ground.scale.set(span * 8, span * 8, 1);
@@ -142,6 +155,14 @@ export function createScene(container) {
     m.material.map = canvas ? canvasTexture(canvas, renderer) : null;
     m.material.color.set(canvas ? 0xffffff : LAND_BASE);
     m.material.needsUpdate = true;
+  }
+
+  // Show the site as it is today (true) or with the proposed facility (false).
+  function setBefore(on) {
+    const has = !!meshes['before-terrain'];
+    if (meshes.site) meshes.site.visible = !on;
+    if (has) { meshes['before-terrain'].visible = on; meshes.terrain.visible = !on; }
+    if (meshes['before-buildings']) meshes['before-buildings'].visible = on;
   }
 
   function setVisible(id, on) {
@@ -209,7 +230,18 @@ export function createScene(container) {
   function setShadow(on) { ground.visible = on; }
 
   // Render at `mult` x the on-screen size and return the pixels on a canvas.
-  function grab(mult = 2) {
+  // Captures ignore any on-screen view offset (the offline viewer shifts the
+  // view beside its panel), so saved images are always centred.
+  function withoutOffset(fn) {
+    const v = camera.view?.enabled ? { ...camera.view } : null;
+    if (v) { camera.clearViewOffset(); camera.updateProjectionMatrix(); }
+    try { return fn(); } finally {
+      if (v) { camera.setViewOffset(v.fullWidth, v.fullHeight, v.offsetX, v.offsetY, v.width, v.height); camera.updateProjectionMatrix(); }
+    }
+  }
+
+  function grab(mult = 2) { return withoutOffset(() => grabInner(mult)); }
+  function grabInner(mult) {
     const w = container.clientWidth, h = container.clientHeight, pr = renderer.getPixelRatio();
     renderer.setPixelRatio(mult); renderer.setSize(w, h, false);
     renderer.render(scene, camera);
@@ -228,7 +260,8 @@ export function createScene(container) {
   function pause() { renderer.setAnimationLoop(null); }
   function resume() { renderer.setAnimationLoop(loop); }
   // Render the current camera at exactly w x h pixels, onto a new canvas.
-  function renderAt(w, h) {
+  function renderAt(w, h) { return withoutOffset(() => renderAtInner(w, h)); }
+  function renderAtInner(w, h) {
     const pr = renderer.getPixelRatio(), cw = container.clientWidth, ch = container.clientHeight;
     renderer.setPixelRatio(1); renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
@@ -255,7 +288,7 @@ export function createScene(container) {
   function orbitEnd() { if (orbitBase) camera.position.copy(orbitBase.pos); camera.lookAt(controls.target); orbitBase = null; }
 
   return { renderer, scene, camera, controls, view, meshes, focalMm, setModel, setDrape, setVisible, setView, setSpin,
-    setSun, setFov, setHeightScale, setBackground, setPrintColours, setShadow, grab,
+    setSun, setFov, setHeightScale, setBackground, setPrintColours, setShadow, grab, setBefore,
     pause, resume, renderAt, orbitStart, orbitTo, orbitEnd };
 }
 

@@ -43,12 +43,12 @@
     "licence": "CC-BY-4.0",
     "notes": "Farmland by Auchtertool. APRS reports a newly built battery energy storage system next to the site, that the council is screening for EIA, and that the submitted plans show buildings over Hallyards Castle.",
     "model_bbox": {
-      "min_lat": 56.10013,
-      "max_lat": 56.11809,
-      "min_lon": -3.28147,
-      "max_lon": -3.24925
+      "min_lat": 56.10372,
+      "max_lat": 56.1145,
+      "min_lon": -3.29114,
+      "max_lon": -3.23959
     },
-    "model_bbox_note": "2 km square centred on the APRS pin; a modelling extent, not a site boundary.",
+    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary.",
     "model_bbox_wide": {
       "min_lat": 56.09158,
       "max_lat": 56.10642,

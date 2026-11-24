@@ -43,11 +43,11 @@
     "licence": "CC-BY-4.0",
     "notes": "Green Belt land across the M8 from Chapelhall; APRS describes it as the main site of the proposed AI Growth Zone (about 500 MW across the zone).",
     "model_bbox": {
-      "min_lat": 55.81882,
-      "max_lat": 55.83679,
-      "min_lon": -3.929,
-      "max_lon": -3.89701
+      "min_lat": 55.82241,
+      "max_lat": 55.83319,
+      "min_lon": -3.93859,
+      "max_lon": -3.88742
     },
-    "model_bbox_note": "2 km square centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

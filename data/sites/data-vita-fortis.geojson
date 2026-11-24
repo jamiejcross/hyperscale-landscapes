@@ -43,11 +43,11 @@
     "licence": "CC-BY-4.0",
     "notes": "Extension of an existing data centre; APRS reports an existing connection of about 24 MW rising to 40 MW, within the proposed North Lanarkshire AI Growth Zone.",
     "model_bbox": {
-      "min_lat": 55.82537,
-      "max_lat": 55.84334,
-      "min_lon": -3.96771,
-      "max_lon": -3.93572
+      "min_lat": 55.82897,
+      "max_lat": 55.83975,
+      "min_lon": -3.9773,
+      "max_lon": -3.92612
     },
-    "model_bbox_note": "2 km square centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

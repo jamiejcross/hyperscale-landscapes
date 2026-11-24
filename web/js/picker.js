@@ -13,11 +13,13 @@ export function createPicker(el, { onBBox, onFootprint, onSection = () => {} }) 
   }).addTo(map);
 
   let rect = null, footprint = null, mode = null, start = null, poly = [], polyLine = null;
-  const style = { color: '#D55E00', weight: 2, fillOpacity: 0.08 };
+  // Swiss palette: the model area in black, the site in the one spot colour.
+  const style = { color: '#d55e00', weight: 2, fillOpacity: 0.08 };
+  const areaStyle = { color: '#000', weight: 2, fillOpacity: 0.04, dashArray: null };
 
   function showBBox(b, fit = true) {
     rect?.remove();
-    rect = L.rectangle([[b.minLat, b.minLon], [b.maxLat, b.maxLon]], { ...style, color: '#0072B2' }).addTo(map);
+    rect = L.rectangle([[b.minLat, b.minLon], [b.maxLat, b.maxLon]], areaStyle).addTo(map);
     if (fit) map.fitBounds(rect.getBounds(), { padding: [20, 20] });
     onBBox(b);
   }
@@ -40,7 +42,7 @@ export function createPicker(el, { onBBox, onFootprint, onSection = () => {} }) 
   map.on('mousemove', e => {
     if (mode !== 'box' || !start) return;
     rect?.remove();
-    rect = L.rectangle(L.latLngBounds(start, e.latlng), { ...style, color: '#0072B2' }).addTo(map);
+    rect = L.rectangle(L.latLngBounds(start, e.latlng), areaStyle).addTo(map);
   });
   map.on('mouseup', e => {
     if (mode !== 'box' || !start) return;
@@ -96,7 +98,7 @@ export function createPicker(el, { onBBox, onFootprint, onSection = () => {} }) 
   let pin = null;
   function showPin([lon, lat], label) {
     pin?.remove();
-    pin = L.circleMarker([lat, lon], { radius: 7, color: '#fff', weight: 2, fillColor: '#D55E00', fillOpacity: 1 })
+    pin = L.circleMarker([lat, lon], { radius: 7, color: '#fff', weight: 2, fillColor: '#d55e00', fillOpacity: 1 })
       .addTo(map).bindTooltip(label);
   }
 
