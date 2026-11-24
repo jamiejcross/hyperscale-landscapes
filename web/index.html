@@ -12,7 +12,9 @@
 <script type="importmap">
 { "imports": {
   "three": "./vendor/three/three.module.min.js",
-  "three/addons/": "./vendor/three/addons/"
+  "three/addons/": "./vendor/three/addons/",
+  "gifenc": "./vendor/gifenc.js",
+  "hl/caption": "./js/scene/caption.js"
 } }
 </script>
 </head>
@@ -121,6 +123,22 @@
       <div id="studio"></div>
     </details>
     <p id="caption" class="caption"></p>
+    <details class="studio-wrap" id="section-panel">
+      <summary>Cross-section</summary>
+      <p class="hint">Draw a line across the area on the map, for example from a village through the site to a substation. The profile shows the ground, buildings at their heights, the proposed building at its stated height, and what the line crosses.</p>
+      <div class="inline">
+        <button type="button" id="section-draw">Draw a line on the map</button>
+        <label>Vertical scale
+          <select id="section-vex">
+            <option value="1" selected>True (×1)</option><option value="2">×2</option>
+            <option value="5">×5</option><option value="10">×10</option>
+          </select></label>
+        <button type="button" id="section-svg" disabled>Save SVG</button>
+        <button type="button" id="section-png" disabled>Save PNG</button>
+      </div>
+      <p id="section-status" class="hint" aria-live="polite"></p>
+      <figure id="section-figure" class="section-figure"></figure>
+    </details>
   </section>
 
   <section class="step" id="export" aria-labelledby="export-h" hidden>

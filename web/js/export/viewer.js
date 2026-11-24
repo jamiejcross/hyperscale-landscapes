@@ -10,6 +10,8 @@ const MODULES = {
   'hl/scene': 'js/scene/scene.js',
   'hl/studio': 'js/scene/studio.js',
   'hl/caption': 'js/scene/caption.js',
+  'hl/turntable': 'js/scene/turntable.js',
+  gifenc: 'vendor/gifenc.js',
 };
 
 function b64(bytes) {
@@ -20,7 +22,8 @@ function b64(bytes) {
 const dataURL = text => `data:text/javascript;base64,${b64(new TextEncoder().encode(text))}`;
 
 // Relative imports cannot resolve from a data: URL, so point them at the map.
-const rewrite = text => text.replaceAll("from './caption.js'", "from 'hl/caption'");
+const rewrite = text => text.replaceAll("from './caption.js'", "from 'hl/caption'")
+  .replaceAll("from './turntable.js'", "from 'hl/turntable'");
 
 export async function buildViewer({ model, legend, colours, printColours, caption, sub, drape, zExag, slug, alt }) {
   // Pack every non-empty layer (and the insert) into one gzipped buffer.

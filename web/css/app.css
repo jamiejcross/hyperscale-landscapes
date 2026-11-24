@@ -98,6 +98,8 @@ label.file input { display: block; }
 .check { display: flex; gap: .4rem; align-items: center; }
 .caption { font-size: .9rem; color: var(--muted); max-width: var(--measure); }
 .studio-wrap { margin-top: 1rem; }
+.section-figure { margin: .5rem 0 0; overflow-x: auto; }
+.section-figure svg { width: 100%; height: auto; display: block; border: 1px solid var(--line); border-radius: 6px; }
 .studio-wrap > summary { font-weight: 600; cursor: pointer; }
 .studio { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0 var(--gap); margin-top: .5rem; }
 .studio fieldset { margin-bottom: .75rem; }

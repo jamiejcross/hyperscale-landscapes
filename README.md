@@ -18,8 +18,8 @@ exaggeration, because these are used as evidence.
 
 > **Status: early development (Phase 4 of 7).** The browser app and the Python
 > command-line tool both build multi-colour print files, captioned images and
-> offline 3D viewers, for 27 curated sites or any area you draw. Rotating GIFs, cross-sections and the beginners'
-> guides are still to come. See [PLAN.md](PLAN.md).
+> offline 3D viewers, for 27 curated sites or any area you draw. Before/after images, the scale card and the
+> beginners' guides are still to come. See [PLAN.md](PLAN.md).
 
 ## For organisers
 
@@ -28,6 +28,11 @@ draw an area, and preview it in 3D. From there you can:
 
 - save **images** for Facebook, WhatsApp, slides or leaflets, with a caption
   showing the sources and the height exaggeration built into the picture;
+- make a **rotating GIF or video** of the model (square, portrait or wide;
+  GIFs kept under 8 MB; MP4 where your browser supports it, for WhatsApp);
+- draw a **cross-section** line, for example from a village through the site
+  to a substation, and save the profile as an image, at true scale unless you
+  choose otherwise;
 - download an **interactive 3D viewer**, a single file that opens in any
   browser, works offline, and can be emailed;
 - download a **print file** for a 3D printer.

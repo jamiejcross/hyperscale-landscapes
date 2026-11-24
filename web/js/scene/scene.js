@@ -220,9 +220,43 @@ export function createScene(container) {
     return c;
   }
 
-  renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+  const loop = () => { controls.update(); renderer.render(scene, camera); };
+  renderer.setAnimationLoop(loop);
+
+  // ---- Capture helpers for animations (turntable GIF / video) ----
+  // Pause the live loop so nothing moves the camera between frames.
+  function pause() { renderer.setAnimationLoop(null); }
+  function resume() { renderer.setAnimationLoop(loop); }
+  // Render the current camera at exactly w x h pixels, onto a new canvas.
+  function renderAt(w, h) {
+    const pr = renderer.getPixelRatio(), cw = container.clientWidth, ch = container.clientHeight;
+    renderer.setPixelRatio(1); renderer.setSize(w, h, false);
+    camera.aspect = w / h; camera.updateProjectionMatrix();
+    renderer.render(scene, camera);
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    c.getContext('2d').drawImage(renderer.domElement, 0, 0);
+    renderer.setPixelRatio(pr); renderer.setSize(cw, ch, false);
+    camera.aspect = cw / ch; camera.updateProjectionMatrix();
+    return c;
+  }
+  // Orbit: remember the current view, then place the camera at an angle
+  // (radians, about the vertical axis through the target) from it.
+  let orbitBase = null;
+  // `aspect` is the frame's width/height: when it is narrower than the screen,
+  // the camera moves back so the model's full width stays in frame.
+  function orbitStart(aspect = camera.aspect) {
+    const k = Math.max(1, camera.aspect / aspect);
+    orbitBase = { offset: camera.position.clone().sub(controls.target).multiplyScalar(k), pos: camera.position.clone() };
+  }
+  function orbitTo(angle) {
+    const v = orbitBase.offset.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+    camera.position.copy(controls.target).add(v); camera.lookAt(controls.target);
+  }
+  function orbitEnd() { if (orbitBase) camera.position.copy(orbitBase.pos); camera.lookAt(controls.target); orbitBase = null; }
+
   return { renderer, scene, camera, controls, view, meshes, focalMm, setModel, setDrape, setVisible, setView, setSpin,
-    setSun, setFov, setHeightScale, setBackground, setPrintColours, setShadow, grab };
+    setSun, setFov, setHeightScale, setBackground, setPrintColours, setShadow, grab,
+    pause, resume, renderAt, orbitStart, orbitTo, orbitEnd };
 }
 
 // Separate wall triangles (|normal z| small) from the top/bottom caps.

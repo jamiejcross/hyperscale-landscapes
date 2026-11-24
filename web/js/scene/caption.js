@@ -28,12 +28,12 @@ function wrap(g, text, maxW) {
 // Returns a new canvas: the render with caption bands attached above and
 // below it (part of the same image, so they travel with it, without hiding
 // any of the model).
-export function withCaption(render, caption, { dark = false } = {}) {
-  const W = render.width;
+const font = (px, weight = 400) => `${weight} ${px}px system-ui, -apple-system, "Segoe UI", Arial, sans-serif`;
+
+// Layout of the caption bands for an image `W` pixels wide.
+function layout(W, caption) {
   const fs = Math.max(12, Math.round(W / 120));          // body text size
   const pad = Math.round(fs * 0.8), lh = Math.round(fs * 1.3);
-  const font = (px, weight = 400) => `${weight} ${px}px system-ui, -apple-system, "Segoe UI", Arial, sans-serif`;
-
   const m = document.createElement('canvas').getContext('2d');
   const titleFs = Math.round(fs * 1.25);
   m.font = font(fs);
@@ -44,6 +44,15 @@ export function withCaption(render, caption, { dark = false } = {}) {
   const discInline = pad + tw + m.measureText(disc).width < W - pad;
   const bandH = pad * 2 + Math.round(titleFs * 1.25) + lh * (srcLines.length + footLines.length + (discInline ? 0 : 1));
   const topH = Math.round(fs * 1.8);
+  return { fs, pad, lh, titleFs, srcLines, footLines, tw, disc, discInline, bandH, topH };
+}
+
+// Total height the caption bands add to an image W pixels wide.
+export function captionHeight(W, caption) { const L = layout(W, caption); return L.bandH + L.topH; }
+
+export function withCaption(render, caption, { dark = false } = {}) {
+  const W = render.width;
+  const { fs, pad, lh, titleFs, srcLines, footLines, tw, disc, discInline, bandH, topH } = layout(W, caption);
 
   const out = document.createElement('canvas');
   out.width = W; out.height = topH + render.height + bandH;

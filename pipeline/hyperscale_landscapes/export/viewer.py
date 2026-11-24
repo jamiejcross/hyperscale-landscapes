@@ -24,6 +24,8 @@ MODULES = {
     "hl/scene": "js/scene/scene.js",
     "hl/studio": "js/scene/studio.js",
     "hl/caption": "js/scene/caption.js",
+    "hl/turntable": "js/scene/turntable.js",
+    "gifenc": "vendor/gifenc.js",
 }
 
 # Keep in step with LANDCOVER_COLOURS in web/js/scene/scene.js.
@@ -134,7 +136,8 @@ def write_viewer(path, *, layer_meshes: dict, insert, opts, preset: dict, featur
     w = web_dir()
     imports = {}
     for spec, rel in MODULES.items():
-        text = (w / rel).read_text().replace("from './caption.js'", "from 'hl/caption'")
+        text = ((w / rel).read_text().replace("from './caption.js'", "from 'hl/caption'")
+                .replace("from './turntable.js'", "from 'hl/turntable'"))
         imports[spec] = _data_url(text)
     html = (w / "viewer.html").read_text()
     html = html.replace("<!--IMPORTMAP-->", f'<script type="importmap">{json.dumps({"imports": imports})}</script>')

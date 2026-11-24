@@ -5,7 +5,7 @@ import { allCoords, bboxOfCoords } from './geo.js';
 
 const L = window.L;
 
-export function createPicker(el, { onBBox, onFootprint }) {
+export function createPicker(el, { onBBox, onFootprint, onSection = () => {} }) {
   const map = L.map(el, { zoomSnap: 0.25, keyboard: true }).setView([56.0, -3.8], 9);
   L.tileLayer(BASEMAP, {
     maxZoom: 19,
@@ -49,13 +49,29 @@ export function createPicker(el, { onBBox, onFootprint }) {
     showBBox({ minLat: b.getSouth(), maxLat: b.getNorth(), minLon: b.getWest(), maxLon: b.getEast() }, false);
   });
   map.on('click', e => {
-    if (mode !== 'polygon' && mode !== 'footprint') return;
+    if (mode !== 'polygon' && mode !== 'footprint' && mode !== 'section') return;
     poly.push([e.latlng.lng, e.latlng.lat]);
     polyLine?.remove();
     polyLine = L.polyline(poly.map(([x, y]) => [y, x]), style).addTo(map);
   });
 
+  const sectionLayer = L.layerGroup().addTo(map);
+  function showSection(coords) {
+    sectionLayer.clearLayers();
+    if (!coords) return;
+    L.polyline(coords.map(([x, y]) => [y, x]), { color: '#111', weight: 3, dashArray: '6 4' }).addTo(sectionLayer);
+    for (const [label, [x, y]] of [['A', coords[0]], ['B', coords.at(-1)]])
+      L.circleMarker([y, x], { radius: 4, color: '#111', fillOpacity: 1 }).addTo(sectionLayer)
+        .bindTooltip(label, { permanent: true, direction: 'top' });
+  }
+
   function finishPolygon() {
+    if (mode === 'section') {
+      if (poly.length < 2) return false;
+      const line = poly.slice();
+      setMode(null); showSection(line); onSection(line);
+      return true;
+    }
     if (poly.length < 3) return false;
     const gj = { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[...poly, poly[0]]] } };
     const m = mode;
@@ -84,5 +100,5 @@ export function createPicker(el, { onBBox, onFootprint }) {
       .addTo(map).bindTooltip(label);
   }
 
-  return { map, showBBox, showFootprint, showPin, setMode, finishPolygon, search, goTo, get mode() { return mode; } };
+  return { map, showBBox, showFootprint, showPin, showSection, setMode, finishPolygon, search, goTo, get mode() { return mode; } };
 }

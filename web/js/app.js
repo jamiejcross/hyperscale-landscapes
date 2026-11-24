@@ -12,6 +12,7 @@ import { createScene, landcoverCanvas } from './scene/scene.js';
 import { SURFACES, imageryCanvas } from './data/imagery.js';
 import { mountStudio } from './scene/studio.js';
 import { buildViewer } from './export/viewer.js';
+import { computeSection, sectionSVG, svgToPNG } from './export/section.js';
 import { captionLines, altText as draftAlt } from './scene/caption.js';
 import { write3MF } from './export/threemf.js';
 import { writeSTL } from './export/stl.js';
@@ -32,6 +33,7 @@ for (const id of ['power-and-place', 'residues', 'full', 'classic']) {
 const picker = createPicker($('map'), {
   onBBox: b => setBBox(b),
   onFootprint: gj => setFootprint(gj),
+  onSection: line => drawSection(line),
 });
 
 function setBBox(b, { name = '', site = null, bundle = null } = {}) {
@@ -182,7 +184,8 @@ $('options').onsubmit = async e => {
       [`Made ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} with Hyperscale Landscapes`, 3.6],
     ];
     const model = buildModel({ bbox: state.bbox, elev, osm, opts });
-    state.model = { model, osm, opts, sources, form: Object.fromEntries(new FormData(e.target)) };
+    state.model = { model, osm, opts, sources, elev, form: Object.fromEntries(new FormData(e.target)) };
+    state.section = null; picker.showSection(null); $('section-figure').textContent = '';
     showPreview();
     const objs = printObjects(model, state.presets[o.preset.value]).filter(x => x.mesh.indices.length);
     status.textContent = t('build.done', { objects: objs.length, buildings: model.report.counts.buildings + model.report.counts.receptors });
@@ -362,7 +365,47 @@ $('dl-viewer').onclick = async () => {
   } catch (err) { console.error(err); info.textContent = `Could not build the viewer: ${err.message}`; }
   finally { btn.disabled = false; }
 };
+// ---------------- Cross-section ----------------
+$('section-draw').onclick = () => {
+  if (!state.model) return;
+  picker.setMode('section'); $('draw-finish').hidden = false;
+  $('section-status').textContent = 'Click points along the line on the map, then press "Finish" under the drawing tools.';
+  $('map').scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
+function sectionCaption(vex) {
+  const { opts, form } = state.model;
+  return captionLines({ name: state.name,
+    exaggeration: vex === 1 ? 'Profile at true vertical scale (not exaggerated)' : `Profile height exaggerated ×${vex}`,
+    sources: [ELEV_ATTRIBUTION, `Map data ${OSM_ATTR}`].join('; '),
+    footprint: opts.footprint ? `${t('caption.footprint', { precision: form.precision, ref: form.planningRef || 'not given' })}; height ${opts.insertHeight} m (${form.insertSource || 'source not given'})` : null });
+}
+function drawSection(line) {
+  $('draw-finish').hidden = true;
+  const { model, osm, opts, elev } = state.model;
+  const sec = computeSection({ line, bbox: state.bbox, elev, osm, footprint: opts.footprint, insertHeight: opts.insertHeight });
+  state.section = sec;
+  renderSection();
+  $('section-panel').open = true;
+  $('section-panel').scrollIntoView({ behavior: 'smooth' });
+  const n = sec.items;
+  $('section-status').textContent = `${(sec.length / 1000).toFixed(2)} km; crosses ${n.buildings.length} buildings, ${n.points.length} roads, railways, watercourses or power lines.`;
+}
+function renderSection() {
+  if (!state.section) return;
+  const vex = +$('section-vex').value;
+  const colours = Object.fromEntries(Object.values(state.layers).map(l => [l.id, l.colour_screen]));
+  colours.road = '#555555'; colours.water = state.layers.water.colour_screen;
+  state.sectionSVG = sectionSVG(state.section, { vex, caption: sectionCaption(vex), colours });
+  $('section-figure').innerHTML = state.sectionSVG;
+  $('section-svg').disabled = $('section-png').disabled = false;
+}
+$('section-vex').onchange = renderSection;
+$('section-svg').onclick = () => save(new Blob([state.sectionSVG], { type: 'image/svg+xml' }), `${slug()}-section.svg`);
+$('section-png').onclick = async () => save(await svgToPNG(state.sectionSVG, 2), `${slug()}-section.png`);
+
 $('dl-insert').onclick = () => save(writeSTL([state.model.model.insert]), `${slug()}-data-centre-block.stl`);
 
 window.__app = state;   // for debugging and automated checks
 Object.defineProperty(window, "__studio", { get: () => studio });
+Object.defineProperty(window, "__scene", { get: () => scene });
+window.__picker = picker;

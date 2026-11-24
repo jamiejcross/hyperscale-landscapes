@@ -2,6 +2,7 @@
 // sun, height, background, screengrab), shared by the app's preview and the
 // downloadable offline viewer.  Saved images always carry the caption strip.
 import { withCaption } from './caption.js';
+import { SIZES, makeGIF, makeVideo, videoType } from './turntable.js';
 
 const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'N'];
 
@@ -38,6 +39,18 @@ export function mountStudio(el, scene, host) {
         <option value="white">White</option><option value="dark">Charcoal</option>
         <option value="clear">Transparent</option>
       </select>
+    </fieldset>
+    <fieldset><legend>Animation</legend>
+      <label>Size <select name="animSize">${Object.entries(SIZES).map(([k, s]) => `<option value="${k}">${s.label}</option>`).join('')}</select></label>
+      <label class="range">Length <input type="range" name="secs" min="4" max="16" step="2" value="8"><output name="secsV"></output></label>
+      <label class="check"><input type="checkbox" name="half"> Half a turn only</label>
+      <label class="check"><input type="checkbox" name="hold" checked> Pause on the current view first</label>
+      <div class="inline">
+        <button type="button" name="gif">Make GIF</button>
+        <button type="button" name="video">Make video</button>
+      </div>
+      <p class="hint">Starts from the view on screen: point the camera at the site first. GIFs are kept under 8 MB. ${videoType()?.includes('mp4') ? 'Videos are MP4.' : 'Videos are WebM; WhatsApp needs MP4 (use Safari or a recent Chrome).'}</p>
+      <p class="hint" name="animInfo" aria-live="polite"></p>
     </fieldset>
     <fieldset><legend>Save an image</legend>
       <div class="inline">
@@ -90,6 +103,38 @@ export function mountStudio(el, scene, host) {
     return { canvas: out, blob };
   }
   q('grab').addEventListener('click', grab);
+
+  // ---- animations ----
+  const secsLabel = () => { q('secsV').value = `${q('secs').value} s`; };
+  q('secs').addEventListener('input', secsLabel); secsLabel();
+  function animOpts(fps) {
+    const s = SIZES[q('animSize').value];
+    return { w: s.w, h: s.h, seconds: +q('secs').value, fps, turn: q('half').checked ? 0.5 : 1,
+      holdSeconds: q('hold').checked ? 1.5 : 0, dark: scene.view.background === 'dark' };
+  }
+  function download(blob, name) {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  }
+  async function runAnim(kind) {
+    const info = q('animInfo'), btns = [q('gif'), q('video')];
+    btns.forEach(b => { b.disabled = true; });
+    try {
+      if (kind === 'gif') {
+        const r = await makeGIF(scene, host.caption(), animOpts(12), m => { info.textContent = m; });
+        download(r.blob, `${host.filename()}.gif`);
+        info.textContent = `GIF: ${r.w} × ${r.h} px, ${(r.blob.size / 1e6).toFixed(1)} MB.`;
+        return r;
+      }
+      const r = await makeVideo(scene, host.caption(), animOpts(30), m => { info.textContent = m; });
+      download(r.blob, `${host.filename()}.${r.ext}`);
+      info.textContent = `Video (${r.ext.toUpperCase()}): ${(r.blob.size / 1e6).toFixed(1)} MB.`;
+      return r;
+    } catch (e) { info.textContent = `Could not make the ${kind}: ${e.message}`; throw e; }
+    finally { btns.forEach(b => { b.disabled = false; }); }
+  }
+  q('gif').addEventListener('click', () => runAnim('gif'));
+  q('video').addEventListener('click', () => runAnim('video'));
   update();
-  return { update, grab, compose, reset: update };
+  return { update, grab, compose, runAnim, animOpts, reset: update };
 }
