@@ -2,12 +2,13 @@
 // exaggeration, data sources and licences, and the date. A full band runs along the bottom and a one-line band along
 // the top, so a single crop rarely removes both.
 
-export function captionLines({ name, exaggeration, sources, date = new Date() }) {
+// legend: an optional line explaining marks drawn on the model (e.g. the red line).
+export function captionLines({ name, exaggeration, sources, legend = null, date = new Date() }) {
   const d = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   return {
     title: name || 'Terrain model',
     disclosure: exaggeration,
-    sources,
+    sources, ...(legend ? { legend } : {}),
     footer: `Made ${d} with Hyperscale Landscapes`,
     top: `${name || 'Terrain model'} · ${exaggeration} · ${sources.split(';')[0]} and others · ${d}`,
   };
@@ -39,13 +40,14 @@ function layout(W, caption) {
   const titleFs = Math.round(fs * 1.25);
   m.font = font(fs);
   const srcLines = wrap(m, caption.sources, W - 2 * pad);
+  const legendLines = caption.legend ? wrap(m, caption.legend, W - 2 * pad) : [];
   const footLines = wrap(m, caption.footer, W - 2 * pad);
   m.font = font(titleFs, 700); const tw = m.measureText(caption.title).width;
   m.font = font(fs, 700); const disc = `  ·  ${caption.disclosure}`;
   const discInline = pad + tw + m.measureText(disc).width < W - pad;
-  const bandH = pad * 2 + Math.round(titleFs * 1.25) + lh * (srcLines.length + footLines.length + (discInline ? 0 : 1));
+  const bandH = pad * 2 + Math.round(titleFs * 1.25) + lh * (legendLines.length + srcLines.length + footLines.length + (discInline ? 0 : 1));
   const topH = Math.round(fs * 1.8);
-  return { fs, pad, lh, titleFs, srcLines, footLines, tw, disc, discInline, bandH, topH };
+  return { fs, pad, lh, titleFs, legendLines, srcLines, footLines, tw, disc, discInline, bandH, topH };
 }
 
 // Total height the caption bands add to an image W pixels wide.
@@ -53,7 +55,7 @@ export function captionHeight(W, caption) { const L = layout(W, caption); return
 
 export function withCaption(render, caption, { dark = false } = {}) {
   const W = render.width;
-  const { fs, pad, lh, titleFs, srcLines, footLines, tw, disc, discInline, bandH, topH } = layout(W, caption);
+  const { fs, pad, lh, titleFs, legendLines, srcLines, footLines, tw, disc, discInline, bandH, topH } = layout(W, caption);
 
   const out = document.createElement('canvas');
   out.width = W; out.height = topH + render.height + bandH;
@@ -71,7 +73,9 @@ export function withCaption(render, caption, { dark = false } = {}) {
   if (discInline) g.fillText(disc, pad + tw, y);
   else { y += lh; g.fillText(caption.disclosure, pad, y); }
   y += Math.round(titleFs * 0.25);
-  g.font = font(fs); g.fillStyle = muted;
+  g.font = font(fs); g.fillStyle = fg;
+  for (const l of legendLines) { y += lh; g.fillText(l, pad, y); }
+  g.fillStyle = muted;
   for (const l of srcLines) { y += lh; g.fillText(l, pad, y); }
   for (const l of footLines) { y += lh; g.fillText(l, pad, y); }
 

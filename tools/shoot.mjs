@@ -25,7 +25,8 @@ const SITES = opt('sites', 'south-gyle,auchtertool-cato').split(',');
 const STYLE = opt('style', 'field'), LABEL = opt('label', ''), AZ = opt('az', '313'), EL = opt('el', '35');
 const SURFACE = opt('surface', 'landcover');
 const HIDE = opt('hide', '').split(',').filter(Boolean);   // layer ids to switch off, e.g. buildings
-const EVAL = opt('eval', '');                              // debugging: JS run in the page before the grab
+const EVAL = opt('eval', '');
+const UPLOAD = opt('upload', '');                          // a boundary file (GeoJSON) to upload, as a user would                              // debugging: JS run in the page before the grab
 const CHROME = opt('chrome', process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
 
 // ---- static server for web/ (no caching) ----
@@ -69,10 +70,20 @@ const evaluate = async expr => {
 
 // Runs in the page: wait for the model built from the URL, choose the
 // surface, settle, and return the view at 2x as a PNG data URL.
-const CAPTURE = (surface, hide, extra) => `(async () => {
-  const wait = (f, ms = 120000) => new Promise((res, rej) => { const t0 = Date.now();
+const CAPTURE = (surface, hide, extra, upload) => `(async () => {
+  const wait = (f, ms = 300000) => new Promise((res, rej) => { const t0 = Date.now();
     (function poll() { try { if (f()) return res(); } catch {} if (Date.now() - t0 > ms) return rej(new Error('timed out')); setTimeout(poll, 200); })(); });
   await wait(() => window.__app?.model && window.__scene);
+  ${upload ? `{
+    const f = new File([${JSON.stringify(upload.text)}], ${JSON.stringify(upload.name)}, { type: 'application/geo+json' });
+    const dt = new DataTransfer(); dt.items.add(f);
+    const inp = document.getElementById('upload'); inp.files = dt.files; inp.dispatchEvent(new Event('change'));
+    await new Promise(r => setTimeout(r, 1500));
+    const prev = window.__app.model; document.getElementById('build').click();
+    await wait(() => window.__app.model !== prev);
+    const v = window.__app.view, sc0 = window.__scene;
+    sc0.setCameraAngles(${AZ}, ${EL});
+  }` : ''}
   await new Promise(r => setTimeout(r, 300));
   await wait(() => !/Loading/.test(document.getElementById('surface-note').textContent));   // the default surface
   const sf = document.getElementById('surface');
@@ -95,7 +106,7 @@ try {
     const url = `${base}/?site=${encodeURIComponent(site)}&style=${STYLE}&az=${AZ}&el=${EL}`;
     await send('Page.navigate', { url });
     await sleep(1500);
-    const r = await evaluate(CAPTURE(SURFACE, HIDE, EVAL));
+    const r = await evaluate(CAPTURE(SURFACE, HIDE, EVAL, UPLOAD && { name: path.basename(UPLOAD), text: fs.readFileSync(UPLOAD, 'utf8') }));
     const file = path.join(OUT, `${site}-${STYLE}${LABEL ? `-${LABEL}` : ''}.png`);
     fs.writeFileSync(file, Buffer.from(r.png.split(',')[1], 'base64'));
     console.log(`${path.relative(ROOT, file)}  ${r.w}×${r.h}  ${r.look}  az ${r.angles.az.toFixed(0)} el ${r.angles.el.toFixed(0)}  (${r.status})`);

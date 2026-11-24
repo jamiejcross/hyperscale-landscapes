@@ -1,7 +1,7 @@
 // App controller: pick -> size and style -> preview -> download.
 import { loadStrings, t } from './i18n.js';
 import { CELL_MM, LIMITS, MAX_COLS } from './config.js';
-import { allCoords, bboxOfCoords, bboxSizeKm } from './geo.js';
+import { allCoords, bboxOfCoords, bboxSizeKm, polygonsOf } from './geo.js';
 import { createPicker } from './picker.js';
 import { listSites, loadSite } from './data/sites.js';
 import { fetchOSM, parseOSM } from './data/overpass.js';
@@ -48,10 +48,12 @@ for (const id of ['power-and-place', 'residues', 'full', 'classic']) {
 const picker = createPicker($('map'), {
   onBBox: b => setBBox(b),
   onSection: line => drawSection(line),
+  onBoundary: gj => setBoundary(gj, { drawn: true }),
 });
 
 function setBBox(b, { name = '', site = null, bundle = null } = {}) {
   state.bbox = b; state.name = name; state.site = site; state.bundle = bundle;
+  state.boundary = null;                    // a new area has no red line until one is supplied
   const { w, h } = bboxSizeKm(b);
   const area = $('area');
   const tooLarge = w * h > LIMITS.maxAreaKm2 || Math.max(w, h) > LIMITS.maxSideKm;
@@ -64,6 +66,22 @@ function setBBox(b, { name = '', site = null, bundle = null } = {}) {
   f.minLon.value = b.minLon.toFixed(5); f.maxLon.value = b.maxLon.toFixed(5);
   writeUrl();
 }
+
+// ---------------- Site red line ----------------
+// Drawn only from a real boundary, and captioned with where it came from: a
+// curated site's sourced boundary, a file the user uploads, or an area the
+// user draws. The model area itself is never presented as a site boundary.
+function setBoundary(gj, { file = null, drawn = false, site = null } = {}) {
+  const geoms = gj.type === 'FeatureCollection' ? gj.features.map(f => f.geometry) : [gj.type === 'Feature' ? gj.geometry : gj];
+  const polygons = geoms.filter(g => g && (g.type === 'Polygon' || g.type === 'MultiPolygon')).flatMap(g => polygonsOf(g));
+  if (!polygons.length) { state.boundary = null; return; }
+  const label = site ? `proposed site boundary, from ${site}`
+    : file ? `boundary as supplied in the file ${file}` : 'area drawn by the user in this tool';
+  state.boundary = { polygons, label, drawn };
+}
+const boundaryLegend = () => (state.boundary && state.model?.model.vectors?.boundary ? `Red line: ${state.boundary.label}.` : null);
+// Rings in print mm, as flat [x0, y0, …] arrays.
+const boundaryRings = (polygons, grid) => polygons.flatMap(rings => rings.map(r => r.flatMap(([lon, lat]) => grid.mm(lon, lat).map(v => +v.toFixed(2)))));
 
 // Curated sites: one dropdown, grouped by council, and a short fact panel.
 const SITES = await listSites();
@@ -85,6 +103,8 @@ async function chooseSite(entry) {
   const p = site.properties, bb = p.model_bbox;
   picker.showBBox({ minLat: bb.min_lat, maxLat: bb.max_lat, minLon: bb.min_lon, maxLon: bb.max_lon });
   setBBox(state.bbox, { name: p.name, site, bundle });
+  // A sourced boundary, if the site record has one (none do yet; see data/sites/TODO.md).
+  if (site.geometry) setBoundary(site, { site: (p.sources || [])[0]?.title || 'the site record' });
   if (p.location) picker.showPin(p.location, p.name);
   const row = (k, v) => v == null || v === '' ? '' : `<dt>${k}</dt><dd>${v}</dd>`;
   const by = p.reported_by ? ` (reported by ${esc(p.reported_by)})` : '';
@@ -124,6 +144,7 @@ $('upload').onchange = async e => {
     const gj = await readBoundary(f);
     picker.showBBox(bboxOfCoords(allCoords(gj), 300));
     state.name = f.name.replace(/\.(geo)?json|\.kmz?$/i, '');
+    setBoundary(gj, { file: f.name });
   } catch (err) { $('area').textContent = err.message; }
 };
 $('coords').onsubmit = e => {
@@ -161,6 +182,7 @@ $('options').onsubmit = async e => {
       [`Made ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} with Hyperscale Landscapes`, 3.6],
     ];
     const model = buildModel({ bbox: state.bbox, elev, osm, opts });
+    if (state.boundary) model.vectors.boundary = boundaryRings(state.boundary.polygons, model.grid);   // screen only
     state.model = { model, osm, opts, sources, elev, form: Object.fromEntries(new FormData(e.target)) };
     state.section = null; picker.showSection(null); $('section-figure').textContent = '';
     showPreview();
@@ -186,7 +208,7 @@ function showPreview() {
   if (!scene) {
     scene = createScene($('view'));
     studio = mountStudio($('studio'), scene, {
-      caption: () => captionLines({ name: state.name, exaggeration: exaggerationText(), sources: sourcesText() }),
+      caption: () => captionLines({ name: state.name, exaggeration: exaggerationText(), sources: sourcesText(), legend: boundaryLegend() }),
       filename: () => `${slug()}-${new Date().toISOString().slice(0, 10)}`,
       printColours: printColourMap,
       alt: () => draftAlt({ name: state.name, report: state.model.model.report, exaggeration: exaggerationText(), surface: SURFACES[state.surface].label.toLowerCase() }),
@@ -341,7 +363,7 @@ $('dl-viewer').onclick = async () => {
       .filter(id => model.layers[id]?.indices.length);
     const legend = shown.map(id => ({ id, name: state.layers[id].name, colour: state.layers[id].colour_screen, why: state.layers[id].why }));
     const { w, h } = bboxSizeKm(state.bbox);
-    const caption = captionLines({ name: state.name, exaggeration: t('caption.exag', { x: opts.zExag }), sources: sourcesText() });
+    const caption = captionLines({ name: state.name, exaggeration: t('caption.exag', { x: opts.zExag }), sources: sourcesText(), legend: boundaryLegend() });
     const blob = await buildViewer({
       model, legend, colours, printColours: printColourMap(), caption, zExag: opts.zExag, slug: slug(),
       sub: `${state.bbox.minLat.toFixed(3)}–${state.bbox.maxLat.toFixed(3)}°N, ${Math.abs(state.bbox.maxLon).toFixed(3)}–${Math.abs(state.bbox.minLon).toFixed(3)}°W · ${w.toFixed(1)} × ${h.toFixed(1)} km · from the ${opts.printSize} mm print model`,

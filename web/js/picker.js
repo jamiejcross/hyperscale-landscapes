@@ -5,7 +5,7 @@ import { allCoords, bboxOfCoords } from './geo.js';
 
 const L = window.L;
 
-export function createPicker(el, { onBBox, onSection = () => {} }) {
+export function createPicker(el, { onBBox, onSection = () => {}, onBoundary = () => {} }) {
   const map = L.map(el, { zoomSnap: 0.25, keyboard: true }).setView([56.0, -3.8], 9);
   L.tileLayer(BASEMAP, {
     maxZoom: 19,
@@ -76,6 +76,7 @@ export function createPicker(el, { onBBox, onSection = () => {} }) {
     const gj = { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[...poly, poly[0]]] } };
     setMode(null);
     showBBox(bboxOfCoords(allCoords(gj), 300), false);
+    onBoundary(gj);                    // a drawn area is also shown as a red line
     return true;
   }
 

@@ -8,6 +8,11 @@
 
 export const OVERLAY = {
   baseWidth: 2048,
+  // Site red line: three stacked strokes (dark casing, white halo, red core)
+  // in the proportions 7/6/4, given in canvas px at 4096 across and scaled by
+  // `emphasis` so the core reads at about 3 CSS px in a default view (at 1x
+  // it was a hairline once the drape is fitted to the screen).
+  boundary: { baseWidth: 4096, emphasis: 5, casing: 7, casingColour: '#16120e', casingAlpha: 0.6, halo: 6, haloColour: '#ffffff', core: 4, coreColour: '#ff4d1f' },
   road: { major: 3, minor: 2, casing: 0.75, fill: '#f3eee4', casingColour: '#6b6256' },
   rail: { width: 1.5, colour: '#3a332b', tickEvery: 10, tickLength: 4, dash: [5, 3] },
   powerLine: { width: 1.25, colour: '#3a332b' },
@@ -113,4 +118,20 @@ function hatch(g, colour, s) {
   h.strokeStyle = colour; h.lineWidth = OVERLAY.residues.hatchWidth * s; h.lineCap = 'square';
   h.beginPath(); h.moveTo(0, n); h.lineTo(n, 0); h.moveTo(-n / 2, n / 2); h.lineTo(n / 2, -n / 2); h.moveTo(n / 2, n * 1.5); h.lineTo(n * 1.5, n / 2); h.stroke();
   return g.createPattern(c, 'repeat');
+}
+
+// Paint a site boundary (rings: flat [x0, y0, …] arrays in print mm) as a
+// route-style red line. Drawn last, so it sits on top of every overlay.
+export function paintBoundary(g, rings, { Wmm, Hmm }) {
+  if (!rings?.length) return;
+  const B = OVERLAY.boundary, W = g.canvas.width, H = g.canvas.height, s = W / B.baseWidth * B.emphasis;
+  const X = x => x / Wmm * W, Y = y => (1 - y / Hmm) * H;
+  g.save();
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  g.beginPath();
+  for (const p of rings) { g.moveTo(X(p[0]), Y(p[1])); for (let i = 2; i < p.length; i += 2) g.lineTo(X(p[i]), Y(p[i + 1])); g.closePath(); }
+  for (const [w, c, a] of [[B.casing, B.casingColour, B.casingAlpha], [B.halo, B.haloColour, 1], [B.core, B.coreColour, 1]]) {
+    g.globalAlpha = a; g.lineWidth = w * s; g.strokeStyle = c; g.stroke();
+  }
+  g.restore();
 }

@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/RoomEnvironment.js';
 import { createInk, INK } from './ink.js';
-import { paintOverlays } from './overlays.js';
+import { paintOverlays, paintBoundary } from './overlays.js';
 
 export const LANDCOVER_COLOURS = {
   'landuse:farmland': '#C9C08A', 'landuse:meadow': '#B5C98A', 'landuse:grass': '#B5C98A',
@@ -212,14 +212,14 @@ export function createScene(container) {
   // residue areas painted on top. Painting happens when the model came with
   // vectors (the web app and its offline viewer) and print colours are off;
   // then the raised route strips are hidden instead (see refreshVisibility).
-  let drapeKind = null, fieldDrapeTex = null, fieldBase = null, fieldCanvas = null;
+  let drapeKind = null, drapeRaw = null, fieldDrapeTex = null, fieldBase = null, fieldCanvas = null;
   let vectors = null, modelSize = null, residueColour = '#c98aa0';
   const shown = {};                                  // layer checkboxes: id -> on
   const painted = () => view.look === 'field' && !view.print && !!vectors;
   function fieldDrape() {
-    if (!drapeTex) return null;
+    if (!drapeRaw) return null;
     if (!fieldBase) {
-      const img = drapeTex.image, W = Math.min(4096, renderer.capabilities.maxTextureSize);
+      const img = drapeRaw, W = Math.min(4096, renderer.capabilities.maxTextureSize);
       const H = Math.round(W * img.height / img.width);
       fieldBase = document.createElement('canvas'); fieldBase.width = W; fieldBase.height = H;
       const g = fieldBase.getContext('2d', { willReadFrequently: drapeKind === 'landcover' });
@@ -239,6 +239,7 @@ export function createScene(container) {
       paintOverlays(g, vectors, { Wmm: modelSize.Wmm, Hmm: modelSize.Hmm, residueColour,
         show: { roads: shown.roads !== false, rail: shown.rail !== false, power: shown.power !== false, residues: shown.residues !== false } });
     }
+    paintBoundary(g, vectors?.boundary, modelSize);          // the site red line, on top
     fieldDrapeTex.needsUpdate = true;
   }
   // Route strips hidden while they are painted; power keeps its substations
@@ -346,8 +347,15 @@ export function createScene(container) {
   // Swap the drape on the land top (land cover or satellite) without rebuilding.
   function setDrapeTextures(canvas, kind) {
     drapeTex?.dispose(); fieldDrapeTex?.dispose(); fieldDrapeTex = null; fieldBase = fieldCanvas = null;
-    drapeTex = canvas ? canvasTexture(canvas, renderer) : null;
-    drapeKind = kind;
+    drapeRaw = canvas; drapeKind = kind;
+    // Mossmorran shows the site red line on its drape too, when there is one.
+    let display = canvas;
+    if (canvas && vectors?.boundary?.length) {
+      display = document.createElement('canvas'); display.width = canvas.width; display.height = canvas.height;
+      const g = display.getContext('2d'); g.drawImage(canvas, 0, 0);
+      paintBoundary(g, vectors.boundary, modelSize);
+    }
+    drapeTex = display ? canvasTexture(display, renderer) : null;
   }
   // kind: 'landcover' for the land-cover map, else anything (see setModel).
   function setDrape(canvas, kind = null) {
