@@ -16,6 +16,7 @@ export function mountStudio(el, scene, host) {
       <select name="look" aria-label="Style">
         ${Object.entries(LOOKS).map(([k, label]) => `<option value="${k}"${k === scene.view.look ? ' selected' : ''}>${label}</option>`).join('')}
       </select>
+      <label class="range" name="inkRow" hidden>Outline <input type="range" name="ink" min="1" max="3" step="0.1" value="1.8"><output name="inkV"></output></label>
       <p class="hint">Changes how the model is drawn on screen and in saved images. Print files are not affected.</p>
     </fieldset>
     <fieldset><legend>Camera</legend>
@@ -91,8 +92,12 @@ export function mountStudio(el, scene, host) {
   q('fovV').value = `${scene.focalMm(28)} mm`;
   q('spin').addEventListener('change', e => scene.setSpin(e.target.checked));
   q('bg').addEventListener('change', e => scene.setBackground(e.target.value));
+  const inkLabel = () => { q('inkV').value = `${(+q('ink').value).toFixed(1)} px`; };
+  q('ink').addEventListener('input', () => { scene.setInkWidth(+q('ink').value); inkLabel(); });
+  inkLabel();
   q('look').addEventListener('change', e => {
     scene.setLook(e.target.value);
+    q('inkRow').hidden = e.target.value !== 'field';     // the outline only exists in field
     q('bg').value = scene.view.background;     // each look brings its own background and lens
     q('fov').value = Math.round(scene.view.fov); q('fovV').value = `${scene.focalMm(scene.view.fov)} mm`;
     update();

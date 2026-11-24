@@ -13,7 +13,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/RoomEnvironment.js';
-import { createInk } from './ink.js';
+import { createInk, INK } from './ink.js';
 import { paintOverlays } from './overlays.js';
 
 export const LANDCOVER_COLOURS = {
@@ -41,9 +41,13 @@ export const FIELD_LANDCOVER_COLOURS = {
 };
 const FIELD_LAND_BASE = '#DAD3BC';
 // Screen-only meshes from buildModel, and the layer whose colour they take.
-const SCREEN_OF = { powerPoints: 'power' };
+const SCREEN_OF = { powerPoints: 'power', waterAreas: 'water', waterLines: 'water' };
+// Object IDs for the ink pass (1-15): a change of ID between neighbouring pixels is an edge.
+// Narrow waterways share the terrain's ID, so their stepped edges get no ink.
+const INK_IDS = { terrain: 1, 'terrain-steep': 1, 'terrain-sides': 2, 'terrain-base': 3, water: 4, waterAreas: 4, waterLines: 1, buildings: 5,
+  receptors: 6, powerPoints: 7, roads: 8, power: 9, rail: 10, railDisused: 11, residues: 12 };
 const FIELD = {
-  wallLight: '#f4f2ee', wallDark: '#c9c5bd', base: '#9b968c',
+  wallLight: '#f4f2ee', wallDark: '#c9c5bd', base: '#9b968c', channel: '#a9a27f',
   water: '#7fbcc4', waterOpacity: 0.5,
   tones: [0.62, 0.84, 1.0],      // three toon steps (shadow side, mid, lit)
   fov: 20, minEl: 12, maxEl: 70,  // camera
@@ -87,10 +91,11 @@ export function createScene(container) {
   // Every render (live view, screengrabs, GIF and video frames) goes through
   // draw(), so the field style's ink outlines appear in all of them.
   const ink = createInk(renderer);
-  // The thin draped overlays are left out of the outline pass: at grid
-  // resolution their edges are stepped, and ink would trace every step.
-  // Terrain, slab edges, shorelines and buildings keep their outlines.
-  const INKLESS = ['water', 'roads', 'power', 'rail', 'railDisused', 'residues'];
+  // The raised route strips (shown in field only with print colours on) are
+  // left out of the outline pass: at grid resolution their edges are
+  // stepped, and ink would trace every step. Water stays in, so shorelines
+  // are inked by the change of object.
+  const INKLESS = ['roads', 'power', 'rail', 'railDisused', 'residues'];
   function draw() {
     renderer.render(scene, camera);
     if (view.look === 'field' && view.ink) ink.render(scene, camera, { hide: [ground, ...INKLESS.map(id => meshes[id]).filter(Boolean)] });
@@ -113,7 +118,7 @@ export function createScene(container) {
 
   // Measured: at 0.9 a lit, level surface renders at its own colour (±2/255).
   const FIELD_SUN = 0.9, FIELD_FILL = 0.9;
-  const view = { az: 225, el: 32, strength: 3.0, fill: 1.0, heightScale: 1, fov: 28, background: 'sky', print: false, look: 'mossmorran', ink: true };
+  const view = { az: 225, el: 32, strength: 3.0, fill: 1.0, heightScale: 1, fov: 28, background: 'sky', print: false, look: 'mossmorran', ink: true, inkWidth: 1.8 };
 
   // Sun: azimuth clockwise from north, height above the horizon; it warms
   // towards orange as it drops (as in the Mossmorran viewer).
@@ -147,7 +152,7 @@ export function createScene(container) {
     mossmorran(mesh) {
       const { kind, colour } = mesh.userData;
       if (kind === 'terrain' || kind === 'terrain-base') return new THREE.MeshStandardMaterial({ map: drapeTex, color: drapeTex ? 0xffffff : LAND_BASE, roughness: 0.92 });
-      if (kind === 'terrain-sides') return new THREE.MeshStandardMaterial({ map: strataTexture(renderer), roughness: 0.96 });
+      if (kind === 'terrain-sides' || kind === 'terrain-steep') return new THREE.MeshStandardMaterial({ map: strataTexture(renderer), roughness: 0.96 });
       if (kind === 'water') return new THREE.MeshPhysicalMaterial({ color: 0x24506a, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.6 });
       return new THREE.MeshStandardMaterial({ color: colour, roughness: 0.8 });
     },
@@ -159,6 +164,7 @@ export function createScene(container) {
       if (kind === 'terrain') { const t = fieldDrape(); return toon({ map: t, color: t ? 0xffffff : FIELD_LAND_BASE }); }
       if (kind === 'terrain-base') return new THREE.MeshBasicMaterial({ color: FIELD.base });
       if (kind === 'terrain-sides') return new THREE.MeshBasicMaterial({ vertexColors: true });
+      if (kind === 'terrain-steep') return toon({ color: FIELD.channel });     // channel banks inside the land
       if (kind === 'water') return toon({ color: FIELD.water, transparent: true, opacity: FIELD.waterOpacity, depthWrite: false });
       return toon({ color: colour });
     },
@@ -208,11 +214,11 @@ export function createScene(container) {
   }
   // Route strips hidden while they are painted; power keeps its substations
   // and pegs as a screen-only mesh (powerPoints) so they still cast shadows.
-  const PAINTED_MESHES = new Set(['roads', 'rail', 'railDisused', 'power', 'residues']);
+  const PAINTED_MESHES = new Set(['roads', 'rail', 'railDisused', 'power', 'residues', 'water']);
   function refreshVisibility() {
     const p = painted();
     for (const [k, m] of Object.entries(meshes)) {
-      if (k === 'powerPoints') m.visible = p && shown.power !== false;
+      if (SCREEN_OF[k]) m.visible = p && shown[SCREEN_OF[k]] !== false;     // screen-only stand-ins
       else m.visible = shown[k] !== false && !(p && PAINTED_MESHES.has(k));
     }
   }
@@ -267,7 +273,7 @@ export function createScene(container) {
     let zmax = 0;
     const add = (id, g, kind, colour) => {
       const mesh = new THREE.Mesh(g);
-      mesh.userData = { kind, colour, looks: {}, override: {} };
+      mesh.userData = { kind, colour, looks: {}, override: {}, inkId: INK_IDS[id] ?? 15 };
       mesh.castShadow = kind !== 'water'; mesh.receiveShadow = true;
       mesh.name = id;
       applyMaterial(mesh);
@@ -280,10 +286,11 @@ export function createScene(container) {
       if (id === 'terrain') {
         // Top and bottom take the drape; the sides are split off into their
         // own geometry (soil strata in the Mossmorran look).
-        const { capsIdx, baseIdx, walls } = splitWalls(m);
+        const { capsIdx, baseIdx, walls, steep } = splitWalls(m, grid);
         g.setIndex(new THREE.BufferAttribute(capsIdx, 1));
         g.setAttribute('uv', planarUV(m.positions, grid));
         add('terrain-sides', walls, 'terrain-sides');
+        if (steep) add('terrain-steep', steep, 'terrain-steep');
         // The underside: its own mesh so the field style can colour it.
         const base = new THREE.BufferGeometry();
         base.setAttribute('position', g.attributes.position); base.setAttribute('uv', g.attributes.uv);
@@ -295,7 +302,7 @@ export function createScene(container) {
       for (let k = 2; k < m.positions.length; k += 3) zmax = Math.max(zmax, m.positions[k]);
     }
     for (const [id, m] of Object.entries(screen || {})) {
-      if (m?.indices.length) add(id, geometry(m), 'layer', colours[SCREEN_OF[id]] || '#cccccc');
+      if (m?.indices.length) add(id, geometry(m), SCREEN_OF[id] === 'water' ? 'water' : 'layer', colours[SCREEN_OF[id]] || '#cccccc');
     }
     refreshVisibility();
     H = zmax;
@@ -387,6 +394,7 @@ export function createScene(container) {
 
   function setVisible(id, on) {
     for (const k of [id, `${id}Disused`, `${id}-sides`, `${id}-base`]) shown[k] = on;
+    if (id === 'terrain-sides') shown['terrain-steep'] = on;      // "Soil sides" hid these before too
     refreshVisibility();
     if (['roads', 'rail', 'power', 'residues'].includes(id) && painted()) paintField();
   }
@@ -415,6 +423,8 @@ export function createScene(container) {
   }
 
   function setSpin(on) { controls.autoRotate = on; }
+  // Field ink line width, CSS px (1–3).
+  function setInkWidth(px) { INK.lineWidth = THREE.MathUtils.clamp(+px || 1.8, 1, 3); view.inkWidth = INK.lineWidth; }
 
   // Camera angles as seen from the model's centre, in degrees: az is the
   // compass bearing the camera stands at (clockwise from north), el its
@@ -546,15 +556,18 @@ export function createScene(container) {
   function orbitEnd() { if (orbitBase) camera.position.copy(orbitBase.pos); camera.lookAt(controls.target); orbitBase = null; }
 
   return { renderer, scene, camera, controls, view, meshes, focalMm, setModel, setDrape, setLook, setVisible, setView, setSpin,
-    cameraAngles, setCameraAngles,
+    cameraAngles, setCameraAngles, setInkWidth,
     setSun, setFov, setHeightScale, setBackground, setPrintColours, setScreenColours, setShadow, grab,
     pause, resume, renderAt, orbitStart, orbitTo, orbitEnd };
 }
 
 // Separate wall triangles (|normal z| small) from the top cap and the
-// underside (normal pointing down).
-function splitWalls({ positions: P, indices: I }) {
-  const caps = [], base = [], wallPos = [], wallUV = [];
+// underside (normal pointing down). Walls on the model's edge are the slab
+// sides; steep faces inside (stream channels cut into the land) are kept
+// apart as `steep`, so the field style can treat them as land.
+function splitWalls({ positions: P, indices: I }, grid) {
+  const caps = [], base = [], wallPos = [], wallUV = [], steepPos = [], steepUV = [];
+  const onEdge = v => Math.min(Math.abs(P[v]), Math.abs(P[v] - grid.Wmm), Math.abs(P[v + 1]), Math.abs(P[v + 1] - grid.Hmm)) < 1e-3;
   let zmax = 0;
   for (let k = 2; k < P.length; k += 3) zmax = Math.max(zmax, P[k]);
   for (let t = 0; t < I.length; t += 3) {
@@ -564,17 +577,21 @@ function splitWalls({ positions: P, indices: I }) {
     const len = Math.hypot(nz, (P[b + 1] - P[a + 1]) * (P[c + 2] - P[a + 2]) - (P[b + 2] - P[a + 2]) * (P[c + 1] - P[a + 1]),
       (P[b + 2] - P[a + 2]) * (P[c] - P[a]) - (P[b] - P[a]) * (P[c + 2] - P[a + 2])) || 1;
     if (Math.abs(nz / len) > 0.2) { (nz > 0 ? caps : base).push(I[t], I[t + 1], I[t + 2]); continue; }
+    const edge = onEdge(a) && onEdge(b) && onEdge(c);
     for (const v of [a, b, c]) {
-      wallPos.push(P[v], P[v + 1], P[v + 2]);
+      (edge ? wallPos : steepPos).push(P[v], P[v + 1], P[v + 2]);
       // u runs along the edge of the model; v is height
-      wallUV.push((P[v] + P[v + 1]) / 60, Math.min(P[v + 2] / zmax, 1));
+      (edge ? wallUV : steepUV).push((P[v] + P[v + 1]) / 60, Math.min(P[v + 2] / zmax, 1));
     }
   }
-  const walls = new THREE.BufferGeometry();
-  walls.setAttribute('position', new THREE.Float32BufferAttribute(wallPos, 3));
-  walls.setAttribute('uv', new THREE.Float32BufferAttribute(wallUV, 2));
-  walls.computeVertexNormals();
-  return { capsIdx: new Uint32Array(caps), baseIdx: new Uint32Array(base), walls };
+  const geo = (pos, uv) => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.computeVertexNormals();
+    return g;
+  };
+  return { capsIdx: new Uint32Array(caps), baseIdx: new Uint32Array(base), walls: geo(wallPos, wallUV), steep: steepPos.length ? geo(steepPos, steepUV) : null };
 }
 
 // Soil strata for the sides (from the Mossmorran viewer): irregular bands

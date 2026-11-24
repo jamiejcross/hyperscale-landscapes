@@ -23,6 +23,7 @@ MODULES = {
     "three/addons/RoomEnvironment.js": "vendor/three/addons/RoomEnvironment.js",
     "hl/scene": "js/scene/scene.js",
     "hl/ink": "js/scene/ink.js",
+    "hl/ink-math": "js/scene/ink-math.js",
     "hl/overlays": "js/scene/overlays.js",
     "hl/urlstate": "js/urlstate.js",
     "hl/studio": "js/scene/studio.js",
@@ -134,6 +135,7 @@ def write_viewer(path, *, layer_meshes: dict, opts, preset: dict, features,
                 .replace("from './turntable.js'", "from 'hl/turntable'")
                 .replace("from './scene.js'", "from 'hl/scene'")
                 .replace("from './ink.js'", "from 'hl/ink'")
+                .replace("from './ink-math.js'", "from 'hl/ink-math'")
                 .replace("from './overlays.js'", "from 'hl/overlays'"))
         imports[spec] = _data_url(text)
     html = (w / "viewer.html").read_text()

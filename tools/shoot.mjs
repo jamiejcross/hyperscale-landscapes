@@ -24,6 +24,8 @@ const opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i
 const SITES = opt('sites', 'south-gyle,auchtertool-cato').split(',');
 const STYLE = opt('style', 'field'), LABEL = opt('label', ''), AZ = opt('az', '313'), EL = opt('el', '35');
 const SURFACE = opt('surface', 'landcover');
+const HIDE = opt('hide', '').split(',').filter(Boolean);   // layer ids to switch off, e.g. buildings
+const EVAL = opt('eval', '');                              // debugging: JS run in the page before the grab
 const CHROME = opt('chrome', process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
 
 // ---- static server for web/ (no caching) ----
@@ -67,7 +69,7 @@ const evaluate = async expr => {
 
 // Runs in the page: wait for the model built from the URL, choose the
 // surface, settle, and return the view at 2x as a PNG data URL.
-const CAPTURE = surface => `(async () => {
+const CAPTURE = (surface, hide, extra) => `(async () => {
   const wait = (f, ms = 120000) => new Promise((res, rej) => { const t0 = Date.now();
     (function poll() { try { if (f()) return res(); } catch {} if (Date.now() - t0 > ms) return rej(new Error('timed out')); setTimeout(poll, 200); })(); });
   await wait(() => window.__app?.model && window.__scene);
@@ -77,7 +79,10 @@ const CAPTURE = surface => `(async () => {
   if (sf.value !== ${JSON.stringify(surface)}) { sf.value = ${JSON.stringify(surface)}; sf.dispatchEvent(new Event('change')); }
   await wait(() => !/Loading/.test(document.getElementById('surface-note').textContent));
   await new Promise(r => setTimeout(r, 800));
-  const sc = window.__scene; sc.pause();
+  const sc = window.__scene;
+  for (const id of ${JSON.stringify(hide)}) sc.setVisible(id, false);
+  ${extra}
+  sc.pause();
   const c = sc.grab(2); sc.resume();
   return { png: c.toDataURL('image/png'), w: c.width, h: c.height, look: sc.view.look,
     angles: sc.cameraAngles(), status: document.getElementById('build-status').textContent };
@@ -90,7 +95,7 @@ try {
     const url = `${base}/?site=${encodeURIComponent(site)}&style=${STYLE}&az=${AZ}&el=${EL}`;
     await send('Page.navigate', { url });
     await sleep(1500);
-    const r = await evaluate(CAPTURE(SURFACE));
+    const r = await evaluate(CAPTURE(SURFACE, HIDE, EVAL));
     const file = path.join(OUT, `${site}-${STYLE}${LABEL ? `-${LABEL}` : ''}.png`);
     fs.writeFileSync(file, Buffer.from(r.png.split(',')[1], 'base64'));
     console.log(`${path.relative(ROOT, file)}  ${r.w}×${r.h}  ${r.look}  az ${r.angles.az.toFixed(0)} el ${r.angles.el.toFixed(0)}  (${r.status})`);

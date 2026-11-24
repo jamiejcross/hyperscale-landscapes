@@ -514,7 +514,14 @@ export function buildModel({ bbox, elev, osm, opts }) {
   const layerCanvas = {};
   const cv = id => (layerCanvas[id] ||= canvasFor(grid));
   // water
-  for (const w of osm.water) fillPolys(cv('water'), grid, w.geometry);
+  for (const w of osm.water) {
+    fillPolys(cv('water'), grid, w.geometry);
+    // waterAreas (screen only): lochs, ponds and reservoirs big enough to
+    // have a shoreline on the model (2 mm², ~40 x 40 m at 150 mm); smaller
+    // pieces are bits of mapped stream.
+    const mm2 = polygonsOf(w.geometry).reduce((t, rings) => t + Math.abs(ringArea(rings[0].map(([lon, lat]) => grid.mm(lon, lat)))), 0);
+    if (mm2 >= 2) fillPolys(cv('waterAreas'), grid, w.geometry);
+  }
   for (const w of osm.waterways) {
     const width = WATERWAY_WIDTHS[w.kind] ?? 4;
     strokeLine(cv('water'), grid, w.geometry, Math.max(width * mmPerM, w.kind === 'river' || w.kind === 'canal' ? minW : MM.minRoad));
@@ -674,7 +681,18 @@ export function buildModel({ bbox, elev, osm, opts }) {
   layers.power = concat([layers.power, ...pegMeshes]);
   // Screen only (field style): power without the line strips, which are
   // painted into the surface there. Not a print layer.
-  const screen = { powerPoints: concat([powerAreas, ...pegMeshes]) };
+  // Water split into lochs/sea and narrow waterways (same surfaces as the
+  // print water), so the field style can outline shorelines but not the
+  // stepped edges of streams.
+  const waterSplit = {};
+  if (masks.water) {
+    const area = layerCanvas.waterAreas ? maskOf(layerCanvas.waterAreas) : new Uint8Array(cx * cy);
+    const a = new Uint8Array(cx * cy), l = new Uint8Array(cx * cy);
+    for (let k = 0; k < a.length; k++) if (masks.water[k]) (area[k] || seaCells[k] ? a : l)[k] = 1;
+    const wslab = m => m.some(Boolean) ? slabFromMask(grid, m, v => W[v], v => W[v] - MM.waterDepth - 0.3) : null;
+    waterSplit.waterAreas = wslab(a); waterSplit.waterLines = wslab(l);
+  }
+  const screen = { powerPoints: concat([powerAreas, ...pegMeshes]), ...waterSplit };
 
   report.counts = { buildings: bl.length, receptors: rl.length, roads: nRoads, pegs: pegMeshes.filter(Boolean).length };
   report.grid = { cols: nx, rows: grid.ny, cellMm: +grid.dx.toFixed(3) };

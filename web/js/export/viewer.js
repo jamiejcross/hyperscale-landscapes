@@ -10,6 +10,7 @@ const MODULES = {
   'three/addons/RoomEnvironment.js': 'vendor/three/addons/RoomEnvironment.js',
   'hl/scene': 'js/scene/scene.js',
   'hl/ink': 'js/scene/ink.js',
+  'hl/ink-math': 'js/scene/ink-math.js',
   'hl/overlays': 'js/scene/overlays.js',
   'hl/urlstate': 'js/urlstate.js',
   'hl/studio': 'js/scene/studio.js',
@@ -30,6 +31,7 @@ const rewrite = text => text.replaceAll("from './caption.js'", "from 'hl/caption
   .replaceAll("from './turntable.js'", "from 'hl/turntable'")
   .replaceAll("from './scene.js'", "from 'hl/scene'")
   .replaceAll("from './ink.js'", "from 'hl/ink'")
+  .replaceAll("from './ink-math.js'", "from 'hl/ink-math'")
   .replaceAll("from './overlays.js'", "from 'hl/overlays'");
 
 export async function buildViewer({ model, legend, colours, printColours, caption, sub, drape, drapeKind = null, zExag, slug, alt }) {
