@@ -44,8 +44,9 @@ your browser. The browser's print files are lower resolution than the
 command-line tool's. For exhibitions or planning hearings, ask a maker or
 researcher to run the command-line tool.
 
-To run the web app locally: `python3 -m http.server --directory web`, then open
-<http://localhost:8000>.
+To run the web app locally: `python3 tools/serve.py`, then open
+<http://localhost:8765>. It tells the browser not to reuse stored copies of the
+code, so edits show on the next reload.
 
 ## For technical users
 
