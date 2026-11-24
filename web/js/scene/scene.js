@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/RoomEnvironment.js';
+import { createInk } from './ink.js';
 
 export const LANDCOVER_COLOURS = {
   'landuse:farmland': '#C9C08A', 'landuse:meadow': '#B5C98A', 'landuse:grass': '#B5C98A',
@@ -80,6 +81,18 @@ export function createScene(container) {
   model.add(inner);
   scene.add(model);
 
+  // Every render (live view, screengrabs, GIF and video frames) goes through
+  // draw(), so the field style's ink outlines appear in all of them.
+  const ink = createInk(renderer);
+  // The thin draped overlays are left out of the outline pass: at grid
+  // resolution their edges are stepped, and ink would trace every step.
+  // Terrain, slab edges, shorelines and buildings keep their outlines.
+  const INKLESS = ['water', 'roads', 'power', 'rail', 'railDisused', 'residues'];
+  function draw() {
+    renderer.render(scene, camera);
+    if (view.look === 'field' && view.ink) ink.render(scene, camera, { hide: [ground, ...INKLESS.map(id => meshes[id]).filter(Boolean)] });
+  }
+
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.28 }));
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
   scene.add(ground);
@@ -97,7 +110,7 @@ export function createScene(container) {
 
   // Measured: at 0.9 a lit, level surface renders at its own colour (±2/255).
   const FIELD_SUN = 0.9, FIELD_FILL = 0.9;
-  const view = { az: 225, el: 32, strength: 3.0, fill: 1.0, heightScale: 1, fov: 28, background: 'sky', print: false, look: 'mossmorran' };
+  const view = { az: 225, el: 32, strength: 3.0, fill: 1.0, heightScale: 1, fov: 28, background: 'sky', print: false, look: 'mossmorran', ink: true };
 
   // Sun: azimuth clockwise from north, height above the horizon; it warms
   // towards orange as it drops (as in the Mossmorran viewer).
@@ -418,7 +431,7 @@ export function createScene(container) {
   function grabInner(mult) {
     const w = container.clientWidth, h = container.clientHeight, pr = renderer.getPixelRatio();
     renderer.setPixelRatio(mult); renderer.setSize(w, h, false);
-    renderer.render(scene, camera);
+    draw();
     const c = document.createElement('canvas');
     c.width = renderer.domElement.width; c.height = renderer.domElement.height;
     c.getContext('2d').drawImage(renderer.domElement, 0, 0);
@@ -426,7 +439,7 @@ export function createScene(container) {
     return c;
   }
 
-  const loop = () => { controls.update(); renderer.render(scene, camera); };
+  const loop = () => { controls.update(); draw(); };
   renderer.setAnimationLoop(loop);
 
   // ---- Capture helpers for animations (turntable GIF / video) ----
@@ -439,7 +452,7 @@ export function createScene(container) {
     const pr = renderer.getPixelRatio(), cw = container.clientWidth, ch = container.clientHeight;
     renderer.setPixelRatio(1); renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
-    renderer.render(scene, camera);
+    draw();
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     c.getContext('2d').drawImage(renderer.domElement, 0, 0);
     renderer.setPixelRatio(pr); renderer.setSize(cw, ch, false);

@@ -22,6 +22,7 @@ MODULES = {
     "three/addons/OrbitControls.js": "vendor/three/addons/OrbitControls.js",
     "three/addons/RoomEnvironment.js": "vendor/three/addons/RoomEnvironment.js",
     "hl/scene": "js/scene/scene.js",
+    "hl/ink": "js/scene/ink.js",
     "hl/studio": "js/scene/studio.js",
     "hl/caption": "js/scene/caption.js",
     "hl/turntable": "js/scene/turntable.js",
@@ -129,7 +130,8 @@ def write_viewer(path, *, layer_meshes: dict, opts, preset: dict, features,
     for spec, rel in MODULES.items():
         text = ((w / rel).read_text().replace("from './caption.js'", "from 'hl/caption'")
                 .replace("from './turntable.js'", "from 'hl/turntable'")
-                .replace("from './scene.js'", "from 'hl/scene'"))
+                .replace("from './scene.js'", "from 'hl/scene'")
+                .replace("from './ink.js'", "from 'hl/ink'"))
         imports[spec] = _data_url(text)
     html = (w / "viewer.html").read_text()
     faces = "".join(

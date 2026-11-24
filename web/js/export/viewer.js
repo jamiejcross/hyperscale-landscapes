@@ -9,6 +9,7 @@ const MODULES = {
   'three/addons/OrbitControls.js': 'vendor/three/addons/OrbitControls.js',
   'three/addons/RoomEnvironment.js': 'vendor/three/addons/RoomEnvironment.js',
   'hl/scene': 'js/scene/scene.js',
+  'hl/ink': 'js/scene/ink.js',
   'hl/studio': 'js/scene/studio.js',
   'hl/caption': 'js/scene/caption.js',
   'hl/turntable': 'js/scene/turntable.js',
@@ -25,7 +26,8 @@ const dataURL = text => `data:text/javascript;base64,${b64(new TextEncoder().enc
 // Relative imports cannot resolve from a data: URL, so point them at the map.
 const rewrite = text => text.replaceAll("from './caption.js'", "from 'hl/caption'")
   .replaceAll("from './turntable.js'", "from 'hl/turntable'")
-  .replaceAll("from './scene.js'", "from 'hl/scene'");
+  .replaceAll("from './scene.js'", "from 'hl/scene'")
+  .replaceAll("from './ink.js'", "from 'hl/ink'");
 
 export async function buildViewer({ model, legend, colours, printColours, caption, sub, drape, drapeKind = null, zExag, slug, alt }) {
   // Pack every non-empty layer into one gzipped buffer.
