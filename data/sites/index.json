@@ -117,7 +117,9 @@
       "local_authority": "Fife",
       "status": null,
       "site_role": "data centre",
-      "file": "auchtertool-cato.geojson"
+      "file": "auchtertool-cato.geojson",
+      "bundle": "auchtertool-cato.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
     },
     {
       "id": "greenock",
@@ -125,7 +127,9 @@
       "local_authority": "Inverclyde",
       "status": null,
       "site_role": "data centre",
-      "file": "greenock.geojson"
+      "file": "greenock.geojson",
+      "bundle": "greenock.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
     },
     {
       "id": "hunterston",
@@ -133,7 +137,9 @@
       "local_authority": "North Ayrshire",
       "status": "pre-application",
       "site_role": "data centre",
-      "file": "hunterston.geojson"
+      "file": "hunterston.geojson",
+      "bundle": "hunterston.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
     },
     {
       "id": "irvine-i3",
@@ -141,7 +147,9 @@
       "local_authority": "North Ayrshire",
       "status": null,
       "site_role": "data centre",
-      "file": "irvine-i3.geojson"
+      "file": "irvine-i3.geojson",
+      "bundle": "irvine-i3.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
     },
     {
       "id": "data-vita-fortis",
@@ -149,7 +157,9 @@
       "local_authority": "North Lanarkshire",
       "status": null,
       "site_role": "data centre",
-      "file": "data-vita-fortis.geojson"
+      "file": "data-vita-fortis.geojson",
+      "bundle": "data-vita-fortis.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
     },
     {
       "id": "data-vita-lancaster-road",
@@ -157,7 +167,9 @@
       "local_authority": "North Lanarkshire",
       "status": "pre-application",
       "site_role": "data centre",
-      "file": "data-vita-lancaster-road.geojson"
+      "file": "data-vita-lancaster-road.geojson",
+      "bundle": "data-vita-lancaster-road.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
     },
     {
       "id": "data-vita-south-lanridge",
@@ -165,7 +177,9 @@
       "local_authority": "North Lanarkshire",
       "status": "pre-application",
       "site_role": "data centre",
-      "file": "data-vita-south-lanridge.geojson"
+      "file": "data-vita-south-lanridge.geojson",
+      "bundle": "data-vita-south-lanridge.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
     },
     {
       "id": "drumshangie",
@@ -173,7 +187,9 @@
       "local_authority": "North Lanarkshire",
       "status": "pre-application",
       "site_role": "data centre",
-      "file": "drumshangie.geojson"
+      "file": "drumshangie.geojson",
+      "bundle": "drumshangie.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
     },
     {
       "id": "newhouse",
@@ -181,7 +197,9 @@
       "local_authority": "North Lanarkshire",
       "status": "pre-application",
       "site_role": "data centre",
-      "file": "newhouse.geojson"
+      "file": "newhouse.geojson",
+      "bundle": "newhouse.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
     },
     {
       "id": "ravenscraig",
@@ -189,7 +207,9 @@
       "local_authority": "North Lanarkshire",
       "status": null,
       "site_role": "data centre",
-      "file": "ravenscraig.geojson"
+      "file": "ravenscraig.geojson",
+      "bundle": "ravenscraig.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
     },
     {
       "id": "duns",
@@ -197,7 +217,9 @@
       "local_authority": "Scottish Borders",
       "status": null,
       "site_role": "data centre",
-      "file": "duns.geojson"
+      "file": "duns.geojson",
+      "bundle": "duns.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
     },
     {
       "id": "coldstream",
@@ -205,7 +227,9 @@
       "local_authority": "Scottish Borders",
       "status": null,
       "site_role": "data centre",
-      "file": "coldstream.geojson"
+      "file": "coldstream.geojson",
+      "bundle": "coldstream.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
     },
     {
       "id": "clydebridge",
@@ -213,7 +237,9 @@
       "local_authority": "South Lanarkshire",
       "status": null,
       "site_role": "data centre",
-      "file": "clydebridge.geojson"
+      "file": "clydebridge.geojson",
+      "bundle": "clydebridge.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
     },
     {
       "id": "haspielaw",
@@ -221,7 +247,9 @@
       "local_authority": "South Lanarkshire",
       "status": null,
       "site_role": "data centre",
-      "file": "haspielaw.geojson"
+      "file": "haspielaw.geojson",
+      "bundle": "haspielaw.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
     },
     {
       "id": "plean",
@@ -229,7 +257,9 @@
       "local_authority": "Stirling",
       "status": null,
       "site_role": "related infrastructure",
-      "file": "plean.geojson"
+      "file": "plean.geojson",
+      "bundle": "plean.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
     },
     {
       "id": "freeport-west-calder",
@@ -237,7 +267,9 @@
       "local_authority": "West Lothian",
       "status": null,
       "site_role": "data centre",
-      "file": "freeport-west-calder.geojson"
+      "file": "freeport-west-calder.geojson",
+      "bundle": "freeport-west-calder.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
     }
   ]
 }
