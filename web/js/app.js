@@ -18,11 +18,24 @@ import { fontFaceCSS } from './fonts.js';
 import { captionLines, altText as draftAlt } from './scene/caption.js';
 import { write3MF } from './export/threemf.js';
 import { writeSTL } from './export/stl.js';
+import { parseView, urlWriter } from './urlstate.js';
 
 const $ = id => document.getElementById(id);
 const OSM_ATTR = '© OpenStreetMap contributors';
 const state = { bbox: null, name: '', site: null, bundle: null, model: null, layers: {}, presets: {}, surface: 'eox-2025' };
 let scene = null, studio = null;
+
+// Shareable view URL (?site=&style=&az=&el=). A view in the address bar on
+// load is applied once the first model is built.
+let pendingView = parseView(location.search);
+const writeUrl = urlWriter(() => {
+  const v = { site: state.site ? $('site-select').value || null : null };
+  if (scene) {
+    const a = scene.cameraAngles();
+    Object.assign(v, { style: scene.view.look, az: a.az, el: a.el });
+  }
+  return v;
+});
 
 await loadStrings();
 state.layers = Object.fromEntries((await (await fetch('data/layers.json')).json()).layers.map(l => [l.id, l]));
@@ -49,6 +62,7 @@ function setBBox(b, { name = '', site = null, bundle = null } = {}) {
   const f = $('coords').elements;
   f.minLat.value = b.minLat.toFixed(5); f.maxLat.value = b.maxLat.toFixed(5);
   f.minLon.value = b.minLon.toFixed(5); f.maxLon.value = b.maxLon.toFixed(5);
+  writeUrl();
 }
 
 // Curated sites: one dropdown, grouped by council, and a short fact panel.
@@ -173,8 +187,9 @@ function showPreview() {
       filename: () => `${slug()}-${new Date().toISOString().slice(0, 10)}`,
       printColours: printColourMap,
       alt: () => draftAlt({ name: state.name, report: state.model.model.report, exaggeration: exaggerationText(), surface: SURFACES[state.surface].label.toLowerCase() }),
-      onChange: () => refreshCaption(),
+      onChange: () => { refreshCaption(); writeUrl(); },
     });
+    scene.controls.addEventListener('change', writeUrl);
   }
   const colours = Object.fromEntries(Object.values(state.layers).map(l => [l.id, l.colour_screen]));
   colours.railDisused = state.layers.rail.colour_screen_disused;
@@ -192,6 +207,12 @@ function showPreview() {
   ul.querySelectorAll('input').forEach(i => { i.onchange = () => scene.setVisible(i.dataset.layer, i.checked); });
   const counts = model.report.counts;
   studio.update();
+  if (pendingView) {           // a view from a shared link, applied once
+    const { style, az, el } = pendingView; pendingView = null;
+    if (style) studio.setLook(style);
+    if (az != null || el != null) { const a = scene.cameraAngles(); scene.setCameraAngles(az ?? a.az, el ?? a.el); }
+  }
+  writeUrl();
   scene.renderer.domElement.setAttribute('aria-label', altText(model, osm));
   $('caption').textContent = captionText(opts, form) + ` Counts: ${counts.buildings} buildings, ${counts.receptors} schools, care or community buildings, ${counts.roads} roads.`;
   $('pauses').textContent = 'Single-colour printers: pause to change filament at ' +
@@ -362,6 +383,12 @@ async function renderSection() {
 $('section-vex').onchange = renderSection;
 $('section-svg').onclick = () => save(new Blob([state.sectionSVG], { type: 'image/svg+xml' }), `${slug()}-section.svg`);
 $('section-png').onclick = async () => save(await svgToPNG(state.sectionSVG, 2), `${slug()}-section.png`);
+
+// A shared link naming a curated site opens it and builds the model.
+if (pendingView.site) {
+  const entry = SITES.find(s => s.id === pendingView.site);
+  if (entry) { await chooseSite(entry); $('options').requestSubmit(); }
+}
 
 window.__app = state;   // for debugging and automated checks
 Object.defineProperty(window, "__studio", { get: () => studio });

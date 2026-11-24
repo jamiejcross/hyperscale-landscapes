@@ -21,6 +21,10 @@ everywhere).
    proposed building (JC, 24 Nov 2026), but a sourced red-line boundary
    would still help check the pins (item 4). Add one only from a planning
    drawing or a digitised published plan, with `footprint_precision`.
+   Red-line plans are usually drawn on an Ordnance Survey base map, so a
+   boundary traced from one may carry OS copyright: check before adding (to
+   verify). A boundary, once added, will also be drawn in the 3D view
+   (parked until then; see PLAN.md, field style).
 4. **Pin precision.** Pins are APRS's markers. Irvine is explicitly
    approximate. Check each against the red-line boundary once a footprint is
    added.

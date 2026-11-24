@@ -364,6 +364,22 @@ export function createScene(container) {
 
   function setSpin(on) { controls.autoRotate = on; }
 
+  // Camera angles as seen from the model's centre, in degrees: az is the
+  // compass bearing the camera stands at (clockwise from north), el its
+  // height above the horizon. Used for shareable view URLs.
+  function cameraAngles() {
+    const v = camera.position.clone().sub(controls.target), r = v.length() || 1;
+    const az = THREE.MathUtils.radToDeg(Math.atan2(v.x, -v.z));
+    return { az: (az + 360) % 360, el: THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(v.y / r, -1, 1))) };
+  }
+  function setCameraAngles(azDeg, elDeg) {
+    const az = THREE.MathUtils.degToRad(azDeg), el = THREE.MathUtils.degToRad(elDeg);
+    const r = camera.position.distanceTo(controls.target);
+    const dir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el));
+    camera.position.copy(view.look === 'field' ? fitPosition(dir, controls.target) : controls.target.clone().addScaledVector(dir, r));
+    controls.update();
+  }
+
   // Lens: keep the framing while changing focal length (dolly to compensate).
   function setFov(f) {
     const dir = camera.position.clone().sub(controls.target);
@@ -475,6 +491,7 @@ export function createScene(container) {
   function orbitEnd() { if (orbitBase) camera.position.copy(orbitBase.pos); camera.lookAt(controls.target); orbitBase = null; }
 
   return { renderer, scene, camera, controls, view, meshes, focalMm, setModel, setDrape, setLook, setVisible, setView, setSpin,
+    cameraAngles, setCameraAngles,
     setSun, setFov, setHeightScale, setBackground, setPrintColours, setScreenColours, setShadow, grab,
     pause, resume, renderAt, orbitStart, orbitTo, orbitEnd };
 }

@@ -4,6 +4,7 @@
 // scene, studio and caption code as the web app.
 import { createScene } from 'hl/scene';
 import { mountStudio } from 'hl/studio';
+import { parseView, urlWriter } from 'hl/urlstate';
 
 const D = JSON.parse(document.getElementById('terrain-data').textContent);
 const $ = id => document.getElementById(id);
@@ -40,11 +41,20 @@ const exag = () => {
   return k === 1 ? D.caption.disclosure : `Height exaggerated ×${r(z * k)}; buildings ×${r(k)}`;
 };
 const caption = () => ({ ...D.caption, disclosure: exag(), top: D.caption.top.replace(D.caption.disclosure, exag()) });
+// Shareable view: ?style=&az=&el= (camera angles), read on load and kept up
+// to date as the view changes.
+const writeUrl = urlWriter(() => { const a = scene.cameraAngles(); return { style: scene.view.look, az: a.az, el: a.el }; });
 const studio = mountStudio($('studio'), scene, {
   caption, filename: () => `${D.slug}-${new Date().toISOString().slice(0, 10)}`,
   printColours: () => D.printColours, alt: () => D.alt,
-  onChange: () => { $('caption').textContent = `${exag()}. ${D.caption.sources}. ${D.caption.footer}.`; },
+  onChange: () => { $('caption').textContent = `${exag()}. ${D.caption.sources}. ${D.caption.footer}.`; writeUrl(); },
 });
+{
+  const v = parseView(location.search);
+  if (v.style) studio.setLook(v.style);
+  if (v.az != null || v.el != null) { const a = scene.cameraAngles(); scene.setCameraAngles(v.az ?? a.az, v.el ?? a.el); }
+  scene.controls.addEventListener('change', writeUrl);
+}
 $('attr').textContent = D.caption.sources;
 
 // ---- keys (as in the Mossmorran viewer): H hide panel, C clean view, P save PNG

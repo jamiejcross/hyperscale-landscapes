@@ -10,6 +10,12 @@
 > - **Default model area 3.2 × 1.6 km** (east–west × north–south), centred on each site's pin, so nearby villages fall inside.
 > - **Satellite drape default: EOX 2025** (CC BY-NC-SA 4.0), graded for legibility; the project is non-commercial. Land cover and EOX 2016 remain options.
 > - **LiDAR terrain.** The Python tier reads every Scottish LiDAR programme from the public `srsp-open-data` bucket at 2 m, newest survey first, filling gaps from Copernicus 30 m. Curated-site bundles carry a 4 m LiDAR grid, so the browser uses LiDAR for them; custom areas in the browser still use Terrarium tiles.
+>
+> **Field style, 24 Nov 2026** (JC's brief, inspired by slabmaps.com's "field" look; no slab code used):
+> - A second, switchable *presentation* style: toon shading, flat slab walls, ink outlines, white ground, 20° lens. Mossmorran stays the default. It never changes print files, sections or manifests. Field's colours (teal water, warm greys) are an agreed exception to "strictly black and white", for this optional style only.
+> - Shareable view URLs: `?site=&style=&az=&el=` (camera angles; elevation held to 12–70°).
+> - **Parked:** the site boundary drawn as a route-style line on the terrain. No site has a sourced red-line boundary yet (`data/sites/TODO.md` item 3), so there is nothing to draw. Build and test it against the first sourced boundary.
+> - **Possible later phase, not started:** procedural scenery (instanced trees from OSM woodland or Meta/WRI canopy height; pitched roofs) and an ESA WorldCover fallback for land cover. If done, captions must say the scenery is illustrative, and each source's licence goes through §10.3 first.
 
 ---
 

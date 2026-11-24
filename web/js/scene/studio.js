@@ -150,5 +150,10 @@ export function mountStudio(el, scene, host) {
 
   q('video').addEventListener('click', () => runAnim('video'));
   update();
-  return { update, grab, compose, runAnim, animOpts, reset: update };
+  // Switch style from outside (e.g. a shared URL), keeping the panel in step.
+  function setLook(look) {
+    if (look === scene.view.look || !q('look').querySelector(`option[value="${look}"]`)) return;
+    q('look').value = look; q('look').dispatchEvent(new Event('change'));
+  }
+  return { update, grab, compose, runAnim, animOpts, setLook, reset: update };
 }

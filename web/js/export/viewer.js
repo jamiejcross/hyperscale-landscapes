@@ -10,6 +10,7 @@ const MODULES = {
   'three/addons/RoomEnvironment.js': 'vendor/three/addons/RoomEnvironment.js',
   'hl/scene': 'js/scene/scene.js',
   'hl/ink': 'js/scene/ink.js',
+  'hl/urlstate': 'js/urlstate.js',
   'hl/studio': 'js/scene/studio.js',
   'hl/caption': 'js/scene/caption.js',
   'hl/turntable': 'js/scene/turntable.js',
