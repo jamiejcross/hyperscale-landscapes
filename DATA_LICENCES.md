@@ -16,6 +16,28 @@ Sources marked *to verify* must be checked before the first public release.
 | Overture Maps (opt-in only) | buildings / roads fallback | mixed by theme | © Overture Maps Foundation; © OpenStreetMap contributors | to verify |
 | Curated sites (`data/sites/`) | site metadata | CC BY 4.0 | Hyperscale Landscapes contributors | — |
 
+## Imagery (candidates checked 24 Nov 2026; none integrated yet)
+
+The tool's exports (PNG, GIF, offline HTML) are forwarded freely, so imagery
+must allow embedding in exported files and redistribution by end users.
+
+| Source | Licence | Browser use | In redistributed exports | Resolution | Verdict |
+|---|---|---|---|---|---|
+| EOxCloudless **2016** (tiles.maps.eox.at, layer `s2cloudless_3857`) | CC BY 4.0 | yes; no key; CORS ok; fair use | yes, attribution visibly embedded | 10 m (imagery from 2016–17) | **fully open option** |
+| EOxCloudless **2018–2025** (`s2cloudless-2025_3857` etc.) | CC BY-NC-SA 4.0 | yes; no key; CORS ok; non-commercial apps only | yes, with attribution + CC BY-NC-SA notice; recipients bound by NC and ShareAlike; EOX counts government/agency use as commercial | 10 m | **current imagery, with conditions** |
+| Copernicus Sentinel-2 (raw scenes) | EU Copernicus legal notice: free, full and open, incl. distribution | via AWS COGs (CORS ok) but single, often cloudy scenes | yes; "Contains modified Copernicus Sentinel data [year]" | 10 m | possible later; more engineering |
+| Esri World Imagery | proprietary (Esri Master Agreement E204) | works without a key, but keyless use not expressly permitted | static images arguably for account holders; embedding tiles in forwarded HTML doubtful; open licensing of exports conflicts with B.1(k) | ~0.3 m | **not for exports** |
+| APGB / Getmapping / Digimap | public-sector / educational licences | — | no redistribution | 12.5–25 cm | not usable |
+| Mapbox, Google, Bing/Azure | proprietary | key required | storage and redistribution prohibited | sub-metre | not usable |
+| OpenAerialMap (CC BY 4.0) | CC BY 4.0 | yes | yes | 2–5 cm, tiny patches only (8 in the central belt, none at the sites) | not useful here |
+| Landsat (USGS / NASA GIBS) | public domain | yes | yes | 30 m | too coarse |
+
+Attribution wording (EOX): "EOxCloudless https://cloudless.eox.at by EOX IT
+Services GmbH (Contains modified Copernicus Sentinel data [year])"; links
+required in online publications and social media.
+
+No openly licensed sub-metre aerial imagery of the central belt was found.
+
 ## Services used by the browser app
 
 | Service | Use | Terms |

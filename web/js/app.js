@@ -9,12 +9,13 @@ import { loadElevation, ATTRIBUTION as ELEV_ATTRIBUTION } from './data/elevation
 import { readBoundary } from './data/upload.js';
 import { buildModel, printObjects, pauseHeights } from './geom/model.js';
 import { createScene, landcoverCanvas } from './scene/scene.js';
+import { SURFACES, imageryCanvas } from './data/imagery.js';
 import { write3MF } from './export/threemf.js';
 import { writeSTL } from './export/stl.js';
 
 const $ = id => document.getElementById(id);
 const OSM_ATTR = '© OpenStreetMap contributors';
-const state = { bbox: null, name: '', site: null, bundle: null, footprint: null, model: null, layers: {}, presets: {} };
+const state = { bbox: null, name: '', site: null, bundle: null, footprint: null, model: null, layers: {}, presets: {}, surface: 'landcover' };
 let scene = null;
 
 await loadStrings();
@@ -50,25 +51,62 @@ function setFootprint(gj) {
   picker.showFootprint(gj);
 }
 
-for (const s of await listSites()) {
-  const li = document.createElement('li');
-  const b = document.createElement('button');
-  b.type = 'button'; b.textContent = s.name;
-  b.onclick = async () => {
-    const { site, bundle } = await loadSite(s);
-    const bb = site.properties.model_bbox;
-    picker.showBBox({ minLat: bb.min_lat, maxLat: bb.max_lat, minLon: bb.min_lon, maxLon: bb.max_lon });
-    setBBox(state.bbox, { name: site.properties.name, site, bundle });
-    if (site.geometry) {
-      setFootprint({ type: 'Feature', properties: {}, geometry: site.geometry });
-      const o = $('options').elements, p = site.properties;
-      if (p.stated_height_m) o.insertHeight.value = p.stated_height_m;
-      if (p.massing_source) o.insertSource.value = p.massing_source;
-      if (p.footprint_precision) o.precision.value = p.footprint_precision;
-      if (p.planning_refs?.[0]) o.planningRef.value = p.planning_refs[0].ref || p.planning_refs[0];
-    } else setFootprint(null);
-  };
-  li.append(b); $('sites').append(li);
+// Curated sites, grouped by council, with a filter and a short fact panel.
+const SITES = await listSites();
+const esc = v => String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function renderSites(filter = '') {
+  const box = $('sites'); box.textContent = '';
+  const q = filter.trim().toLowerCase();
+  const groups = {};
+  for (const s of SITES) {
+    if (q && !`${s.name} ${s.local_authority}`.toLowerCase().includes(q)) continue;
+    (groups[s.local_authority || 'Other'] ||= []).push(s);
+  }
+  for (const [la, list] of Object.entries(groups)) {
+    const h = document.createElement('h4'); h.textContent = la; box.append(h);
+    const ul = document.createElement('ul');
+    for (const s of list) {
+      const li = document.createElement('li'), b = document.createElement('button');
+      b.type = 'button'; b.dataset.site = s.id; b.setAttribute('aria-pressed', 'false');
+      b.innerHTML = `${esc(s.name)}${s.status ? ` <span class="status">· ${esc(s.status)}</span>` : ''}`;
+      b.onclick = () => chooseSite(s, b);
+      li.append(b); ul.append(li);
+    }
+    box.append(ul);
+  }
+  if (!box.children.length) box.textContent = 'No sites match.';
+}
+$('site-filter').oninput = e => renderSites(e.target.value);
+renderSites();
+
+async function chooseSite(entry, button) {
+  document.querySelectorAll('#sites button').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
+  const { site, bundle } = await loadSite(entry);
+  const p = site.properties, bb = p.model_bbox;
+  picker.showBBox({ minLat: bb.min_lat, maxLat: bb.max_lat, minLon: bb.min_lon, maxLon: bb.max_lon });
+  setBBox(state.bbox, { name: p.name, site, bundle });
+  if (site.geometry) {
+    setFootprint({ type: 'Feature', properties: {}, geometry: site.geometry });
+    const o = $('options').elements;
+    if (p.stated_height_m) o.insertHeight.value = p.stated_height_m;
+    if (p.massing_source) o.insertSource.value = p.massing_source;
+    if (p.footprint_precision) o.precision.value = p.footprint_precision;
+    if (p.planning_refs?.[0]) o.planningRef.value = p.planning_refs[0].ref || p.planning_refs[0];
+  } else setFootprint(null);
+  if (p.location) picker.showPin(p.location, p.name);
+  const row = (k, v) => v == null || v === '' ? '' : `<dt>${k}</dt><dd>${v}</dd>`;
+  const by = p.reported_by ? ` (reported by ${esc(p.reported_by)})` : '';
+  const links = (p.sources || []).map(x => `<a href="${esc(x.url)}" rel="noopener" target="_blank">${esc(x.title)}</a>`).join('<br>');
+  $('site-facts').hidden = false;
+  $('site-facts').innerHTML = `<strong>${esc(p.name)}</strong><dl>
+    ${row('Developer', p.developer ? esc(p.developer) + by : null)}
+    ${row('Capacity', p.stated_capacity_mw != null ? `${p.stated_capacity_mw} MW${by}` : null)}
+    ${row('Grid connection', p.grid_connection_mw != null ? `${p.grid_connection_mw} MW${by}` : null)}
+    ${row('Site area', p.stated_site_area_ha != null ? `${p.stated_site_area_ha} ha${by}` : null)}
+    ${row('Planning stage', p.status ? esc(p.status) : 'not stated')}
+    ${row('Council', esc(p.local_authority))}
+    ${row('Footprint', site.geometry ? esc(p.footprint_precision || 'approximate') : 'not yet mapped, so no data-centre block')}
+  </dl><p>${esc(p.notes)}</p><p class="hint">${esc(p.verification || '')} The marker shows the reported location. Model area: ${esc(p.model_bbox_note || 'a box around the site')}</p><p>${links}</p>`;
 }
 
 $('search').onsubmit = async e => {
@@ -182,11 +220,13 @@ function showPreview() {
   $('dl-insert').hidden = !model.insert;
   $('pauses').textContent = 'Single-colour printers: pause to change filament at ' +
     pauseHeights(model, opts.base).map(p => `${p.zMm} mm (${p.changeTo})`).join(', ') + '.';
+  if (state.surface !== 'landcover') applySurface(state.surface);
   $('preview').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 
 function captionText(opts, form) {
-  let s = `${state.name || 'Terrain model'}. ${t('caption.exag', { x: opts.zExag })}. ${ELEV_ATTRIBUTION}. Map data ${OSM_ATTR}. Generated ${new Date().toISOString().slice(0, 10)}.`;
+  const sat = SURFACES[state.surface]?.attribution;
+  let s = `${state.name || 'Terrain model'}. ${t('caption.exag', { x: opts.zExag })}. ${ELEV_ATTRIBUTION}. Map data ${OSM_ATTR}.${sat ? ` ${sat}.` : ''} Generated ${new Date().toISOString().slice(0, 10)}.`;
   if (opts.footprint) s += ` ${t('caption.footprint', { precision: form.precision, ref: form.planningRef || 'not given' })}. Height ${opts.insertHeight} m (${form.insertSource || 'source not given'}).`;
   return s;
 }
@@ -199,6 +239,31 @@ function altText(model, osm) {
     `${n('power', k => k.startsWith('substation'))} substations, ${n('power', k => k.startsWith('line'))} high-voltage lines, ` +
     `${n('residues')} industrial residue features, ${n('rail', k => /disused/.test(k))} disused railways.`;
 }
+
+// ---------------- Surface: land cover or satellite ----------------
+for (const [id, s] of Object.entries(SURFACES)) $('surface').append(new Option(s.label, id, id === 'landcover', id === 'landcover'));
+async function applySurface(id) {
+  const { model, osm, opts, form } = state.model;
+  const note = $('surface-note');
+  state.surface = id;
+  try {
+    if (id === 'landcover') {
+      scene.setDrape(landcoverCanvas(model.grid, osm.features));
+      note.textContent = '';
+    } else {
+      note.textContent = 'Loading satellite imagery from EOX…';
+      scene.setDrape(await imageryCanvas(id, state.bbox, model.grid));
+      note.textContent = SURFACES[id].note;
+    }
+  } catch (err) {
+    note.textContent = `Satellite imagery could not be loaded (${err.message}). Showing land cover instead.`;
+    state.surface = 'landcover'; $('surface').value = 'landcover';
+    scene.setDrape(landcoverCanvas(model.grid, osm.features));
+  }
+  const counts = model.report.counts;
+  $('caption').textContent = captionText(opts, form) + ` Counts: ${counts.buildings} buildings, ${counts.receptors} schools, care or community buildings, ${counts.roads} roads.`;
+}
+$('surface').onchange = e => applySurface(e.target.value);
 
 $('preview').addEventListener('click', e => { const v = e.target.closest('[data-view]'); if (v) scene.setView(v.dataset.view); });
 $('spin').onchange = e => scene.setSpin(e.target.checked);

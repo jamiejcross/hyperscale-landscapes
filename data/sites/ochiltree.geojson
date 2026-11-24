@@ -1,0 +1,53 @@
+{
+  "type": "Feature",
+  "geometry": null,
+  "properties": {
+    "id": "ochiltree",
+    "name": "Ochiltree (Killoch), East Ayrshire",
+    "site_role": "data centre",
+    "developer": "Apatura",
+    "local_authority": "East Ayrshire",
+    "local_authority_source": "OpenStreetMap boundaries (Nominatim reverse lookup)",
+    "status": null,
+    "planning_refs": [],
+    "stated_capacity_mw": 200,
+    "grid_connection_mw": null,
+    "stated_height_m": null,
+    "stated_floor_area_m2": null,
+    "stated_site_area_ha": null,
+    "stated_building_area_ha": null,
+    "footprint_precision": null,
+    "massing_source": null,
+    "location": [
+      -4.412888,
+      55.457124
+    ],
+    "location_precision": "pin on APRS map",
+    "reported_by": "APRS",
+    "verification": "Figures as reported by APRS; not yet checked against planning documents.",
+    "sources": [
+      {
+        "title": "APRS map of proposed data centres in Scotland",
+        "publisher": "APRS",
+        "url": "https://www.google.com/maps/d/viewer?mid=1iGmWc4tSHrLNwDRCFz86dLgBFWWw-Kg",
+        "accessed": "2026-11-24"
+      },
+      {
+        "title": "APRS page: Ochiltree (Killoch), East Ayrshire",
+        "publisher": "APRS",
+        "url": "https://aprs.scot/ochiltree-dc",
+        "accessed": null
+      }
+    ],
+    "last_verified": null,
+    "licence": "CC-BY-4.0",
+    "notes": "Farmland next to the former Killoch Colliery, near Cumnock. APRS reports that an EIA is required.",
+    "model_bbox": {
+      "min_lat": 55.44814,
+      "max_lat": 55.46611,
+      "min_lon": -4.42873,
+      "max_lon": -4.39705
+    },
+    "model_bbox_note": "2 km square centred on the APRS pin; a modelling extent, not a site boundary."
+  }
+}

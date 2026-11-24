@@ -1,0 +1,164 @@
+{
+ "Ravenscraig": {
+  "county": "North Lanarkshire",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Coldstream": {
+  "county": "Scottish Borders",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Drumshangie": {
+  "county": "North Lanarkshire",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Killean": {
+  "county": "Argyll and Bute",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Auchtertool": {
+  "county": "Fife",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Hurlford": {
+  "county": "East Ayrshire",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Newhouse": {
+  "county": "North Lanarkshire",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "South Gyle": {
+  "county": null,
+  "state_district": null,
+  "city": "City of Edinburgh",
+  "state": "Scotland"
+ },
+ "Wester Hermiston": {
+  "county": null,
+  "state_district": null,
+  "city": "City of Edinburgh",
+  "state": "Scotland"
+ },
+ "Freeport": {
+  "county": "West Lothian",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Westerhill": {
+  "county": "East Dunbartonshire",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Haspielaw": {
+  "county": "South Lanarkshire",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Ochiltree": {
+  "county": "East Ayrshire",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Duns": {
+  "county": "Scottish Borders",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Dunbar": {
+  "county": "East Lothian",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Data vita, Fortis": {
+  "county": "North Lanarkshire",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Data Vita, South Lanridge": {
+  "county": "North Lanarkshire",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Irvine": {
+  "county": "North Ayrshire",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Cockenzie": {
+  "county": "East Lothian",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Chapelcross": {
+  "county": "Dumfries and Galloway",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Greenock": {
+  "county": "Inverclyde",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Larbert": {
+  "county": "Falkirk",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Blackdog Aberdeen": {
+  "county": "Aberdeenshire",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Apatura Plean": {
+  "county": "Stirling",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Data Vita Lancaster Road AI Growth zone site": {
+  "county": "North Lanarkshire",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Hunterston Data Centre": {
+  "county": "North Ayrshire",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ },
+ "Clydebridge Data Centre": {
+  "county": "South Lanarkshire",
+  "state_district": null,
+  "city": null,
+  "state": "Scotland"
+ }
+}

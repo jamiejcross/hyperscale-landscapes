@@ -19,3 +19,6 @@ cache/
 # Offline test fixtures are small and must be committed
 !pipeline/tests/fixtures/cache/
 !pipeline/tests/fixtures/cache/**
+
+# Third-party source exports (contain the publisher's own text; re-export to regenerate)
+tools/sources/*.kml

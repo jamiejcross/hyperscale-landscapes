@@ -30,8 +30,11 @@
       <div class="pick-controls">
         <fieldset>
           <legend data-i18n="pick.sites"></legend>
-          <ul id="sites" class="sites"></ul>
+          <label for="site-filter" class="visually-hidden">Filter sites</label>
+          <input id="site-filter" type="search" placeholder="Filter by name or council" autocomplete="off">
+          <div id="sites" class="sites"></div>
           <p class="hint" data-i18n="pick.sites.help"></p>
+          <div id="site-facts" class="site-facts" aria-live="polite" hidden></div>
         </fieldset>
         <form id="search" class="row" role="search">
           <label for="q" data-i18n="pick.search"></label>
@@ -108,6 +111,9 @@
       <aside class="layers">
         <h3 data-i18n="preview.layers"></h3>
         <ul id="layer-list"></ul>
+        <h3><label for="surface">Surface</label></h3>
+        <select id="surface"></select>
+        <p id="surface-note" class="hint" aria-live="polite"></p>
         <h3 data-i18n="preview.views"></h3>
         <div class="inline">
           <button type="button" data-view="oblique" data-i18n="view.oblique"></button>

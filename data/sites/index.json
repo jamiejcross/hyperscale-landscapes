@@ -2,12 +2,242 @@
   "schema": "hyperscale-landscapes/sites-index@1",
   "sites": [
     {
+      "id": "blackdog",
+      "name": "Blackdog, Aberdeenshire",
+      "local_authority": "Aberdeenshire",
+      "status": null,
+      "site_role": "data centre",
+      "file": "blackdog.geojson",
+      "bundle": "blackdog.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
+    },
+    {
+      "id": "killean-cowal",
+      "name": "Killean, Cowal (Argyll)",
+      "local_authority": "Argyll and Bute",
+      "status": null,
+      "site_role": "data centre",
+      "file": "killean-cowal.geojson",
+      "bundle": "killean-cowal.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
+    },
+    {
+      "id": "south-gyle",
+      "name": "South Gyle, Edinburgh",
+      "local_authority": "City of Edinburgh",
+      "status": "refused",
+      "site_role": "data centre",
+      "file": "south-gyle.geojson",
+      "bundle": "south-gyle.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
+    },
+    {
+      "id": "wester-hermiston",
+      "name": "Wester Hermiston, Edinburgh",
+      "local_authority": "City of Edinburgh",
+      "status": null,
+      "site_role": "data centre",
+      "file": "wester-hermiston.geojson",
+      "bundle": "wester-hermiston.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
+    },
+    {
+      "id": "chapelcross",
+      "name": "Chapelcross, Annan",
+      "local_authority": "Dumfries and Galloway",
+      "status": "application lodged",
+      "site_role": "data centre",
+      "file": "chapelcross.geojson",
+      "bundle": "chapelcross.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
+    },
+    {
+      "id": "hurlford",
+      "name": "Hurlford, East Ayrshire",
+      "local_authority": "East Ayrshire",
+      "status": "pre-application",
+      "site_role": "data centre",
+      "file": "hurlford.geojson",
+      "bundle": "hurlford.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
+    },
+    {
+      "id": "ochiltree",
+      "name": "Ochiltree (Killoch), East Ayrshire",
+      "local_authority": "East Ayrshire",
+      "status": null,
+      "site_role": "data centre",
+      "file": "ochiltree.geojson",
+      "bundle": "ochiltree.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
+    },
+    {
+      "id": "westerhill",
+      "name": "Westerhill, Bishopbriggs",
+      "local_authority": "East Dunbartonshire",
+      "status": null,
+      "site_role": "data centre",
+      "file": "westerhill.geojson",
+      "bundle": "westerhill.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
+    },
+    {
+      "id": "cockenzie",
+      "name": "Cockenzie, East Lothian",
+      "local_authority": "East Lothian",
+      "status": null,
+      "site_role": "data centre",
+      "file": "cockenzie.geojson",
+      "bundle": "cockenzie.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
+    },
+    {
+      "id": "dunbar",
+      "name": "Dunbar, East Lothian",
+      "local_authority": "East Lothian",
+      "status": null,
+      "site_role": "data centre",
+      "file": "dunbar.geojson",
+      "bundle": "dunbar.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
+    },
+    {
+      "id": "larbert",
+      "name": "Glenbervie, Larbert",
+      "local_authority": "Falkirk",
+      "status": "application lodged",
+      "site_role": "data centre",
+      "file": "larbert.geojson",
+      "bundle": "larbert.bundle.json.gz",
+      "bundle_fetched": "2026-11-24"
+    },
+    {
       "id": "auchtertool-cato",
       "name": "Auchtertool (Cato), Fife",
+      "local_authority": "Fife",
       "status": null,
-      "file": "auchtertool-cato.geojson",
-      "bundle": "auchtertool-cato.bundle.json.gz",
-      "bundle_fetched": "2026-11-23"
+      "site_role": "data centre",
+      "file": "auchtertool-cato.geojson"
+    },
+    {
+      "id": "greenock",
+      "name": "Greenock, Inverclyde",
+      "local_authority": "Inverclyde",
+      "status": null,
+      "site_role": "data centre",
+      "file": "greenock.geojson"
+    },
+    {
+      "id": "hunterston",
+      "name": "Hunterston, North Ayrshire",
+      "local_authority": "North Ayrshire",
+      "status": "pre-application",
+      "site_role": "data centre",
+      "file": "hunterston.geojson"
+    },
+    {
+      "id": "irvine-i3",
+      "name": "Irvine (i3 Business Park)",
+      "local_authority": "North Ayrshire",
+      "status": null,
+      "site_role": "data centre",
+      "file": "irvine-i3.geojson"
+    },
+    {
+      "id": "data-vita-fortis",
+      "name": "Data Vita (Fortis), Chapelhall",
+      "local_authority": "North Lanarkshire",
+      "status": null,
+      "site_role": "data centre",
+      "file": "data-vita-fortis.geojson"
+    },
+    {
+      "id": "data-vita-lancaster-road",
+      "name": "Data Vita, Lancaster Road, Chapelhall",
+      "local_authority": "North Lanarkshire",
+      "status": "pre-application",
+      "site_role": "data centre",
+      "file": "data-vita-lancaster-road.geojson"
+    },
+    {
+      "id": "data-vita-south-lanridge",
+      "name": "Data Vita, South Lanridge",
+      "local_authority": "North Lanarkshire",
+      "status": "pre-application",
+      "site_role": "data centre",
+      "file": "data-vita-south-lanridge.geojson"
+    },
+    {
+      "id": "drumshangie",
+      "name": "Drumshangie, Airdrie",
+      "local_authority": "North Lanarkshire",
+      "status": "pre-application",
+      "site_role": "data centre",
+      "file": "drumshangie.geojson"
+    },
+    {
+      "id": "newhouse",
+      "name": "Newhouse, North Lanarkshire",
+      "local_authority": "North Lanarkshire",
+      "status": "pre-application",
+      "site_role": "data centre",
+      "file": "newhouse.geojson"
+    },
+    {
+      "id": "ravenscraig",
+      "name": "Ravenscraig, Motherwell",
+      "local_authority": "North Lanarkshire",
+      "status": null,
+      "site_role": "data centre",
+      "file": "ravenscraig.geojson"
+    },
+    {
+      "id": "duns",
+      "name": "Duns, Scottish Borders",
+      "local_authority": "Scottish Borders",
+      "status": null,
+      "site_role": "data centre",
+      "file": "duns.geojson"
+    },
+    {
+      "id": "coldstream",
+      "name": "Laundryfield, Coldstream",
+      "local_authority": "Scottish Borders",
+      "status": null,
+      "site_role": "data centre",
+      "file": "coldstream.geojson"
+    },
+    {
+      "id": "clydebridge",
+      "name": "Clydebridge, Cambuslang",
+      "local_authority": "South Lanarkshire",
+      "status": null,
+      "site_role": "data centre",
+      "file": "clydebridge.geojson"
+    },
+    {
+      "id": "haspielaw",
+      "name": "Haspielaw, Hamilton",
+      "local_authority": "South Lanarkshire",
+      "status": null,
+      "site_role": "data centre",
+      "file": "haspielaw.geojson"
+    },
+    {
+      "id": "plean",
+      "name": "Plean (grid connection for Larbert)",
+      "local_authority": "Stirling",
+      "status": null,
+      "site_role": "related infrastructure",
+      "file": "plean.geojson"
+    },
+    {
+      "id": "freeport-west-calder",
+      "name": "Freeport, West Calder",
+      "local_authority": "West Lothian",
+      "status": null,
+      "site_role": "data centre",
+      "file": "freeport-west-calder.geojson"
     }
   ]
 }

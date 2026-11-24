@@ -35,3 +35,21 @@ def test_curated_bundles_are_small_and_valid():
         b = json.loads(gzip.decompress(p.read_bytes()))
         assert b["schema"] == "hyperscale-landscapes/site-bundle@1"
         assert b["osm"]["elements"] and b["elevation"]["tiles"]
+
+
+def test_every_site_validates_against_the_schema():
+    import jsonschema
+    schema = json.loads((DATA / "schema.json").read_text())
+    for f in sorted(DATA.glob("*.geojson")):
+        jsonschema.validate(json.loads(f.read_text()), schema)
+
+
+def test_every_site_has_a_source_and_a_sane_extent():
+    for f in sorted(DATA.glob("*.geojson")):
+        p = json.loads(f.read_text())["properties"]
+        assert p["sources"] and all(s["url"].startswith("http") for s in p["sources"]), f.name
+        bb = p["model_bbox"]
+        assert bb["min_lat"] < bb["max_lat"] and bb["min_lon"] < bb["max_lon"], f.name
+        if "location" in p:
+            lon, lat = p["location"]
+            assert bb["min_lon"] < lon < bb["max_lon"] and bb["min_lat"] < lat < bb["max_lat"], f.name

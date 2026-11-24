@@ -125,6 +125,15 @@ export function createScene(container) {
     setView('oblique', false);
   }
 
+  // Swap the drape on the land top (land cover or satellite) without rebuilding.
+  function setDrape(canvas) {
+    const m = meshes.terrain; if (!m) return;
+    m.material.map?.dispose();
+    m.material.map = canvas ? canvasTexture(canvas, renderer) : null;
+    m.material.color.set(canvas ? 0xffffff : LAND_BASE);
+    m.material.needsUpdate = true;
+  }
+
   function setVisible(id, on) {
     for (const k of [id, `${id}Disused`, `${id}-sides`]) if (meshes[k]) meshes[k].visible = on;
   }
@@ -148,7 +157,7 @@ export function createScene(container) {
   function setSpin(on) { controls.autoRotate = on; }
 
   renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
-  return { renderer, scene, camera, controls, setModel, setVisible, setView, setSpin, setSun, meshes };
+  return { renderer, scene, camera, controls, setModel, setDrape, setVisible, setView, setSpin, setSun, meshes };
 }
 
 // Separate wall triangles (|normal z| small) from the top/bottom caps.

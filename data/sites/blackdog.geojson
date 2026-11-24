@@ -1,0 +1,53 @@
+{
+  "type": "Feature",
+  "geometry": null,
+  "properties": {
+    "id": "blackdog",
+    "name": "Blackdog, Aberdeenshire",
+    "site_role": "data centre",
+    "developer": null,
+    "local_authority": "Aberdeenshire",
+    "local_authority_source": "OpenStreetMap boundaries (Nominatim reverse lookup)",
+    "status": null,
+    "planning_refs": [],
+    "stated_capacity_mw": 600,
+    "grid_connection_mw": null,
+    "stated_height_m": null,
+    "stated_floor_area_m2": null,
+    "stated_site_area_ha": null,
+    "stated_building_area_ha": null,
+    "footprint_precision": null,
+    "massing_source": null,
+    "location": [
+      -2.068836,
+      57.227092
+    ],
+    "location_precision": "pin on APRS map",
+    "reported_by": "APRS",
+    "verification": "Figures as reported by APRS; not yet checked against planning documents.",
+    "sources": [
+      {
+        "title": "APRS map of proposed data centres in Scotland",
+        "publisher": "APRS",
+        "url": "https://www.google.com/maps/d/viewer?mid=1iGmWc4tSHrLNwDRCFz86dLgBFWWw-Kg",
+        "accessed": "2026-11-24"
+      },
+      {
+        "title": "APRS page: Blackdog, Aberdeenshire",
+        "publisher": "APRS",
+        "url": "https://aprs.scot/aberdeen-blackdog/",
+        "accessed": null
+      }
+    ],
+    "last_verified": null,
+    "licence": "CC-BY-4.0",
+    "notes": "Edge of the dune system on a former MOD firing range. APRS reports 600 MW initially, scaling to multiple gigawatts, and an existing planning permission in principle for mixed 'town centre' use.",
+    "model_bbox": {
+      "min_lat": 57.21811,
+      "max_lat": 57.23608,
+      "min_lon": -2.08543,
+      "max_lon": -2.05224
+    },
+    "model_bbox_note": "2 km square centred on the APRS pin; a modelling extent, not a site boundary."
+  }
+}

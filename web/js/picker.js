@@ -77,5 +77,12 @@ export function createPicker(el, { onBBox, onFootprint }) {
     showBBox({ minLat: lat - dLat, maxLat: lat + dLat, minLon: lon - dLon, maxLon: lon + dLon });
   }
 
-  return { map, showBBox, showFootprint, setMode, finishPolygon, search, goTo, get mode() { return mode; } };
+  let pin = null;
+  function showPin([lon, lat], label) {
+    pin?.remove();
+    pin = L.circleMarker([lat, lon], { radius: 7, color: '#fff', weight: 2, fillColor: '#D55E00', fillOpacity: 1 })
+      .addTo(map).bindTooltip(label);
+  }
+
+  return { map, showBBox, showFootprint, showPin, setMode, finishPolygon, search, goTo, get mode() { return mode; } };
 }

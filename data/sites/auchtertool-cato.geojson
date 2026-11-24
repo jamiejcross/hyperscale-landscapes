@@ -4,19 +4,57 @@
   "properties": {
     "id": "auchtertool-cato",
     "name": "Auchtertool (Cato), Fife",
-    "developer": null,
-    "local_authority": "Fife Council",
+    "site_role": "data centre",
+    "developer": "ILI",
+    "local_authority": "Fife",
+    "local_authority_source": "OpenStreetMap boundaries (Nominatim reverse lookup)",
     "status": null,
     "planning_refs": [],
-    "stated_capacity_mw": null,
+    "stated_capacity_mw": 600,
+    "grid_connection_mw": null,
     "stated_height_m": null,
     "stated_floor_area_m2": null,
+    "stated_site_area_ha": null,
+    "stated_building_area_ha": null,
     "footprint_precision": null,
     "massing_source": null,
-    "sources": [],
+    "location": [
+      -3.265364,
+      56.109111
+    ],
+    "location_precision": "pin on APRS map",
+    "reported_by": "APRS",
+    "verification": "Figures as reported by APRS; not yet checked against planning documents.",
+    "sources": [
+      {
+        "title": "APRS map of proposed data centres in Scotland",
+        "publisher": "APRS",
+        "url": "https://www.google.com/maps/d/viewer?mid=1iGmWc4tSHrLNwDRCFz86dLgBFWWw-Kg",
+        "accessed": "2026-11-24"
+      },
+      {
+        "title": "APRS page: Auchtertool (Cato), Fife",
+        "publisher": "APRS",
+        "url": "https://aprs.scot/auchtertool-dc",
+        "accessed": null
+      }
+    ],
     "last_verified": null,
     "licence": "CC-BY-4.0",
-    "notes": "No footprint and no insert until a sourced footprint exists (decided by JC, 23 Nov 2026). model_bbox is the study area of JC's Mossmorran/Auchtertool terrain build (Nov 2026); it is a modelling extent, not a site boundary.",
-    "model_bbox": { "min_lat": 56.09158, "max_lat": 56.10642, "min_lon": -3.30543, "max_lon": -3.24569 }
+    "notes": "Farmland by Auchtertool. APRS reports a newly built battery energy storage system next to the site, that the council is screening for EIA, and that the submitted plans show buildings over Hallyards Castle.",
+    "model_bbox": {
+      "min_lat": 56.10013,
+      "max_lat": 56.11809,
+      "min_lon": -3.28147,
+      "max_lon": -3.24925
+    },
+    "model_bbox_note": "2 km square centred on the APRS pin; a modelling extent, not a site boundary.",
+    "model_bbox_wide": {
+      "min_lat": 56.09158,
+      "max_lat": 56.10642,
+      "min_lon": -3.30543,
+      "max_lon": -3.24569
+    },
+    "model_bbox_wide_note": "Study area of JC's Mossmorran/Auchtertool terrain build (Nov 2026), taking in the Mossmorran plant."
   }
 }
