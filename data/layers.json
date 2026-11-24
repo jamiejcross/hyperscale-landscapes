@@ -116,17 +116,6 @@
       "sources": [
         "upload"
       ]
-    },
-    {
-      "id": "site",
-      "name": "Proposed data centre",
-      "colour_screen": "#D55E00",
-      "print_default": "#FFFFFF",
-      "why": "The proposed footprint and its stated height, shown as a removable block. Heights are as stated by the developer, or an estimate whose source is recorded. Its precision is stated on every export.",
-      "why_status": "reviewed by JC, 23 Nov 2026",
-      "sources": [
-        "site"
-      ]
     }
   ]
 }

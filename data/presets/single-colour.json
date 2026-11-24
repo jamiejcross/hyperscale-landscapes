@@ -1,8 +1,8 @@
 { "id": "single-colour", "name": "Single colour",
-  "description": "One merged watertight STL for any printer, plus the insert as a separate STL.",
+  "description": "One merged watertight STL for any printer.",
   "single": true,
   "objects": [
     { "name": "Model", "slot": 1, "colour": "#C8C8C8",
       "layers": ["terrain", "buildings", "receptors", "roads", "rail", "power", "residues"] }
-  ],
-  "insert": { "name": "Proposed data centre", "slot": 1 } }
+  ]
+}

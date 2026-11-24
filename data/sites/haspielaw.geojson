@@ -43,11 +43,11 @@
     "licence": "CC-BY-4.0",
     "notes": "Green Belt farmland south-west of Hamilton. APRS reports that the capacity is not given in the planning documents and that an EIA is required.",
     "model_bbox": {
-      "min_lat": 55.73667,
-      "max_lat": 55.74745,
+      "min_lat": 55.73487,
+      "max_lat": 55.74925,
       "min_lon": -4.10141,
       "max_lon": -4.05035
     },
-    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.6 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

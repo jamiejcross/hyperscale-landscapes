@@ -43,11 +43,11 @@
     "licence": "CC-BY-4.0",
     "notes": "Grade 2 agricultural land along the southern edge of Dunbar. APRS reports that the capacity is not stated.",
     "model_bbox": {
-      "min_lat": 55.98016,
-      "max_lat": 55.99093,
+      "min_lat": 55.97836,
+      "max_lat": 55.99273,
       "min_lon": -2.54774,
       "max_lon": -2.49635
     },
-    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.6 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

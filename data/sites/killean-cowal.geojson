@@ -43,11 +43,11 @@
     "licence": "CC-BY-4.0",
     "notes": "APRS reports a proposal of 1,000 MW scaling to 2,000 MW, an AI Growth Zone application covering 186 acres, and a 2020 consent for a single smaller data-storage building nearby.",
     "model_bbox": {
-      "min_lat": 55.87471,
-      "max_lat": 55.88549,
+      "min_lat": 55.87291,
+      "max_lat": 55.88729,
       "min_lon": -5.05651,
       "max_lon": -5.00526
     },
-    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.6 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

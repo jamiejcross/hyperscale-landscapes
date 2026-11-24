@@ -12,7 +12,6 @@ const MODULES = {
   'hl/studio': 'js/scene/studio.js',
   'hl/caption': 'js/scene/caption.js',
   'hl/turntable': 'js/scene/turntable.js',
-  'hl/beforeafter': 'js/scene/beforeafter.js',
   gifenc: 'vendor/gifenc.js',
 };
 
@@ -25,11 +24,10 @@ const dataURL = text => `data:text/javascript;base64,${b64(new TextEncoder().enc
 
 // Relative imports cannot resolve from a data: URL, so point them at the map.
 const rewrite = text => text.replaceAll("from './caption.js'", "from 'hl/caption'")
-  .replaceAll("from './turntable.js'", "from 'hl/turntable'")
-  .replaceAll("from './beforeafter.js'", "from 'hl/beforeafter'");
+  .replaceAll("from './turntable.js'", "from 'hl/turntable'");
 
 export async function buildViewer({ model, legend, colours, printColours, caption, sub, drape, zExag, slug, alt }) {
-  // Pack every non-empty layer (and the insert) into one gzipped buffer.
+  // Pack every non-empty layer into one gzipped buffer.
   const parts = [], layout = {}, ids = [];
   let offset = 0;
   const add = (key, arr, type) => {
@@ -43,9 +41,6 @@ export async function buildViewer({ model, legend, colours, printColours, captio
     add(`${id}_p`, m.positions, 'float32');
     add(`${id}_i`, m.indices, 'uint32');
   }
-  if (model.insert) { add('site_p', model.insert.positions, 'float32'); add('site_i', model.insert.indices, 'uint32'); }
-  for (const [k, m] of Object.entries(model.before || {}))   // 'today' land for before/after
-    if (m?.indices.length) { add(`before_${k}_p`, m.positions, 'float32'); add(`before_${k}_i`, m.indices, 'uint32'); }
   const raw = new Uint8Array(offset);
   let o = 0; for (const p of parts) { raw.set(p, o); o += p.byteLength; }
   const geom = b64(gzipSync(raw, { level: 9 }));

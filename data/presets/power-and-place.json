@@ -5,5 +5,5 @@
     { "name": "Water",     "slot": 2, "colour": "#4488CC", "layers": ["water"] },
     { "name": "Power, roads and rail", "slot": 3, "colour": "#F28C28", "layers": ["power", "roads", "rail"] },
     { "name": "Buildings", "slot": 4, "colour": "#C8C8C8", "layers": ["buildings", "receptors", "residues"] }
-  ],
-  "insert": { "name": "Proposed data centre", "slot": 4 } }
+  ]
+}

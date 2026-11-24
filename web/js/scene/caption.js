@@ -1,15 +1,14 @@
 // Caption strips drawn INTO exported images (brief §6): site name, height
-// exaggeration, data sources and licences, the date, and the footprint
-// precision.  A full band runs along the bottom and a one-line band along
+// exaggeration, data sources and licences, and the date. A full band runs along the bottom and a one-line band along
 // the top, so a single crop rarely removes both.
 
-export function captionLines({ name, exaggeration, sources, footprint, date = new Date() }) {
+export function captionLines({ name, exaggeration, sources, date = new Date() }) {
   const d = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   return {
     title: name || 'Terrain model',
     disclosure: exaggeration,
     sources,
-    footer: [footprint, `Made ${d} with Hyperscale Landscapes`].filter(Boolean).join(' · '),
+    footer: `Made ${d} with Hyperscale Landscapes`,
     top: `${name || 'Terrain model'} · ${exaggeration} · ${sources.split(';')[0]} and others · ${d}`,
   };
 }
@@ -28,10 +27,9 @@ function wrap(g, text, maxW) {
 // Returns a new canvas: the render with caption bands attached above and
 // below it (part of the same image, so they travel with it, without hiding
 // any of the model).
-// Swiss style: one grotesque (Inter, vendored), black and white plus the
-// single spot colour, which marks the band as a rule.
+// Swiss style: one grotesque (Inter, vendored), strictly black and white;
+// a heavy rule marks the caption band.
 const font = (px, weight = 400) => `${weight} ${px}px Inter, "Helvetica Neue", Helvetica, Arial, sans-serif`;
-const SPOT = '#d55e00';
 
 // Layout of the caption bands for an image `W` pixels wide.
 function layout(W, caption) {
@@ -64,9 +62,9 @@ export function withCaption(render, caption, { dark = false } = {}) {
   g.fillStyle = bg; g.fillRect(0, 0, W, out.height);
   g.drawImage(render, 0, topH);
 
-  // Bottom band: a spot-colour rule, then title and disclosure on one line,
+  // Bottom band: a heavy rule, then title and disclosure on one line,
   // then sources, then footer.
-  g.fillStyle = SPOT; g.fillRect(0, topH + render.height, W, Math.max(3, Math.round(fs / 4)));
+  g.fillStyle = fg; g.fillRect(0, topH + render.height, W, Math.max(3, Math.round(fs / 4)));
   let y = topH + render.height + pad + titleFs;
   g.fillStyle = fg; g.font = font(titleFs, 700); g.fillText(caption.title, pad, y);
   g.font = font(fs, 700);

@@ -17,10 +17,10 @@ everywhere).
 2. **Planning references.** No site has a planning reference yet. For each,
    add the council's reference and portal URL (`planning_refs`). That is what
    lets `status` move from "as reported" to verified.
-3. **Footprints.** No site has a footprint, so none gets a data-centre block.
-   Add a polygon only from a planning drawing or a digitised published plan,
-   with `footprint_precision` and the stated height (`stated_height_m`,
-   `massing_source`).
+3. **Footprints.** No site has a footprint. The models no longer show the
+   proposed building (JC, 24 Nov 2026), but a sourced red-line boundary
+   would still help check the pins (item 4). Add one only from a planning
+   drawing or a digitised published plan, with `footprint_precision`.
 4. **Pin precision.** Pins are APRS's markers. Irvine is explicitly
    approximate. Check each against the red-line boundary once a footprint is
    added.
@@ -31,7 +31,7 @@ everywhere).
    Ochiltree ("this application"), Cockenzie ("preferred supplier chosen"),
    Auchtertool ("EIA screening"). Please set these from the planning portals.
 7. **Auchtertool extent.** APRS's pin lies about 300 m north of the Mossmorran
-   study area used so far. The default model is now a 3.2 × 1.2 km strip centred on the pin;
+   study area used so far. The default model is now a 3.2 × 1.6 km strip centred on the pin;
    your wider Mossmorran extent is kept as `model_bbox_wide`.
 
 ## Fields still empty, by site

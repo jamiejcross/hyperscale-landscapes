@@ -33,8 +33,14 @@ def test_curated_bundles_are_small_and_valid():
         p = DATA / s["bundle"]
         assert p.stat().st_size < 5_000_000, s["id"]
         b = json.loads(gzip.decompress(p.read_bytes()))
-        assert b["schema"] == "hyperscale-landscapes/site-bundle@1"
-        assert b["osm"]["elements"] and b["elevation"]["tiles"]
+        assert b["schema"] == "hyperscale-landscapes/site-bundle@2"
+        assert b["osm"]["elements"]
+        L = b["elevation"].get("lidar")
+        assert L or b["elevation"].get("tiles"), s["id"]
+        if L:   # LiDAR grid: complete, credited, and any gap fill recorded
+            assert len(L["data"]) * 3 // 4 >= L["w"] * L["h"] * 2
+            assert "Open Government Licence" in L["attribution"]
+            assert not L["gap_fraction"] or "no LiDAR survey" in L["attribution"]
         # A bundle must cover exactly the site's model area (the app ignores
         # mismatched bundles and falls back to live requests).
         site = json.loads((DATA / s["file"]).read_text())["properties"]

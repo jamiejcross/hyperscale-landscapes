@@ -89,7 +89,7 @@ class BuildOptions:
     sea_level: float = 3.0
     no_buildings: bool = False
     max_buildings: int | None = None
-    elevation: str = "auto"         # auto | srtm | copernicus
+    elevation: str = "auto"         # auto | lidar | copernicus | srtm
     buildings_source: str = "osm"   # osm | overture
     stl: bool = False               # also write the single-colour union STL
     bambu_metadata: bool = True
@@ -102,12 +102,6 @@ class BuildOptions:
     features: bool = True             # power, rail, residues, receptors, land cover
     pegs: bool = True                 # pylons and wind turbines as pegs
     labels: bool = True               # engraved base labels
-    footprint: str | None = None      # GeoJSON of the proposed facility
-    insert_height_m: float | None = None
-    insert_height_source: str | None = None
-    footprint_precision: str | None = None   # exact / digitised / approximate
-    planning_ref: str | None = None
-    magnets: bool = True
     viewer: bool = False              # also write the offline 3D viewer (HTML)
 
     @property
@@ -751,7 +745,7 @@ def _build_core(opts, out_dir: Path, cache_dir: Path, hook=None):
     log.info("Sea water: %d slab(s)", sea_mesh_count)
     log.info("Total water: %d slab(s) (%d skipped)", len(water_meshes), water_skipped)
 
-    # ---- 13c. Extra layers, insert and labels (Phase 2 hook) ----
+    # ---- 13c. Extra layers and labels (Phase 2 hook) ----
     # Everything here is built in the same world units as the core layers,
     # so it is scaled and translated identically below.
     extra_layers: dict[str, list] = {}
@@ -797,9 +791,8 @@ def _build_core(opts, out_dir: Path, cache_dir: Path, hook=None):
 
     # ---- 15. Scale to print size ----
     _progress(18, "Scaling to print size")
-    # The print outline is set by the core layers only; the removable insert
-    # (and anything else in `separate`) is transformed with them but never
-    # widens the plate.
+    # The print outline is set by the core layers only; anything in
+    # `separate` is transformed with them but never widens the plate.
     core = [m for m in (terrain, buildings_mesh, roads_mesh, water_mesh)
             if len(m.vertices) > 0]
     all_verts = np.vstack([m.vertices for m in core])
@@ -849,24 +842,10 @@ def _build_core(opts, out_dir: Path, cache_dir: Path, hook=None):
     }
 
 
-def _load_footprint(path: str):
-    """Union of every polygon in a GeoJSON file (lon/lat)."""
-    from shapely.geometry import shape as _shape
-    gj = json.loads(Path(path).read_text())
-    feats = (gj["features"] if gj.get("type") == "FeatureCollection"
-             else [gj] if gj.get("type") == "Feature" else [{"geometry": gj}])
-    geoms = [_shape(f["geometry"]) for f in feats if f.get("geometry")]
-    geoms = [g for g in geoms if g.geom_type in ("Polygon", "MultiPolygon")]
-    if not geoms:
-        raise ValueError(f"No polygon found in {path}")
-    return unary_union(geoms)
-
-
 def _phase2_hook(ctx, *, terrain, bld_meshes, bld_info, road_meshes, water_meshes):
-    """New layers, the data-centre insert and the base labels (Phase 2)."""
+    """New layers and the base labels (Phase 2)."""
     from .geometry import labels as lbl
-    from .geometry.insert import build_insert, cut_all
-    from .geometry.layers import _project_geom, build_layers
+    from .geometry.layers import build_layers
     from .geometry.union import subtract
     from .providers import features as feat_provider
 
@@ -885,35 +864,6 @@ def _phase2_hook(ctx, *, terrain, bld_meshes, bld_info, road_meshes, water_meshe
                                                  pegs=opts.pegs)
         info.update(linfo)
 
-    # ---- Insert and recess ----
-    if opts.footprint:
-        if not opts.insert_height_m:
-            raise ValueError("A footprint needs --insert_height_m (and its source)")
-        fp_world = _project_geom(_load_footprint(opts.footprint), ctx["project_arr"])
-        insert, recess, magnets, iinfo = build_insert(ctx, fp_world, opts.insert_height_m,
-                                                      magnets=opts.magnets)
-        iinfo.update({"height_source": opts.insert_height_source,
-                      "footprint_precision": opts.footprint_precision,
-                      "planning_ref": opts.planning_ref})
-        # Subtract one solid at a time: the magnet cylinders overlap the
-        # recess prism, and a concatenation of overlapping shells is not a
-        # valid manifold (it left an inverted sliver of recess floor).
-        terrain = subtract(terrain, recess)
-        for m in magnets:
-            terrain = subtract(terrain, m)
-        # Remove buildings standing in the footprint (they would be cleared),
-        # and cut roads, water and pads back to the recess edge.
-        keep_b = [m for m in bld_meshes]
-        bld_meshes = cut_all(keep_b, recess)
-        road_meshes = cut_all(road_meshes, recess)
-        water_meshes = cut_all(water_meshes, recess)
-        for k in list(layers):
-            layers[k] = cut_all(layers[k], recess)
-        separate["insert"] = insert
-        info["insert"] = iinfo
-        log.info("Insert: %.0f m² footprint, %.1f mm tall, %d magnet holes",
-                 iinfo["footprint_area_m2"], iinfo["insert_height_mm"], iinfo["magnet_holes"])
-
     # ---- Engraved base labels ----
     if opts.labels:
         plate_w = ctx["width_m"] * w2mm
@@ -924,10 +874,6 @@ def _phase2_hook(ctx, *, terrain, bld_meshes, bld_info, road_meshes, water_meshe
         spec = [(opts.name or "Terrain model", lbl.NAME_MM),
                 (exaggeration_note(opts), lbl.TEXT_MM),
                 (attrib, lbl.TEXT_MM)]
-        if "insert" in info:
-            spec.append((f"Proposed footprint {opts.footprint_precision or 'approximate'}"
-                         + (f"; source: {opts.planning_ref}" if opts.planning_ref else ""),
-                         lbl.TEXT_MM))
         spec.append((f"Made {time.strftime('%d %b %Y')} with Hyperscale Landscapes",
                      lbl.TEXT_MM))
         label_mm, report = lbl.layout(spec, plate_w, plate_h, w2mm, ctx["width_m"])
@@ -1004,11 +950,6 @@ def build(opts: BuildOptions) -> dict:
             "slot": obj["slot"], "colour": colour, "layers": obj["layers"],
             "faces": int(len(mesh.faces)),
             "watertight": bool(mesh.is_watertight) if len(mesh.faces) else None}
-    insert = r["separate"].get("insert")
-    sep_parts = []
-    if insert is not None:
-        ins = preset.get("insert", {"name": "Proposed data centre", "slot": 1})
-        sep_parts.append(Part(ins["name"], insert, "#FFFFFF", ins["slot"]))
 
     meta = {"Designer": "Hyperscale Landscapes " + __version__,
             "Description": exaggeration_note(opts),
@@ -1019,12 +960,11 @@ def build(opts: BuildOptions) -> dict:
     if not preset.get("single"):
         out_3mf = out_dir / f"terrain_{opts.bbox_id}.3mf"
         export_3mf(out_3mf, parts, title=title, bambu=opts.bambu_metadata,
-                   metadata=meta, separate=sep_parts)
+                   metadata=meta)
 
     # ---- Single-colour union STL (preset or --stl) ----
     union_stats = None
     out_stl = None
-    out_insert_stl = None
     if opts.stl or preset.get("single"):
         from .geometry.union import union_solids
         _progress(19, "Boolean union for single-colour STL")
@@ -1033,9 +973,6 @@ def build(opts: BuildOptions) -> dict:
         merged, union_stats = union_solids(terrain, extras)
         out_stl = out_dir / f"terrain_{opts.bbox_id}.stl"
         merged.export(str(out_stl))
-        if insert is not None:
-            out_insert_stl = out_dir / f"insert_{opts.bbox_id}.stl"
-            insert.export(str(out_insert_stl))
 
     # ---- Features sidecar for the viewer and artefacts ----
     out_geojson = None
@@ -1048,7 +985,7 @@ def build(opts: BuildOptions) -> dict:
     if opts.viewer:
         from .export.viewer import write_viewer
         out_viewer = out_dir / f"viewer_{opts.bbox_id}.html"
-        size = write_viewer(out_viewer, layer_meshes=meshes, insert=insert, opts=opts, preset=preset,
+        size = write_viewer(out_viewer, layer_meshes=meshes, opts=opts, preset=preset,
                             features=info.get("feature_list"), sources_text=attribution,
                             disclosure=exaggeration_note(opts),
                             report={"buildings": r["counts"].get("buildings", 0)})
@@ -1079,7 +1016,6 @@ def build(opts: BuildOptions) -> dict:
         "preset": preset["id"],
         "outputs": {"3mf": str(out_3mf) if out_3mf else None,
                     "stl": str(out_stl) if out_stl else None,
-                    "insert_stl": str(out_insert_stl) if out_insert_stl else None,
                     "features_geojson": str(out_geojson) if out_geojson else None,
                     "viewer": str(out_viewer) if out_viewer else None},
         "bbox": {"min_lat": opts.min_lat, "max_lat": opts.max_lat,
@@ -1100,7 +1036,6 @@ def build(opts: BuildOptions) -> dict:
                     "roads": layer_stats["roads"], "water": layer_stats["water"]},
         "features": info.get("features", {}),
         "receptor_buildings": info.get("receptor_buildings"),
-        "insert": info.get("insert"),
         "base_label": info.get("base_label"),
         "pause_heights_mm": _pause_heights(meshes, opts.base),
         "filtered": r["filtered"],

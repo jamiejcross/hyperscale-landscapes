@@ -14,7 +14,7 @@
 //      masked cells, a buried bottom, and walls wherever a masked cell meets
 //      an unmasked one.  Same idea as the Python road slabs, at grid
 //      resolution.
-//   5. Buildings, pylons and the insert are exact extruded solids.
+//   5. Buildings and pylons are exact extruded solids.
 //
 // The result is lower resolution than the Python tier (edges follow the
 // grid) and has no valley carving; the UI says so.
@@ -28,7 +28,7 @@ export const MM = {
   raise: { water: 0.3, roads: 0.5, power: 0.4, powerLine: 0.35, rail: 0.4, railDisused: 0.25, residues: 0.3 },
   peg: 1.2, turbinePeg: 1.4, outline: 0.6, pointDisc: 1.6,
   buildingMin: 0.6, buildingBury: 1.0,
-  clearance: 0.2, recessDepth: 2.0, floorMin: 1.0,
+  floorMin: 1.0,
   engrave: 0.4,
   waterDepth: 0.8,      // terrain is cut this far below sea and loch level
   riverSink: 0.25,      // rivers sit this far below their banks
@@ -546,15 +546,6 @@ export function buildModel({ bbox, elev, osm, opts }) {
   }
   for (const p of pegs) square(cv('pegcut'), grid, p.at, p.side * 1.5);
 
-  // ---- Insert footprint and recess ----
-  let insert = null, recess = null;
-  if (opts.footprint) {
-    const rc = canvasFor(grid);
-    fillPolys(rc, grid, opts.footprint);
-    strokeLine(rc, grid, opts.footprint, 2 * (MM.clearance + 0.5 * grid.dx));   // grow by the clearance
-    recess = maskOf(rc);
-  }
-
   // ---- Resolve overlap priority per cell ----
   const masks = {};
   const order = ['water', 'roads', 'power', 'powerLine', 'rail', 'railDisused', 'residues'];
@@ -562,7 +553,6 @@ export function buildModel({ bbox, elev, osm, opts }) {
   const pegcut = layerCanvas.pegcut ? maskOf(layerCanvas.pegcut) : null;
   for (let k = 0; k < taken.length; k++) {
     if (buildingMask[k]) taken[k] = 2;                   // buildings punch through overlays
-    if (recess && recess[k]) taken[k] = 3;
     if (pegcut && pegcut[k] && !taken[k]) taken[k] = 4;
   }
   // Sea: from OSM coastlines where mapped, otherwise from elevation <= 0.
@@ -608,26 +598,6 @@ export function buildModel({ bbox, elev, osm, opts }) {
     for (let v = 0; v < all.length; v++) if (all[v]) zTop[v] = Math.max(Math.min(zTop[v], W[v] - MM.waterDepth), floorMin);
   }
 
-  // ---- Terrain top with the recess ----
-  let floor = null;
-  const zBefore = Float32Array.from(zTop);   // the land as it is today, without the recess
-  if (recess) {
-    const rv = vertexTouches(grid, recess);
-    let lo = Infinity, hi = -Infinity;
-    for (let v = 0; v < rv.length; v++) if (rv[v]) { lo = Math.min(lo, H.z[v]); hi = Math.max(hi, H.z[v]); }
-    floor = Math.max(lo - MM.recessDepth, MM.floorMin + (opts.labels ? MM.engrave : 0));
-    for (let v = 0; v < rv.length; v++) if (rv[v]) zTop[v] = floor;
-    // The insert: exact footprint, from the floor to the stated height above the highest ground.
-    const rings = polygonsOf(opts.footprint).map(rs => rs.map(r => r.map(([lon, lat]) => grid.mm(lon, lat))));
-    const top = hi + Math.max(opts.insertHeight * opts.buildingExag * mmPerM, 1);
-    insert = concat(rings.map(rs => extrude(rs, floor, top)));
-    report.insert = {
-      heightMm: +(top - floor).toFixed(2), floorMm: +floor.toFixed(2),
-      recessDepthMm: +(lo - floor).toFixed(2), clearanceMm: MM.clearance,
-      note: 'Browser build: no magnet holes (use the Python tool for those).',
-    };
-  }
-
   // ---- Land ----
   const full = new Uint8Array(cx * cy).fill(1);
   let botLand = () => 0;
@@ -637,8 +607,6 @@ export function buildModel({ bbox, elev, osm, opts }) {
     botLand = v => (lv[v] ? MM.engrave : 0);
   }
   const land = slabFromMask(grid, full, v => zTop[v], botLand);
-  // For 'before' views only (never printed): the land without the recess.
-  const landBefore = recess ? slabFromMask(grid, full, v => zBefore[v], botLand) : null;
 
   // ---- Overlay slabs ----
   const slab = (id, raise) => masks[id] ? slabFromMask(grid, masks[id], v => H.z[v] + raise, v => H.z[v] - MM.bury) : null;
@@ -653,13 +621,8 @@ export function buildModel({ bbox, elev, osm, opts }) {
   };
 
   // ---- Buildings and receptors ----
-  const bl = [], rl = [], cleared = [];
-  let inRecess = 0;
+  const bl = [], rl = [];
   for (const f of footprints) {
-    if (recess) {
-      const ci = Math.floor(f.centre[0] / grid.dx), cj = Math.floor((grid.Hmm - f.centre[1]) / grid.dy);
-      if (ci >= 0 && cj >= 0 && ci < cx && cj < cy && recess[cj * cx + ci]) { inRecess++; f.cleared = true; }
-    }
     const outer = f.rings[0];
     let lo = Infinity, hi = -Infinity;
     for (const [x, y] of outer) { const z = zAt(x, y); lo = Math.min(lo, z); hi = Math.max(hi, z); }
@@ -667,7 +630,7 @@ export function buildModel({ bbox, elev, osm, opts }) {
     let h = parseFloat(t.height);
     if (Number.isNaN(h)) h = (parseFloat(t['building:levels']) || 2) * 3;
     const m = extrude(f.rings, lo - MM.buildingBury, hi + Math.max(h * opts.buildingExag * mmPerM, MM.buildingMin));
-    if (m) (f.cleared ? cleared : f.receptor ? rl : bl).push(m);
+    if (m) (f.receptor ? rl : bl).push(m);
   }
   layers.buildings = concat(bl);
   layers.receptors = concat(rl);
@@ -681,12 +644,10 @@ export function buildModel({ bbox, elev, osm, opts }) {
   });
   layers.power = concat([layers.power, ...pegMeshes]);
 
-  report.counts = { buildings: bl.length, receptors: rl.length, roads: nRoads, pegs: pegMeshes.filter(Boolean).length, buildingsInRecess: inRecess };
+  report.counts = { buildings: bl.length, receptors: rl.length, roads: nRoads, pegs: pegMeshes.filter(Boolean).length };
   report.grid = { cols: nx, rows: grid.ny, cellMm: +grid.dx.toFixed(3) };
   report.elevation = { minM: H.elevMin, maxM: H.elevMax };
-  // `before`: what the site looks like today, for before/after views (not printed).
-  const before = recess ? { terrain: landBefore, buildings: concat(cleared) } : null;
-  return { grid, layers, insert, before, report, heights: H.z };
+  return { grid, layers, report, heights: H.z };
 }
 
 function clamp(v, a, b) { return Math.min(Math.max(v, a), b); }

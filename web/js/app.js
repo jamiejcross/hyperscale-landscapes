@@ -20,7 +20,7 @@ import { writeSTL } from './export/stl.js';
 
 const $ = id => document.getElementById(id);
 const OSM_ATTR = '© OpenStreetMap contributors';
-const state = { bbox: null, name: '', site: null, bundle: null, footprint: null, model: null, layers: {}, presets: {}, surface: 'landcover' };
+const state = { bbox: null, name: '', site: null, bundle: null, model: null, layers: {}, presets: {}, surface: 'eox-2025' };
 let scene = null, studio = null;
 
 await loadStrings();
@@ -33,7 +33,6 @@ for (const id of ['power-and-place', 'residues', 'full', 'classic']) {
 // ---------------- Step 1: choose an area ----------------
 const picker = createPicker($('map'), {
   onBBox: b => setBBox(b),
-  onFootprint: gj => setFootprint(gj),
   onSection: line => drawSection(line),
 });
 
@@ -49,12 +48,6 @@ function setBBox(b, { name = '', site = null, bundle = null } = {}) {
   const f = $('coords').elements;
   f.minLat.value = b.minLat.toFixed(5); f.maxLat.value = b.maxLat.toFixed(5);
   f.minLon.value = b.minLon.toFixed(5); f.maxLon.value = b.maxLon.toFixed(5);
-}
-
-function setFootprint(gj) {
-  state.footprint = gj;
-  $('clear-footprint').hidden = !gj;
-  picker.showFootprint(gj);
 }
 
 // Curated sites: one dropdown, grouped by council, and a short fact panel.
@@ -77,14 +70,6 @@ async function chooseSite(entry) {
   const p = site.properties, bb = p.model_bbox;
   picker.showBBox({ minLat: bb.min_lat, maxLat: bb.max_lat, minLon: bb.min_lon, maxLon: bb.max_lon });
   setBBox(state.bbox, { name: p.name, site, bundle });
-  if (site.geometry) {
-    setFootprint({ type: 'Feature', properties: {}, geometry: site.geometry });
-    const o = $('options').elements;
-    if (p.stated_height_m) o.insertHeight.value = p.stated_height_m;
-    if (p.massing_source) o.insertSource.value = p.massing_source;
-    if (p.footprint_precision) o.precision.value = p.footprint_precision;
-    if (p.planning_refs?.[0]) o.planningRef.value = p.planning_refs[0].ref || p.planning_refs[0];
-  } else setFootprint(null);
   if (p.location) picker.showPin(p.location, p.name);
   const row = (k, v) => v == null || v === '' ? '' : `<dt>${k}</dt><dd>${v}</dd>`;
   const by = p.reported_by ? ` (reported by ${esc(p.reported_by)})` : '';
@@ -97,7 +82,6 @@ async function chooseSite(entry) {
     ${row('Site area', p.stated_site_area_ha != null ? `${p.stated_site_area_ha} ha${by}` : null)}
     ${row('Planning stage', p.status ? esc(p.status) : 'not stated')}
     ${row('Council', esc(p.local_authority))}
-    ${row('Footprint', site.geometry ? esc(p.footprint_precision || 'approximate') : 'not yet mapped, so no data-centre block')}
   </dl><p>${esc(p.notes)}</p><p class="hint">${esc(p.verification || '')} The marker shows the reported location. Model area: ${esc(p.model_bbox_note || 'a box around the site')}</p><p>${links}</p>`;
 }
 
@@ -117,9 +101,7 @@ $('search').onsubmit = async e => {
 
 $('draw-box').onclick = () => { picker.setMode('box'); $('draw-finish').hidden = true; };
 $('draw-poly').onclick = () => { picker.setMode('polygon'); $('draw-finish').hidden = false; };
-$('draw-footprint').onclick = () => { picker.setMode('footprint'); $('draw-finish').hidden = false; $('map').scrollIntoView({ behavior: 'smooth' }); };
 $('draw-finish').onclick = () => { if (picker.finishPolygon()) $('draw-finish').hidden = true; };
-$('clear-footprint').onclick = () => setFootprint(null);
 
 $('upload').onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
@@ -128,10 +110,6 @@ $('upload').onchange = async e => {
     picker.showBBox(bboxOfCoords(allCoords(gj), 300));
     state.name = f.name.replace(/\.(geo)?json|\.kmz?$/i, '');
   } catch (err) { $('area').textContent = err.message; }
-};
-$('footprint-file').onchange = async e => {
-  const f = e.target.files[0]; if (!f) return;
-  try { setFootprint(await readBoundary(f)); } catch (err) { $('build-status').textContent = err.message; }
 };
 $('coords').onsubmit = e => {
   e.preventDefault();
@@ -152,22 +130,19 @@ $('options').onsubmit = async e => {
     const opts = {
       printSize: +o.printSize.value, zExag: +o.zExag.value, buildingExag: 1, base: 5,
       roads: 'major-residential', pegs: true, cellMm: CELL_MM, maxCols: MAX_COLS,
-      footprint: state.footprint, insertHeight: +o.insertHeight.value || null,
     };
-    if (opts.footprint && !opts.insertHeight) throw new Error('Please give the height of the proposed building.');
     status.textContent = t('build.loading.elevation');
-    const elev = await loadElevation(state.bbox, state.bundle?.elevation?.tiles);
+    const elev = await loadElevation(state.bbox, state.bundle);
     status.textContent = t('build.loading.features');
     const raw = state.bundle?.osm || await fetchOSM(state.bbox, host => { status.textContent = `${t('build.loading.features')} (${host})`; });
     const osm = parseOSM(raw);
     status.textContent = t('build.loading.geometry');
     await new Promise(r => setTimeout(r, 30));
-    const sources = sourcesFor();
+    const sources = { elevation: elev.attribution, features: OSM_ATTR };
     opts.labels = [
       [state.name || 'Terrain model', 6.0],
       [t('caption.exag', { x: opts.zExag }), 3.6],
-      [`${ELEV_SHORT}; ${OSM_ATTR}`, 3.6],
-      ...(opts.footprint ? [[t('caption.footprint', { precision: o.precision.value, ref: o.planningRef.value || 'not given' }), 3.6]] : []),
+      [`${elev.short}; ${OSM_ATTR}`, 3.6],
       [`Made ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} with Hyperscale Landscapes`, 3.6],
     ];
     const model = buildModel({ bbox: state.bbox, elev, osm, opts });
@@ -183,10 +158,8 @@ $('options').onsubmit = async e => {
   } finally { $('build').disabled = false; }
 };
 
-const ELEV_SHORT = 'Elevation: Mapzen Terrain Tiles (USGS, NOAA, EA)';
-function sourcesFor() {
-  return { elevation: ELEV_ATTRIBUTION, features: OSM_ATTR };
-}
+// The elevation credit follows the source actually used (LiDAR or Terrarium).
+const elevAttr = () => state.model?.elev?.attribution || ELEV_ATTRIBUTION;
 
 // ---------------- Step 3: preview ----------------
 function showPreview() {
@@ -195,8 +168,7 @@ function showPreview() {
   if (!scene) {
     scene = createScene($('view'));
     studio = mountStudio($('studio'), scene, {
-      caption: () => captionLines({ name: state.name, exaggeration: exaggerationText(), sources: sourcesText(),
-        footprint: state.model.opts.footprint ? t('caption.footprint', { precision: state.model.form.precision, ref: state.model.form.planningRef || 'not given' }) : null }),
+      caption: () => captionLines({ name: state.name, exaggeration: exaggerationText(), sources: sourcesText() }),
       filename: () => `${slug()}-${new Date().toISOString().slice(0, 10)}`,
       printColours: printColourMap,
       alt: () => draftAlt({ name: state.name, report: state.model.model.report, exaggeration: exaggerationText(), surface: SURFACES[state.surface].label.toLowerCase() }),
@@ -206,9 +178,9 @@ function showPreview() {
   const colours = Object.fromEntries(Object.values(state.layers).map(l => [l.id, l.colour_screen]));
   colours.railDisused = state.layers.rail.colour_screen_disused;
   state.drape = landcoverCanvas(model.grid, osm.features);
-  scene.setModel({ layers: model.layers, insert: model.insert, before: model.before, colours, grid: model.grid, landcover: state.drape });
+  scene.setModel({ layers: model.layers, colours, grid: model.grid, landcover: state.drape });
   const ul = $('layer-list'); ul.textContent = '';
-  const shown = ['terrain', 'water', 'buildings', 'roads', 'rail', 'power', 'residues', 'receptors', ...(model.insert ? ['site'] : [])];
+  const shown = ['terrain', 'water', 'buildings', 'roads', 'rail', 'power', 'residues', 'receptors'];
   for (const id of shown) {
     const L = state.layers[id];
     const li = document.createElement('li');
@@ -218,10 +190,9 @@ function showPreview() {
   }
   ul.querySelectorAll('input').forEach(i => { i.onchange = () => scene.setVisible(i.dataset.layer, i.checked); });
   const counts = model.report.counts;
-  studio.update();   // also enables before/after when there is a site block
+  studio.update();
   scene.renderer.domElement.setAttribute('aria-label', altText(model, osm));
   $('caption').textContent = captionText(opts, form) + ` Counts: ${counts.buildings} buildings, ${counts.receptors} schools, care or community buildings, ${counts.roads} roads.`;
-  $('dl-insert').hidden = !model.insert;
   $('pauses').textContent = 'Single-colour printers: pause to change filament at ' +
     pauseHeights(model, opts.base).map(p => `${p.zMm} mm (${p.changeTo})`).join(', ') + '.';
   if (state.surface !== 'landcover') applySurface(state.surface);
@@ -237,13 +208,12 @@ function exaggerationText() {
 }
 function sourcesText() {
   const sat = SURFACES[state.surface]?.attribution;
-  return [ELEV_ATTRIBUTION, `Map data ${OSM_ATTR}`, sat].filter(Boolean).join('; ');
+  return [elevAttr(), `Map data ${OSM_ATTR}`, sat].filter(Boolean).join('; ');
 }
 function printColourMap() {
   const preset = state.presets[$('options').elements.preset.value];
   const map = {};
   for (const o of preset.objects) for (const l of o.layers) map[l] = o.colour;
-  map.site = '#FFFFFF';
   return map;
 }
 function refreshCaption() {
@@ -255,9 +225,8 @@ function refreshCaption() {
 function captionText(opts, form, { print = false } = {}) {
   // Print files state the model's own exaggeration; the studio's extra height is view-only.
   const exag = print ? t('caption.exag', { x: opts.zExag }) : exaggerationText();
-  const src = print ? [ELEV_ATTRIBUTION, `Map data ${OSM_ATTR}`].join('; ') : sourcesText();
+  const src = print ? [elevAttr(), `Map data ${OSM_ATTR}`].join('; ') : sourcesText();
   let s = `${state.name || 'Terrain model'}. ${exag}. ${src}. Generated ${new Date().toISOString().slice(0, 10)}.`;
-  if (opts.footprint) s += ` ${t('caption.footprint', { precision: form.precision, ref: form.planningRef || 'not given' })}. Height ${opts.insertHeight} m (${form.insertSource || 'source not given'}).`;
   return s;
 }
 
@@ -271,11 +240,14 @@ function altText(model, osm) {
 }
 
 // ---------------- Surface: land cover or satellite ----------------
-for (const [id, s] of Object.entries(SURFACES)) $('surface').append(new Option(s.label, id, id === 'landcover', id === 'landcover'));
+for (const [id, s] of Object.entries(SURFACES)) $('surface').append(new Option(s.label, id, id === state.surface, id === state.surface));
 async function applySurface(id) {
   const { model, osm, opts, form } = state.model;
   const note = $('surface-note');
   state.surface = id;
+  // Dark roads disappear into a photograph; draw them light over satellite.
+  const roads = state.layers.roads.colour_screen;
+  scene.setScreenColours({ roads: id === 'landcover' ? roads : '#f2f2f2' });
   try {
     if (id === 'landcover') {
       scene.setDrape(state.drape = landcoverCanvas(model.grid, osm.features));
@@ -288,7 +260,8 @@ async function applySurface(id) {
   } catch (err) {
     note.textContent = `Satellite imagery could not be loaded (${err.message}). Showing land cover instead.`;
     state.surface = 'landcover'; $('surface').value = 'landcover';
-    scene.setDrape(landcoverCanvas(model.grid, osm.features));
+    scene.setScreenColours({ roads });
+    scene.setDrape(state.drape = landcoverCanvas(model.grid, osm.features));
   }
   refreshCaption();
 }
@@ -308,13 +281,12 @@ $('dl-3mf').onclick = async () => {
   try {
     const preset = state.presets[$('options').elements.preset.value];
     const parts = printObjects(model, preset).map(o => ({ ...o }));
-    const separate = model.insert ? [{ name: 'Proposed data centre', slot: preset.insert.slot, colour: '#FFFFFF', mesh: model.insert }] : [];
     const blob = await write3MF({
-      title: state.name || 'Terrain model', parts, separate,
+      title: state.name || 'Terrain model', parts,
       metadata: {
         Designer: 'Hyperscale Landscapes (browser)',
         Description: captionText(opts, form, { print: true }),
-        Copyright: `${ELEV_ATTRIBUTION}; Map data ${OSM_ATTR}`,
+        Copyright: `${elevAttr()}; Map data ${OSM_ATTR}`,
         LicenseTerms: 'Map data ODbL 1.0',
         CreationDate: new Date().toISOString().slice(0, 10),
       },
@@ -334,12 +306,11 @@ $('dl-viewer').onclick = async () => {
   try {
     const colours = Object.fromEntries(Object.values(state.layers).map(l => [l.id, l.colour_screen]));
     colours.railDisused = state.layers.rail.colour_screen_disused;
-    const shown = ['terrain', 'water', 'buildings', 'roads', 'rail', 'power', 'residues', 'receptors', ...(model.insert ? ['site'] : [])]
-      .filter(id => id === 'site' || model.layers[id]?.indices.length);
+    const shown = ['terrain', 'water', 'buildings', 'roads', 'rail', 'power', 'residues', 'receptors']
+      .filter(id => model.layers[id]?.indices.length);
     const legend = shown.map(id => ({ id, name: state.layers[id].name, colour: state.layers[id].colour_screen, why: state.layers[id].why }));
     const { w, h } = bboxSizeKm(state.bbox);
-    const caption = captionLines({ name: state.name, exaggeration: t('caption.exag', { x: opts.zExag }), sources: sourcesText(),
-      footprint: opts.footprint ? t('caption.footprint', { precision: form.precision, ref: form.planningRef || 'not given' }) : null });
+    const caption = captionLines({ name: state.name, exaggeration: t('caption.exag', { x: opts.zExag }), sources: sourcesText() });
     const blob = await buildViewer({
       model, legend, colours, printColours: printColourMap(), caption, zExag: opts.zExag, slug: slug(),
       sub: `${state.bbox.minLat.toFixed(3)}–${state.bbox.maxLat.toFixed(3)}°N, ${Math.abs(state.bbox.maxLon).toFixed(3)}–${Math.abs(state.bbox.minLon).toFixed(3)}°W · ${w.toFixed(1)} × ${h.toFixed(1)} km · from the ${opts.printSize} mm print model`,
@@ -360,16 +331,14 @@ $('section-draw').onclick = () => {
   $('map').scrollIntoView({ behavior: 'smooth', block: 'center' });
 };
 function sectionCaption(vex) {
-  const { opts, form } = state.model;
   return captionLines({ name: state.name,
     exaggeration: vex === 1 ? 'Profile at true vertical scale (not exaggerated)' : `Profile height exaggerated ×${vex}`,
-    sources: [ELEV_ATTRIBUTION, `Map data ${OSM_ATTR}`].join('; '),
-    footprint: opts.footprint ? `${t('caption.footprint', { precision: form.precision, ref: form.planningRef || 'not given' })}; height ${opts.insertHeight} m (${form.insertSource || 'source not given'})` : null });
+    sources: [elevAttr(), `Map data ${OSM_ATTR}`].join('; ') });
 }
 function drawSection(line) {
   $('draw-finish').hidden = true;
   const { model, osm, opts, elev } = state.model;
-  const sec = computeSection({ line, bbox: state.bbox, elev, osm, footprint: opts.footprint, insertHeight: opts.insertHeight });
+  const sec = computeSection({ line, bbox: state.bbox, elev, osm });
   state.section = sec;
   renderSection();
   $('section-panel').open = true;
@@ -388,8 +357,6 @@ async function renderSection() {
 $('section-vex').onchange = renderSection;
 $('section-svg').onclick = () => save(new Blob([state.sectionSVG], { type: 'image/svg+xml' }), `${slug()}-section.svg`);
 $('section-png').onclick = async () => save(await svgToPNG(state.sectionSVG, 2), `${slug()}-section.png`);
-
-$('dl-insert').onclick = () => save(writeSTL([state.model.model.insert]), `${slug()}-data-centre-block.stl`);
 
 window.__app = state;   // for debugging and automated checks
 Object.defineProperty(window, "__studio", { get: () => studio });

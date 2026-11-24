@@ -85,7 +85,7 @@ def test_ciede2000_reference_pair():
 def test_screen_palette_is_colour_blind_safe():
     layers = load_layers()
     ids = ["terrain", "water", "buildings", "roads", "rail", "power", "residues",
-           "receptors", "site"]
+           "receptors"]
     failures = []
     for vision, mat in [("normal", None)] + list(MACHADO.items()):
         labs = {i: _sim(layers[i]["colour_screen"], mat) for i in ids}

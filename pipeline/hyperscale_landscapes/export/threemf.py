@@ -11,7 +11,7 @@ parts locked together).  Additions:
   part to a filament slot (1-based), so colours land on AMS slots without
   manual assignment.  Bambu's format is undocumented: keep it minimal and
   re-test when Bambu Studio updates (PLAN.md §6, §12).
-- Optional separate build items (e.g. the removable data-centre insert),
+- Optional separate build items,
   placed beside the main model rather than inside it.
 """
 from __future__ import annotations

@@ -43,11 +43,11 @@
     "licence": "CC-BY-4.0",
     "notes": "Former Ravenscraig steelworks site. APRS reports that no Environmental Impact Assessment (EIA) is required.",
     "model_bbox": {
-      "min_lat": 55.786,
-      "max_lat": 55.79678,
+      "min_lat": 55.7842,
+      "max_lat": 55.79858,
       "min_lon": -4.00105,
       "max_lon": -3.94992
     },
-    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.6 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

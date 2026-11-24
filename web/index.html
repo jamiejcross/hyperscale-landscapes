@@ -6,7 +6,7 @@
 <title>Hyperscale Landscapes</title>
 <meta name="description" content="Make 3D-printable models and images of the landscape around a proposed data centre. Runs entirely in your browser.">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M2 26 L11 12 L17 20 L22 14 L30 26Z' fill='%238B7355'/%3E%3Crect x='18' y='19' width='8' height='7' fill='%23D55E00'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M2 26 L11 12 L17 20 L22 14 L30 26Z' fill='%238B7355'/%3E%3Crect x='18' y='19' width='8' height='7' fill='%23000000'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="css/app.css">
 <script type="importmap">
@@ -82,24 +82,6 @@
       <label><span data-i18n="size.preset"></span>
         <select name="preset" id="preset"></select></label>
       <p class="hint" id="exag-note"></p>
-      <fieldset class="insert">
-        <legend data-i18n="insert.legend"></legend>
-        <p class="hint" data-i18n="insert.help"></p>
-        <div class="inline">
-          <button type="button" id="draw-footprint">Draw footprint</button>
-          <label class="file">Upload footprint <input id="footprint-file" type="file" accept=".geojson,.json,.kml,.kmz"></label>
-          <button type="button" id="clear-footprint" hidden>Remove</button>
-        </div>
-        <label><span data-i18n="insert.height"></span> <input name="insertHeight" type="number" min="1" max="200" step="0.5"></label>
-        <label><span data-i18n="insert.source"></span> <input name="insertSource" type="text" placeholder="e.g. Planning statement, p. 12"></label>
-        <label><span data-i18n="insert.precision"></span>
-          <select name="precision">
-            <option value="approximate" data-i18n="insert.precision.approximate"></option>
-            <option value="digitised from images" data-i18n="insert.precision.digitised"></option>
-            <option value="exact from plans" data-i18n="insert.precision.exact"></option>
-          </select></label>
-        <label><span data-i18n="insert.ref"></span> <input name="planningRef" type="text"></label>
-      </fieldset>
       <button id="build" class="primary" data-i18n="build.button" disabled></button>
       <p id="build-status" class="status" role="status" aria-live="polite"></p>
     </form>
@@ -145,7 +127,6 @@
     <div class="inline downloads">
       <button type="button" id="dl-3mf" class="primary" data-i18n="export.3mf"></button>
       <button type="button" id="dl-stl" data-i18n="export.stl"></button>
-      <button type="button" id="dl-insert" data-i18n="export.insert" hidden></button>
     </div>
     <h3>Digital artefacts</h3>
     <div class="inline downloads">

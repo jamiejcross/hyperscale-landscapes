@@ -43,11 +43,11 @@
     "licence": "CC-BY-4.0",
     "notes": "Farmland next to the former Killoch Colliery, near Cumnock. APRS reports that an EIA is required.",
     "model_bbox": {
-      "min_lat": 55.45173,
-      "max_lat": 55.46251,
+      "min_lat": 55.44994,
+      "max_lat": 55.46431,
       "min_lon": -4.43824,
       "max_lon": -4.38754
     },
-    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.6 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

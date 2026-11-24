@@ -43,11 +43,11 @@
     "licence": "CC-BY-4.0",
     "notes": "Former Freeport shopping centre site and Green Belt land next to the Five Sisters bing (spoil heap).",
     "model_bbox": {
-      "min_lat": 55.85122,
-      "max_lat": 55.86199,
+      "min_lat": 55.84942,
+      "max_lat": 55.86379,
       "min_lon": -3.62091,
       "max_lon": -3.56969
     },
-    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.6 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

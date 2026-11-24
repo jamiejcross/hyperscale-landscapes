@@ -9,5 +9,5 @@
     { "name": "Industrial residues", "slot": 6, "colour": "#6E4B6B", "layers": ["residues"] },
     { "name": "Buildings", "slot": 7, "colour": "#C8C8C8", "layers": ["buildings"] },
     { "name": "Schools, care and community", "slot": 8, "colour": "#2E8B57", "layers": ["receptors"] }
-  ],
-  "insert": { "name": "Proposed data centre", "slot": 7 } }
+  ]
+}

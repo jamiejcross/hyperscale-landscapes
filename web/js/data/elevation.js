@@ -1,7 +1,8 @@
-// Elevation from AWS Terrain Tiles (Terrarium PNGs): height in metres is
-// (R × 256 + G + B / 256) − 32768.  Tiles are fetched once, stitched, and
-// sampled bilinearly.  Curated sites ship their tiles in the site bundle,
-// so they need no request at all.
+// Elevation, sampled bilinearly. Two sources:
+//  - Curated sites in Scotland ship a Scottish Government LiDAR terrain grid
+//    (4 m, bare earth, OGL v3) in their bundle; see pipeline/bake.py.
+//  - Anywhere else: AWS Terrain Tiles (Terrarium PNGs), where height in
+//    metres is (R × 256 + G + B / 256) − 32768, fetched once and stitched.
 import { TERRARIUM, TERRARIUM_ZOOM } from '../config.js';
 import { cacheGet, cacheSet } from './cache.js';
 
@@ -33,8 +34,38 @@ async function tileBlob({ z, x, y }, bundled) {
   return blob;
 }
 
-// Returns { sample(lon, lat) -> metres, min, max }.
-export async function loadElevation(bbox, bundled = null) {
+export const SHORT = 'Elevation: Mapzen Terrain Tiles (USGS, NOAA, EA)';
+const LIDAR_SHORT = 'Elevation: Scottish Government LiDAR (OGL v3)';
+
+// Decode a bundled LiDAR grid: int16 decimetres, delta-coded along each row,
+// row 0 at the north edge, spanning the bundle's bbox exactly.
+function lidarSampler(L, bb) {
+  const bin = Uint8Array.from(atob(L.data), c => c.charCodeAt(0));
+  const d = new Int16Array(bin.buffer, bin.byteOffset, L.w * L.h);
+  const z = new Float32Array(L.w * L.h);
+  for (let r = 0; r < L.h; r++) {
+    let acc = 0;
+    for (let c = 0; c < L.w; c++) { acc += d[r * L.w + c]; z[r * L.w + c] = acc / 10; }
+  }
+  const at = (c, r) => z[Math.min(L.h - 1, Math.max(0, r)) * L.w + Math.min(L.w - 1, Math.max(0, c))];
+  return (lon, lat) => {
+    const fx = (lon - bb.min_lon) / (bb.max_lon - bb.min_lon) * L.w - 0.5;
+    const fy = (bb.max_lat - lat) / (bb.max_lat - bb.min_lat) * L.h - 0.5;
+    const c = Math.floor(fx), r = Math.floor(fy), dx = fx - c, dy = fy - r;
+    return (1 - dx) * (1 - dy) * at(c, r) + dx * (1 - dy) * at(c + 1, r)
+         + (1 - dx) * dy * at(c, r + 1) + dx * dy * at(c + 1, r + 1);
+  };
+}
+
+// `bundle`: a site bundle (with .elevation and .bbox) or null.
+// Returns { sample(lon, lat) -> metres, attribution, short, source, metresPerPixel }.
+export async function loadElevation(bbox, bundle = null) {
+  const L = bundle?.elevation?.lidar;
+  if (L) {
+    return { sample: lidarSampler(L, bundle.bbox), attribution: L.attribution, short: LIDAR_SHORT,
+      source: L.source, gapFraction: L.gap_fraction || 0, metresPerPixel: L.res_m };
+  }
+  const bundled = bundle?.elevation?.tiles || null;
   const T = tilesFor(bbox);
   const nx = T.x1 - T.x0 + 1, ny = T.y1 - T.y0 + 1;
   const canvas = new OffscreenCanvas(nx * 256, ny * 256);
@@ -54,5 +85,5 @@ export async function loadElevation(bbox, bundled = null) {
     return (1 - dx) * (1 - dy) * at(c, r) + dx * (1 - dy) * at(c + 1, r)
          + (1 - dx) * dy * at(c, r + 1) + dx * dy * at(c + 1, r + 1);
   };
-  return { sample, tiles: T.tiles.length, metresPerPixel: 40075016 * Math.cos((bbox.minLat + bbox.maxLat) / 2 * Math.PI / 180) / 2 ** T.z / 256 };
+  return { sample, attribution: ATTRIBUTION, short: SHORT, source: 'terrarium', tiles: T.tiles.length, metresPerPixel: 40075016 * Math.cos((bbox.minLat + bbox.maxLat) / 2 * Math.PI / 180) / 2 ** T.z / 256 };
 }

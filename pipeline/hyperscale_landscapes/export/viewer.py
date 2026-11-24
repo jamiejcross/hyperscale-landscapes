@@ -80,7 +80,7 @@ def landcover_drape(features, bbox, width_px=2048):
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
-def write_viewer(path, *, layer_meshes: dict, insert, opts, preset: dict, features,
+def write_viewer(path, *, layer_meshes: dict, opts, preset: dict, features,
                  sources_text: str, disclosure: str, report: dict) -> int:
     from ..paths import load_layers
     layers_meta = load_layers()
@@ -97,28 +97,18 @@ def write_viewer(path, *, layer_meshes: dict, insert, opts, preset: dict, featur
         ids.append(lid)
         add(f"{lid}_p", np.asarray(m.vertices, dtype=np.float32), "float32")
         add(f"{lid}_i", np.asarray(m.faces, dtype=np.uint32), "uint32")
-    if insert is not None and len(insert.faces):
-        add("site_p", np.asarray(insert.vertices, dtype=np.float32), "float32")
-        add("site_i", np.asarray(insert.faces, dtype=np.uint32), "uint32")
     geom = base64.b64encode(gzip.compress(b"".join(parts), 9)).decode()
 
     terrain = layer_meshes["terrain"]
     ext = np.asarray(terrain.vertices).max(axis=0)
     name = opts.name or "Terrain model"
     lt = time.localtime(); date = f"{lt.tm_mday} {time.strftime('%B %Y', lt)}"
-    footprint = None
-    if insert is not None:
-        footprint = (f"Proposed footprint {opts.footprint_precision or 'approximate'}; "
-                     f"source: {opts.planning_ref or 'not given'}")
     caption = {"title": name, "disclosure": disclosure, "sources": sources_text,
-               "footer": " · ".join(x for x in [footprint, f"Made {date} with Hyperscale Landscapes"] if x),
+               "footer": f"Made {date} with Hyperscale Landscapes",
                "top": f"{name} · {disclosure} · {sources_text.split(';')[0]} and others · {date}"}
     shown = [l for l in ["terrain", "water", "buildings", "roads", "rail", "power", "residues", "receptors"] if l in ids]
-    if insert is not None:
-        shown.append("site")
     colours = {k: v["colour_screen"] for k, v in layers_meta.items()}
     print_colours = {l: o["colour"] for o in preset["objects"] for l in o["layers"]}
-    print_colours["site"] = "#FFFFFF"
     bb = {"min_lat": opts.min_lat, "max_lat": opts.max_lat, "min_lon": opts.min_lon, "max_lon": opts.max_lon}
     D = {
         "schema": "hyperscale-landscapes/viewer@1", "layers": ids, "layout": layout, "geom": geom,

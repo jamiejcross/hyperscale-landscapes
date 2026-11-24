@@ -8,8 +8,8 @@
      inside this one file: open it in any modern browser, no internet needed. -->
 <!--FONTS-->
 <style>
-  /* Swiss / International: one grotesque, black and white plus one spot colour. */
-  :root { --paper: rgba(255,255,255,0.94); --ink: #000; --grey: #5c5c5c; --rule: #000; --spot: #d55e00; }
+  /* Swiss / International: one grotesque, strictly black and white. */
+  :root { --paper: rgba(255,255,255,0.94); --ink: #000; --grey: #5c5c5c; --rule: #000; --spot: #000; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #fff; color: var(--ink);
     font: 13px/1.4 Inter, "Helvetica Neue", Helvetica, Arial, sans-serif; }
@@ -36,7 +36,7 @@
     border-radius: 0; padding: 5px 9px; cursor: pointer; }
   button:hover { background: var(--ink); color: #fff; }
   button.primary { background: var(--ink); color: #fff; }
-  button.primary:hover { background: var(--spot); border-color: var(--spot); }
+  button.primary:hover { background: #fff; color: var(--ink); }
   select { font-weight: 400; max-width: 100%; }
   .hint { color: var(--grey); font-size: 11px; }
   #caption { color: var(--grey); font-size: 11px; border-top: 1px solid var(--rule); padding-top: 8px; margin-top: 12px; }

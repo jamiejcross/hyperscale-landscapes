@@ -30,17 +30,10 @@ test('section finds what the line crosses, at the right distances', () => {
   assert.ok(s.zMax > 119 && s.zMin < 101, 'true elevations sampled');
 });
 
-test('the proposed facility is drawn at its stated height above the highest ground', () => {
-  const footprint = { type: 'Polygon', coordinates: sq(-3.0, 56.005, 0.0008) };
-  const s = computeSection({ line, bbox, elev, osm, footprint, insertHeight: 25 });
-  assert.equal(s.items.site.length, 1);
-  assert.ok(Math.abs(s.items.site[0].top - s.items.site[0].base - 25) < 1e-6);
-});
-
 test('the SVG states the vertical scale', () => {
   const s = computeSection({ line, bbox, elev, osm });
   const caption = { title: 'T', disclosure: 'D', sources: 'S', footer: 'F' };
-  const colours = { water: '#00f', power: '#f90', site: '#f00', receptors: '#0af', residues: '#c7a', rail: '#000', road: '#555' };
+  const colours = { water: '#00f', power: '#f90', receptors: '#0af', residues: '#c7a', rail: '#000', road: '#555' };
   assert.match(sectionSVG(s, { vex: 1, caption, colours }), /true \(×1, not exaggerated\)/);
   assert.match(sectionSVG(s, { vex: 5, caption, colours }), /exaggerated ×5/);
 });

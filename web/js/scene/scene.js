@@ -94,11 +94,11 @@ export function createScene(container) {
   }
 
   // layers: {id: mesh}; colours: {id: '#rrggbb'}; landcover: canvas or null
-  function setModel({ layers, insert, before = null, colours, landcover, grid }) {
+  function setModel({ layers, colours, landcover, grid }) {
     for (const k of Object.keys(meshes)) { inner.remove(meshes[k]); meshes[k].geometry.dispose(); delete meshes[k]; }
     span = Math.max(grid.Wmm, grid.Hmm);
     let zmax = 0;
-    for (const [id, m] of Object.entries({ ...layers, ...(insert ? { site: insert } : {}) })) {
+    for (const [id, m] of Object.entries(layers)) {
       if (!m || !m.indices.length) continue;
       const g = geometry(m);
       let mat;
@@ -115,8 +115,6 @@ export function createScene(container) {
         inner.add(side); meshes['terrain-sides'] = side;
       } else if (id === 'water') {
         mat = new THREE.MeshPhysicalMaterial({ color: 0x24506a, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.6 });
-      } else if (id === 'site') {
-        mat = new THREE.MeshStandardMaterial({ color: colours.site || '#D55E00', roughness: 0.5, transparent: true, opacity: 0.88 });
       } else {
         mat = new THREE.MeshStandardMaterial({ color: colours[id] || colours[id.replace('Disused', '')] || '#cccccc', roughness: 0.8 });
       }
@@ -126,19 +124,6 @@ export function createScene(container) {
       mesh.name = id;
       inner.add(mesh); meshes[id] = mesh;
       for (let k = 2; k < m.positions.length; k += 3) zmax = Math.max(zmax, m.positions[k]);
-    }
-    // 'Before' meshes (land without the recess, buildings the site would
-    // clear): hidden unless a before/after view asks for them.
-    if (before?.terrain && meshes.terrain) {
-      const g = geometry(before.terrain);
-      g.setIndex(new THREE.BufferAttribute(splitWalls(before.terrain).capsIdx, 1));
-      g.setAttribute('uv', planarUV(before.terrain.positions, grid));
-      const m = new THREE.Mesh(g, meshes.terrain.material);
-      m.receiveShadow = true; m.visible = false; inner.add(m); meshes['before-terrain'] = m;
-    }
-    if (before?.buildings?.indices.length) {
-      const m = new THREE.Mesh(geometry(before.buildings), new THREE.MeshStandardMaterial({ color: colours.buildings || '#d9d9d9', roughness: 0.8 }));
-      m.castShadow = m.receiveShadow = true; m.visible = false; inner.add(m); meshes['before-buildings'] = m;
     }
     H = zmax;
     inner.position.set(-grid.Wmm / 2, -grid.Hmm / 2, 0);
@@ -157,13 +142,7 @@ export function createScene(container) {
     m.material.needsUpdate = true;
   }
 
-  // Show the site as it is today (true) or with the proposed facility (false).
-  function setBefore(on) {
-    const has = !!meshes['before-terrain'];
-    if (meshes.site) meshes.site.visible = !on;
-    if (has) { meshes['before-terrain'].visible = on; meshes.terrain.visible = !on; }
-    if (meshes['before-buildings']) meshes['before-buildings'].visible = on;
-  }
+
 
   function setVisible(id, on) {
     for (const k of [id, `${id}Disused`, `${id}-sides`]) if (meshes[k]) meshes[k].visible = on;
@@ -215,6 +194,13 @@ export function createScene(container) {
   }
 
   // Print colours: show each layer in the filament colour of its print object.
+  // Recolour layers on screen (not in print files), e.g. neutral roads and
+  // buildings over a satellite drape so they don't fight the photograph.
+  function setScreenColours(colours = {}) {
+    for (const [id, c] of Object.entries(colours)) {
+      const m = meshes[id]; if (m) (m.userData.mapMaterial || m.material).color.set(c);
+    }
+  }
   function setPrintColours(on, colours = {}) {
     view.print = on;
     for (const [id, m] of Object.entries(meshes)) {
@@ -288,7 +274,7 @@ export function createScene(container) {
   function orbitEnd() { if (orbitBase) camera.position.copy(orbitBase.pos); camera.lookAt(controls.target); orbitBase = null; }
 
   return { renderer, scene, camera, controls, view, meshes, focalMm, setModel, setDrape, setVisible, setView, setSpin,
-    setSun, setFov, setHeightScale, setBackground, setPrintColours, setShadow, grab, setBefore,
+    setSun, setFov, setHeightScale, setBackground, setPrintColours, setScreenColours, setShadow, grab,
     pause, resume, renderAt, orbitStart, orbitTo, orbitEnd };
 }
 

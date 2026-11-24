@@ -1,7 +1,6 @@
 /* Hyperscale Landscapes: Swiss / International Typographic Style.
-   One grotesque (Inter, 400 and 700), flush-left ragged-right text, black
-   and white plus a single flat spot colour (the vermilion that marks the
-   proposed data centre in every model), and scale contrast doing the work.
+   One grotesque (Inter, 400 and 700), flush-left ragged-right text, strictly
+   black and white, with scale and weight contrast doing the work.
    No rounded corners, no shadows: hairline rules and a strict grid. */
 
 @font-face { font-family: "Inter"; font-weight: 400; font-display: swap;
@@ -19,8 +18,8 @@
   --grey: #5c5c5c;          /* secondary text: 6.6:1 on white */
   --rule: #000000;
   --faint: #e6e6e6;
-  --spot: #d55e00;          /* the one colour: the proposed data centre */
-  --spot-ink: #ffffff;
+  --spot: var(--ink);       /* no spot colour: emphasis is black */
+  --spot-ink: var(--paper);
   --measure: 62ch;
   --gutter: 16px;
   --col: minmax(0, 1fr);
@@ -67,7 +66,7 @@ header.site p { font-size: clamp(1.05rem, 1.8vw, 1.35rem); line-height: 1.3; mar
 .hint { color: var(--grey); font-size: .875rem; line-height: 1.4; margin: .35rem 0; max-width: var(--measure); }
 .note { border-left: 4px solid var(--spot); padding-left: .75rem; max-width: var(--measure); }
 .status { min-height: 1.45em; font-weight: 700; }
-.status.error { color: var(--spot); }
+.status.error { color: var(--ink); border-left: 4px solid var(--ink); padding-left: .6rem; }
 
 /* ---- controls ---- */
 fieldset { border: 0; border-top: 1px solid var(--rule); margin: 0 0 1.25rem; padding: .6rem 0 0; min-width: 0; }
@@ -79,10 +78,10 @@ input[type=text], input[type=search], input[type=number], select {
 button { background: var(--paper); border: 1px solid var(--ink); border-radius: 0; padding: .5rem .85rem; cursor: pointer; font-weight: 700; font-size: .9rem; }
 button:hover { background: var(--ink); color: var(--paper); }
 button.primary { background: var(--ink); color: var(--paper); }
-button.primary:hover { background: var(--spot); border-color: var(--spot); color: var(--spot-ink); }
+button.primary:hover { background: var(--paper); border-color: var(--ink); color: var(--ink); }
 button:disabled { opacity: .35; cursor: not-allowed; background: var(--paper); color: var(--ink); }
 button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
-input[type=range], input[type=checkbox] { accent-color: var(--spot); }
+input[type=range], input[type=checkbox] { accent-color: var(--ink); }
 .inline { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
 .inline input[type=search] { flex: 1 1 12rem; }
 

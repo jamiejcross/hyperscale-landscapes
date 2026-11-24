@@ -3,7 +3,7 @@
 // stay locked together in the slicer), plus core <metadata> with title,
 // attribution and the exaggeration disclosure, plus Bambu Studio's
 // Metadata/model_settings.config assigning each part to a filament slot.
-// The removable insert, if any, is a separate build item beside the model.
+// Optional `separate` parts become their own build items beside the model.
 import { Zip, ZipDeflate, strToU8 } from '../../vendor/fflate.js';
 
 const CONTENT_TYPES = '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/><Default Extension="config" ContentType="text/xml"/></Types>';

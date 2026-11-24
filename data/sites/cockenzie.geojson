@@ -43,11 +43,11 @@
     "licence": "CC-BY-4.0",
     "notes": "Former coal stores of the dismantled Cockenzie power station. APRS reports it is not yet in planning; East Lothian Council has chosen a preferred supplier.",
     "model_bbox": {
-      "min_lat": 55.96237,
-      "max_lat": 55.97315,
+      "min_lat": 55.96058,
+      "max_lat": 55.97495,
       "min_lon": -2.99631,
       "max_lon": -2.94494
     },
-    "model_bbox_note": "3.2 × 1.2 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.6 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
   }
 }

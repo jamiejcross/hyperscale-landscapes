@@ -31,7 +31,7 @@ def load_sites() -> list[dict]:
     return json.loads(idx.read_text())["sites"]
 
 
-def site_bbox(site_id: str) -> tuple[dict, str, dict]:
+def site_bbox(site_id: str) -> tuple[dict, str]:
     path = data_dir() / "sites" / f"{site_id}.geojson"
     if not path.exists():
         known = ", ".join(s["id"] for s in load_sites()) or "none"
@@ -41,17 +41,7 @@ def site_bbox(site_id: str) -> tuple[dict, str, dict]:
     bb = props.get("model_bbox")
     if not bb:
         sys.exit(f"Site '{site_id}' has no model_bbox yet; see data/sites/TODO.md")
-    insert = {}
-    if feat.get("geometry"):
-        # A sourced footprint exists: build the insert from the site record.
-        refs = props.get("planning_refs") or []
-        insert = {"footprint": str(path),
-                  "insert_height_m": props.get("stated_height_m"),
-                  "insert_height_source": props.get("massing_source"),
-                  "footprint_precision": props.get("footprint_precision"),
-                  "planning_ref": (refs[0].get("ref") if refs and isinstance(refs[0], dict)
-                                   else (refs[0] if refs else None))}
-    return bb, props.get("name") or site_id, insert
+    return bb, props.get("name") or site_id
 
 
 def polygon_bbox(path: Path, pad_m: float) -> dict:
@@ -108,7 +98,8 @@ def _build_parser() -> argparse.ArgumentParser:
     b.add_argument("--road_raise", type=float, default=0.5)
     b.add_argument("--river_width", type=float, default=45.0)
     b.add_argument("--sea_level", type=float, default=3.0)
-    b.add_argument("--elevation", default="auto", choices=["auto", "srtm", "copernicus"])
+    b.add_argument("--elevation", default="auto", choices=["auto", "lidar", "copernicus", "srtm"],
+                   help="auto: Scottish LiDAR where available, else Copernicus 30 m")
     b.add_argument("--buildings_source", default="osm", choices=["osm", "overture"])
     b.add_argument("--no_buildings", action="store_true")
     b.add_argument("--max_buildings", type=int)
@@ -127,16 +118,6 @@ def _build_parser() -> argparse.ArgumentParser:
     b.add_argument("--no_labels", action="store_true", help="No engraved base labels")
     b.add_argument("--viewer", action="store_true",
                    help="Also write the offline interactive 3D viewer (one HTML file)")
-    ins = b.add_argument_group("data-centre insert")
-    ins.add_argument("--footprint", help="GeoJSON polygon of the proposed facility")
-    ins.add_argument("--insert_height_m", type=float,
-                     help="Height of the facility in metres (stated or estimated)")
-    ins.add_argument("--insert_height_source",
-                     help="Where the height comes from, e.g. a planning document")
-    ins.add_argument("--footprint_precision",
-                     choices=["exact from plans", "digitised from images", "approximate"])
-    ins.add_argument("--planning_ref", help="Planning reference for captions")
-    ins.add_argument("--no_magnets", action="store_true")
     b.add_argument("-q", "--quiet", action="store_true")
 
     s = sub.add_parser("sites", help="Curated sites")
@@ -159,10 +140,8 @@ def main(argv=None) -> int:
     name = args.name
     opts_extra = {}
     if args.site:
-        bb, site_name, site_insert = site_bbox(args.site)
+        bb, site_name = site_bbox(args.site)
         name = name or site_name
-        if site_insert and not args.footprint:
-            opts_extra.update({k: v for k, v in site_insert.items() if v is not None})
     elif args.bbox:
         data = json.loads(args.bbox.read_text())
         bb = data.get("bbox", data)
@@ -188,7 +167,7 @@ def main(argv=None) -> int:
         name=name,
         bambu_metadata=not args.no_bambu_metadata,
         features=not args.no_features, pegs=not args.no_pegs,
-        labels=not args.no_labels, magnets=not args.no_magnets,
+        labels=not args.no_labels,
     )
     for k, v in opts_extra.items():
         if k in fields:
@@ -197,11 +176,6 @@ def main(argv=None) -> int:
     span_km = max((opts.max_lat - opts.min_lat) * M_PER_DEG_LAT,
                   (opts.max_lon - opts.min_lon) * M_PER_DEG_LAT
                   * math.cos(math.radians((opts.min_lat + opts.max_lat) / 2))) / 1000
-    if opts.footprint and not opts.insert_height_m:
-        sys.exit("--footprint needs --insert_height_m (and ideally --insert_height_source)")
-    if opts.footprint and not opts.insert_height_source:
-        logging.warning("No source given for the insert height; it will be "
-                        "recorded as unsourced in the manifest.")
     if span_km > 3.0:
         logging.warning("Area is %.1f km across: above ~3 km, buildings stop "
                         "being legible at A1 plate size.", span_km)

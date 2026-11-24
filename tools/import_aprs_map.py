@@ -12,9 +12,9 @@ What is taken from the map:
     checked against planning documents.
 Local authority comes from OpenStreetMap boundaries (Nominatim reverse
 lookup of the public site point).  The model_bbox is centred on
-the point (3.2 km east–west by 1.2 km north–south): a modelling extent, not
-a site boundary.  No footprint is
-recorded for any site, so none has an insert.
+the point (3.2 km east–west by 1.6 km north–south): a modelling extent, not
+a site boundary.  No footprint is recorded for any site, and the models do
+not show the proposed buildings.
 
     python tools/import_aprs_map.py map.kml local_authorities.json
 """
@@ -31,7 +31,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SITES = ROOT / "data" / "sites"
 MAP_URL = "https://www.google.com/maps/d/viewer?mid=1iGmWc4tSHrLNwDRCFz86dLgBFWWw-Kg"
 ACCESSED = "2026-11-24"
-WIDTH_KM, HEIGHT_KM = 3.2, 1.2   # default model area: wide landscape strip (JC, 24 Nov 2026)
+WIDTH_KM, HEIGHT_KM = 3.2, 1.6   # default model area: landscape strip deep enough for nearby villages (JC, 24 Nov 2026)
 
 # KML placemark name -> facts transcribed from APRS's description.
 # None = not stated on the map.  status uses the schema's vocabulary and is

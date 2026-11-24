@@ -10,13 +10,13 @@ Sources marked *to verify* must be checked before the first public release.
 | OpenStreetMap (Overpass API) | buildings, roads, rail, water, power, residues, receptors, land cover | ODbL 1.0 | © OpenStreetMap contributors | verified |
 | SRTM 1″ via AWS Terrain Tiles | elevation (fallback) | Public domain (NASA/USGS) | Elevation: NASA/USGS SRTM | to verify |
 | Copernicus DEM GLO-30 | elevation (global default) | Copernicus DEM licence | Copernicus DEM GLO-30 © DLR e.V. 2010–2014 and © Airbus Defence and Space GmbH 2014–2018, provided under COPERNICUS by the European Union and ESA | to verify |
-| Scottish Public Sector LiDAR | elevation (Scotland) | OGL v3.0 | Contains public sector information licensed under the Open Government Licence v3.0 | to verify |
+| Scottish Public Sector LiDAR (DTM), via the public `srsp-open-data` bucket (Scottish Government / JNCC) | elevation in Scotland: Python tier, and curated-site bundles in the browser | OGL v3.0 (the Remote Sensing Portal states OGL v3 unless a dataset says otherwise; the one stated exception is the Phase 2 LAZ point clouds, which we do not use) | Elevation: Scottish Government LiDAR. Contains public sector information licensed under the Open Government Licence v3.0 | licence checked 24 Nov 2026; **to verify:** per-programme copyright lines (e.g. Phase 1 names Scottish Government, SEPA and Scottish Water) |
 | GSHHG (Wessel & Smith) | coastline | LGPL 3.0 | Coastline: GSHHG (Wessel & Smith) | to verify |
 | AWS Terrain Tiles (Mapzen / tilezen) | elevation (browser tier) | composite: SRTM and GMTED2010 (public domain, USGS), ETOPO1 (public domain, NOAA), UK Environment Agency LiDAR (OGL v3) | Elevation: Mapzen Terrain Tiles (SRTM and GMTED2010 courtesy of the U.S. Geological Survey; ETOPO1, NOAA; UK: © Environment Agency 2015) | to verify: which source covers Scotland (the joerd attribution page does not say) |
 | Overture Maps (opt-in only) | buildings / roads fallback | mixed by theme | © Overture Maps Foundation; © OpenStreetMap contributors | to verify |
 | Curated sites (`data/sites/`) | site metadata | CC BY 4.0 | Hyperscale Landscapes contributors | — |
 
-## Imagery (candidates checked 24 Nov 2026; none integrated yet)
+## Imagery (checked 24 Nov 2026; EOX 2025 is the default drape, EOX 2016 and OSM land cover are options)
 
 The tool's exports (PNG, GIF, offline HTML) are forwarded freely, so imagery
 must allow embedding in exported files and redistribution by end users.

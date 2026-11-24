@@ -1,7 +1,5 @@
-"""Elevation provider: Scottish LIDAR → EA WCS → Copernicus GLO-30 → SRTM fallback.
-
-UK LIDAR sources provide 50cm–1m resolution for Scotland and England,
-falling back to Copernicus 30m / SRTM 30m globally.
+"""Elevation provider: Scottish LiDAR (2 m, gaps filled) -> Copernicus GLO-30
+-> SRTM fallback.
 """
 
 import gzip
@@ -94,231 +92,69 @@ def _bbox_osgb_bounds(bbox: BBox, pad_m: float = 0.0) -> tuple:
             max(es) + pad_m, max(ns) + pad_m)
 
 
-def _bbox_to_quadrant_tiles(bbox: BBox, pad_m: float = 0.0) -> list:
-    """Find all 5km quadrant tile names that cover the bbox.
+def _fetch_scottish_lidar(bbox: BBox, cache_dir: Path, res_m: float = 2.0, force: bool = False):
+    """Scottish LiDAR DTM over the bbox, on a lat/lon grid covering it exactly.
 
-    Returns list of (grid_10km, quadrant) tuples e.g. [('NT37', 'SW')].
+    Every survey programme in the public bucket is considered (see
+    ``providers/lidar.py``); newer surveys win, older ones fill their gaps.
+    Returns (elev with NaN where no survey has data, extent, programmes).
     """
-    e1, n1, e2, n2 = _bbox_osgb_bounds(bbox, pad_m)
-
-    # Expand to 5km grid boundaries
-    e_min = int(e1 // 5000) * 5000
-    n_min = int(n1 // 5000) * 5000
-    e_max = int(e2 // 5000) * 5000
-    n_max = int(n2 // 5000) * 5000
-
-    tiles = set()
-    for e in range(e_min, e_max + 5000, 5000):
-        for n in range(n_min, n_max + 5000, 5000):
-            ref, quad = _osgb_to_gridref(e + 2500, n + 2500)  # centre of 5km cell
-            if ref is not None:
-                tiles.add((ref, quad))
-    return sorted(tiles)
-
-
-# ---------------------------------------------------------------------------
-# Scottish Government LIDAR via S3 (50cm DTM)
-# ---------------------------------------------------------------------------
-
-# Phases in preference order (newest first)
-_SCOTTISH_PHASES = [
-    'national-lidar-programme',
-    'phase-6', 'phase-5', 'phase-4', 'phase-3', 'phase-2', 'phase-1',
-]
-
-_S3_BASE = 'https://srsp-open-data.s3.eu-west-2.amazonaws.com'
-
-
-def _scottish_tile_url(phase: str, grid10: str, quad: str) -> str:
-    """Build the S3 HTTPS URL for a Scottish LIDAR 5km quadrant tile."""
-    # Phase 1 used 10km tiles with 1m resolution (different naming)
-    if phase == 'phase-1':
-        fname = f'{grid10}_1M_DTM_PHASE1.tif'
-    elif phase == 'national-lidar-programme':
-        # National programme uses 1km tiles — not 5km quadrants
-        # We handle this differently; this function is for quadrant tiles only
-        return None
-    else:
-        phase_label = phase.upper().replace('-', '')
-        fname = f'{grid10}{quad}_50CM_DTM_{phase_label}.tif'
-    return f'{_S3_BASE}/lidar/{phase}/dtm/27700/gridded/{fname}'
-
-
-def _try_download(url: str, timeout: int = 120) -> bytes:
-    """Try to download a URL, return bytes or raise."""
-    require_online(url)
-    req = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read()
-
-
-def _find_scottish_tile_url(grid10: str, quad: str) -> tuple:
-    """Find the best available Scottish LIDAR tile URL, newest phase first.
-
-    Returns (url, phase) or raises RuntimeError.
-    Uses HEAD requests to check availability without downloading.
-    """
-    for phase in _SCOTTISH_PHASES:
-        if phase in ('national-lidar-programme', 'phase-1'):
-            continue  # different tile format, skip
-
-        url = _scottish_tile_url(phase, grid10, quad)
-        if url is None:
-            continue
-
-        try:
-            req = urllib.request.Request(url, method='HEAD',
-                                        headers={'User-Agent': USER_AGENT})
-            with urllib.request.urlopen(req, timeout=10) as r:
-                if r.status == 200:
-                    log.info('  Found %s%s in %s', grid10, quad, phase)
-                    return url, phase
-        except Exception:
-            continue
-
-    raise RuntimeError(f'No Scottish LIDAR coverage for {grid10}{quad}')
-
-
-def _fetch_scottish_lidar(bbox: BBox, cache_dir: Path):
-    """Fetch Scottish LIDAR for bbox using windowed reads via /vsicurl/.
-
-    Uses rasterio's virtual filesystem to read only the pixels we need
-    from each S3-hosted GeoTIFF, avoiding multi-hundred-MB downloads.
-
-    Returns (cropped_elev, extent_dict, phase_info).
-    """
-    import rasterio
-    from rasterio.windows import from_bounds
-
-    # Pad the source window 100 m so reprojection has full edge support
-    PAD_M = 100.0
-    tiles_needed = _bbox_to_quadrant_tiles(bbox, pad_m=PAD_M)
-    log.info('Scottish LIDAR: %d quadrant tile(s) needed: %s',
-             len(tiles_needed), tiles_needed)
-
-    # OSGB bounds covering the bbox (all four corners + padding)
-    e_min, n_min, e_max, n_max = _bbox_osgb_bounds(bbox, pad_m=PAD_M)
-
-    # Check which tiles have data and find their URLs
-    tile_urls = {}
-    phases_used = set()
-    for grid10, quad in tiles_needed:
-        try:
-            url, phase = _find_scottish_tile_url(grid10, quad)
-            tile_urls[(grid10, quad)] = url
-            phases_used.add(phase)
-        except RuntimeError:
-            log.warning('  No coverage for %s%s', grid10, quad)
-
-    if not tile_urls:
-        raise RuntimeError('No Scottish LIDAR tiles available for bbox')
-
-    def _read_window(src, window):
-        """Read a window and replace nodata with NaN."""
-        data = src.read(1, window=window).astype(np.float32)
-        if src.nodata is not None:
-            data[data == src.nodata] = np.nan
-        return data
-
-    # For the common case of a single tile, do a simple windowed read
-    if len(tile_urls) == 1:
-        url = next(iter(tile_urls.values()))
-        vsicurl = f'/vsicurl/{url}'
-        with rasterio.open(vsicurl) as src:
-            window = from_bounds(e_min, n_min, e_max, n_max, src.transform)
-            elev = _read_window(src, window)
-            # Compute the actual bounds of the window we read
-            win_transform = src.window_transform(window)
-            rows, cols = elev.shape
-            crop_w = win_transform.c
-            crop_n = win_transform.f
-            crop_e = crop_w + cols * win_transform.a
-            crop_s = crop_n + rows * win_transform.e
-            res_x, res_y = abs(win_transform.a), abs(win_transform.e)
-    else:
-        # Multiple tiles: read each window and stitch
-        tile_reads = []
-        for (grid10, quad), url in tile_urls.items():
-            vsicurl = f'/vsicurl/{url}'
-            with rasterio.open(vsicurl) as src:
-                # Clip the requested bbox to this tile's bounds
-                tb = src.bounds
-                clip_w = max(e_min, tb.left)
-                clip_s = max(n_min, tb.bottom)
-                clip_e = min(e_max, tb.right)
-                clip_n = min(n_max, tb.top)
-                if clip_w >= clip_e or clip_s >= clip_n:
-                    continue
-                window = from_bounds(clip_w, clip_s, clip_e, clip_n, src.transform)
-                data = _read_window(src, window)
-                wt = src.window_transform(window)
-                tile_reads.append((data, wt, clip_w, clip_s, clip_e, clip_n))
-
-        if not tile_reads:
-            raise RuntimeError('No data read from Scottish LIDAR tiles')
-
-        # Compute global bounds and stitch
-        crop_w = min(t[2] for t in tile_reads)
-        crop_s = min(t[3] for t in tile_reads)
-        crop_e = max(t[4] for t in tile_reads)
-        crop_n = max(t[5] for t in tile_reads)
-        res = abs(tile_reads[0][1].a)
-        res_x = res_y = res
-        big_cols = int(round((crop_e - crop_w) / res))
-        big_rows = int(round((crop_n - crop_s) / res))
-        elev = np.full((big_rows, big_cols), np.nan, dtype=np.float32)
-
-        for data, wt, cw, cs, ce, cn in tile_reads:
-            c_off = max(0, int(round((cw - crop_w) / res)))
-            r_off = max(0, int(round((crop_n - cn) / res)))
-            h, w = data.shape
-            # Windowed reads round bounds to whole pixels and can return
-            # one more row/column than the mosaic allows — clip to fit,
-            # otherwise the broadcast error silently dropped the whole
-            # LIDAR source and the build fell back to 30 m Copernicus.
-            r1 = min(r_off + h, big_rows)
-            c1 = min(c_off + w, big_cols)
-            if r1 <= r_off or c1 <= c_off:
-                continue
-            elev[r_off:r1, c_off:c1] = data[:r1 - r_off, :c1 - c_off]
-
-    # --- Reproject OSGB-aligned grid to a lat/lon-aligned grid ---
-    # OSGB north is rotated ~1° from true north at Scottish longitudes.
-    # Treating the OSGB grid as lat/lon-aligned skewed the terrain by up
-    # to ~10-20 m at bbox edges (misaligning roads/buildings with the
-    # terrain) and made the model extent slightly mismatch the requested
-    # bbox (leaving sea/road slivers at the print edge).  Resample onto a
-    # geographic grid covering EXACTLY the requested bbox.
     from rasterio.transform import from_origin
     from rasterio.warp import reproject, Resampling
+    from . import lidar
 
-    src_transform = from_origin(crop_w, crop_n, res_x, res_y)
+    PAD_M = 100.0   # edge support for the reprojection
+    e_min, n_min, e_max, n_max = _bbox_osgb_bounds(bbox, pad_m=PAD_M)
+    grid, (west, north), programmes = lidar.read_dtm(
+        (e_min, n_min, e_max, n_max), cache_dir, res_m=res_m, force=force)
+
+    # OSGB north is rotated ~1 degree from true north at Scottish longitudes:
+    # resample onto a geographic grid covering EXACTLY the requested bbox, or
+    # roads and buildings drift up to 10-20 m from the terrain at the edges.
     mid_lat = (bbox.min_lat + bbox.max_lat) / 2
-    res_lat = res_y / 111320.0
-    res_lon = res_x / (111320.0 * math.cos(math.radians(mid_lat)))
+    res_lat = res_m / 111320.0
+    res_lon = res_m / (111320.0 * math.cos(math.radians(mid_lat)))
     dst_h = max(2, int(math.ceil((bbox.max_lat - bbox.min_lat) / res_lat)))
     dst_w = max(2, int(math.ceil((bbox.max_lon - bbox.min_lon) / res_lon)))
-    dst_transform = from_origin(
-        bbox.min_lon, bbox.max_lat,
-        (bbox.max_lon - bbox.min_lon) / dst_w,
-        (bbox.max_lat - bbox.min_lat) / dst_h)
+    dst_transform = from_origin(bbox.min_lon, bbox.max_lat,
+                                (bbox.max_lon - bbox.min_lon) / dst_w,
+                                (bbox.max_lat - bbox.min_lat) / dst_h)
     dst = np.full((dst_h, dst_w), np.nan, dtype=np.float32)
-    reproject(
-        source=elev, destination=dst,
-        src_transform=src_transform, src_crs='EPSG:27700',
-        dst_transform=dst_transform, dst_crs='EPSG:4326',
-        src_nodata=np.nan, dst_nodata=np.nan,
-        resampling=Resampling.bilinear)
-    elev = dst
-    extent = {'north': bbox.max_lat, 'south': bbox.min_lat,
-              'west': bbox.min_lon, 'east': bbox.max_lon}
+    reproject(source=grid, destination=dst,
+              src_transform=from_origin(west, north, res_m, res_m), src_crs="EPSG:27700",
+              dst_transform=dst_transform, dst_crs="EPSG:4326",
+              src_nodata=np.nan, dst_nodata=np.nan, resampling=Resampling.bilinear)
+    extent = {"north": bbox.max_lat, "south": bbox.min_lat,
+              "west": bbox.min_lon, "east": bbox.max_lon}
+    log.info("Scottish LiDAR: %s at %.1f m, range %.1f-%.1f m, programmes: %s",
+             dst.shape, res_m, np.nanmin(dst), np.nanmax(dst), ", ".join(programmes))
+    return dst, extent, programmes
 
-    log.info('Scottish LIDAR: %s (reprojected to EPSG:4326), '
-             'range %.1f-%.1f m, phases: %s',
-             elev.shape, np.nanmin(elev), np.nanmax(elev),
-             ', '.join(phases_used))
 
-    return elev, extent, ', '.join(sorted(phases_used))
+def _fill_gaps(elev: np.ndarray, bbox: BBox, cache: Path) -> tuple[np.ndarray, float, str | None]:
+    """Fill NaN cells from Copernicus (or SRTM), resampled to the same grid.
+    Returns (filled grid, fraction filled, source used or None)."""
+    from scipy.ndimage import map_coordinates
+    gaps = np.isnan(elev)
+    frac = float(gaps.mean())
+    if not gaps.any():
+        return elev, 0.0, None
+    try:
+        coarse, ext = _fetch_copernicus(bbox, cache); src = "copernicus-30m"
+    except Exception:
+        coarse, ext = _fetch_srtm(bbox, cache); src = "srtm-30m"
+    h, w = elev.shape
+    ch, cw = coarse.shape
+    lat = bbox.max_lat - (np.arange(h) + 0.5) / h * (bbox.max_lat - bbox.min_lat)
+    lon = bbox.min_lon + (np.arange(w) + 0.5) / w * (bbox.max_lon - bbox.min_lon)
+    rr = (ext["north"] - lat) / (ext["north"] - ext["south"]) * (ch - 1)
+    cc = (lon - ext["west"]) / (ext["east"] - ext["west"]) * (cw - 1)
+    RR, CC = np.meshgrid(rr, cc, indexing="ij")
+    fill = map_coordinates(coarse.astype(np.float64), [RR, CC], order=1, mode="nearest")
+    out = elev.copy()
+    out[gaps] = fill[gaps]
+    log.warning("Scottish LiDAR: %.1f%% of the area has no survey; filled from %s", 100 * frac, src)
+    return out, frac, src
 
 
 # ---------------------------------------------------------------------------
@@ -638,13 +474,18 @@ def fetch(bbox: BBox, cache_dir: Path = DEFAULT_CACHE, **kwargs) -> ProviderResu
     # to EPSG:4326; v1 caches held OSGB-skewed grids and must not be used.
     bbox_key = (f"{bbox.min_lat:.5f}_{bbox.max_lat:.5f}"
                 f"_{bbox.min_lon:.5f}_{bbox.max_lon:.5f}")
-    result_cache = cache / f"elev_v2_{kwargs.get('prefer', 'auto')}_{bbox_key}.npz"
+    # v3: LiDAR mosaics every programme and fills gaps from Copernicus (v2
+    # filled them with 0 m). SRTM/Copernicus-only results are unchanged.
+    prefer_key = kwargs.get('prefer', 'auto')
+    version = "v3" if prefer_key in ("auto", "lidar") else "v2"
+    result_cache = cache / f"elev_{version}_{prefer_key}_{bbox_key}.npz"
     if result_cache.exists() and not kwargs.get("force"):
         try:
             cached = np.load(str(result_cache), allow_pickle=True)
             elev = cached["elev"]
             extent = cached["extent"].item()
             source = str(cached["source"])
+            extra = cached["meta"].item() if "meta" in cached.files else {}
             log.info("Using cached elevation (%s, %s)", source, elev.shape)
             return ProviderResult(
                 data={"elev": elev, "extent": extent},
@@ -652,7 +493,7 @@ def fetch(bbox: BBox, cache_dir: Path = DEFAULT_CACHE, **kwargs) -> ProviderResu
                 metadata={"shape": list(elev.shape),
                           "elev_min": float(elev.min()),
                           "elev_max": float(elev.max()),
-                          "extent": extent})
+                          "extent": extent, **extra})
         except Exception as e:
             log.warning("Elevation cache unreadable (%s) — refetching", e)
 
@@ -684,32 +525,26 @@ def fetch(bbox: BBox, cache_dir: Path = DEFAULT_CACHE, **kwargs) -> ProviderResu
             metadata={"shape": list(elev.shape), "elev_min": float(elev.min()),
                       "elev_max": float(elev.max()), "extent": extent})
 
-    # Try Scottish LIDAR first for Scotland bboxes
-    if _is_scotland_bbox(bbox):
+    # Scottish LiDAR first for Scotland bboxes (or when asked for by name).
+    if prefer == "lidar" or (prefer == "auto" and _is_scotland_bbox(bbox)):
         try:
-            elev, extent, phases = _fetch_scottish_lidar(bbox, cache)
-            # Replace NaN gaps with 0 (sea level) if present
-            nan_mask = np.isnan(elev)
-            if nan_mask.any():
-                log.warning('Scottish LIDAR: %d NaN pixels (%.1f%%), filling with 0',
-                            nan_mask.sum(), 100 * nan_mask.mean())
-                elev[nan_mask] = 0.0
-            source = f"scottish-lidar-{phases}"
-            _save_result(elev, extent, source)
+            elev, extent, programmes = _fetch_scottish_lidar(bbox, cache, force=bool(kwargs.get("force")))
+            if np.isnan(elev).mean() > 0.5:
+                raise RuntimeError(f"surveys cover only {100 * (1 - np.isnan(elev).mean()):.0f}% of the area")
+            elev, gap, gap_src = _fill_gaps(elev, bbox, cache)
+            source = "scottish-lidar-" + "+".join(programmes)
+            meta_extra = {"resolution_m": 2.0, "programmes": programmes,
+                          "gap_fraction": round(gap, 4), "gap_fill_source": gap_src}
+            np.savez_compressed(str(result_cache), elev=elev, extent=np.array(extent, dtype=object),
+                                source=source, meta=np.array(meta_extra, dtype=object))
             return ProviderResult(
-                data={"elev": elev, "extent": extent},
-                source=source,
-                cached=False,
-                metadata={
-                    "shape": list(elev.shape),
-                    "elev_min": float(elev.min()),
-                    "elev_max": float(elev.max()),
-                    "extent": extent,
-                    "resolution_m": 0.5,
-                },
-            )
+                data={"elev": elev, "extent": extent}, source=source, cached=False,
+                metadata={"shape": list(elev.shape), "elev_min": float(elev.min()),
+                          "elev_max": float(elev.max()), "extent": extent, **meta_extra})
         except Exception as e:
-            log.warning("Scottish LIDAR failed (%s), falling back to Copernicus", e)
+            if prefer == "lidar":
+                raise
+            log.warning("Scottish LiDAR unavailable (%s); falling back to Copernicus", e)
 
     # Try Copernicus
     try:

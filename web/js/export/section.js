@@ -77,7 +77,7 @@ function distToLine(L, [x, y]) {
 
 const num = (v, d) => { const n = parseFloat(String(v ?? '').replace('m', '')); return Number.isFinite(n) ? n : d; };
 
-export function computeSection({ line, bbox, elev, osm, footprint = null, insertHeight = null }) {
+export function computeSection({ line, bbox, elev, osm }) {
   const proj = makeProjection(bbox);
   const L = along(line, proj);
   const toXY = ([lon, lat]) => proj.toXY(lon, lat);
@@ -103,7 +103,7 @@ export function computeSection({ line, bbox, elev, osm, footprint = null, insert
     return b > minLon - pad && a < maxLon + pad && d > minLat - pad && c < maxLat + pad;
   };
 
-  const items = { buildings: [], site: [], water: [], points: [], spans: [] };
+  const items = { buildings: [], water: [], points: [], spans: [] };
   // buildings (OSM heights; default two storeys)
   for (const b of osm.buildings) {
     if (!nearLine(b.geometry)) continue;
@@ -112,15 +112,6 @@ export function computeSection({ line, bbox, elev, osm, footprint = null, insert
       const g = Math.min(ground(s0), ground(s1));
       const h = num(b.tags.height, num(b.tags['building:levels'], 2) * 3);
       items.buildings.push({ s0, s1, base: g, top: g + h, receptor: !!b.receptor, kind: b.tags.building });
-    }
-  }
-  // the proposed facility, at its stated height
-  if (footprint && insertHeight) {
-    for (const rs of polygonsOf(footprint)) {
-      for (const [s0, s1] of intervals(L, rs.map(r => r.map(toXY)))) {
-        let hi = 0; for (let s = s0; s <= s1; s += step) hi = Math.max(hi, ground(s));
-        items.site.push({ s0, s1, base: hi, top: hi + insertHeight });
-      }
     }
   }
   // water: polygons and waterways
@@ -176,17 +167,17 @@ export function computeSection({ line, bbox, elev, osm, footprint = null, insert
 // ---------------------------------------------------------------------------
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-// Swiss style: black, greys and white, with the one spot colour reserved for
-// the proposed data centre. Layers are told apart by label and tone.
-const INK = '#000000', GREY = '#5c5c5c', MID = '#9a9a9a', LIGHT = '#d9d9d9', SPOT = '#d55e00';
+// Swiss style: strictly black, greys and white. Layers are told apart by
+// label and tone.
+const INK = '#000000', GREY = '#5c5c5c', MID = '#9a9a9a', LIGHT = '#d9d9d9';
 const FONT = "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif";
 
-export function sectionSVG(sec, { vex = 1, caption, width = 1600, siteLabel = 'Proposed data centre', fontCSS = '' }) {
+export function sectionSVG(sec, { vex = 1, caption, width = 1600, fontCSS = '' }) {
   const m = { l: 70, r: 30, t: 60, b: 50 };
   const pw = width - m.l - m.r;
   const kx = pw / sec.length;                         // px per metre, horizontal
   const ky = kx * vex;                                // px per metre, vertical
-  const tallest = Math.max(sec.zMax, ...sec.items.buildings.map(b => b.top), ...sec.items.site.map(b => b.top),
+  const tallest = Math.max(sec.zMax, ...sec.items.buildings.map(b => b.top),
     ...sec.items.points.filter(p => p.height).map(p => ground(sec, p.s) + p.height));
   const lo = Math.max(0, Math.floor((sec.zMin - 5) / 10) * 10);
   const ph = Math.max(140, (tallest - lo) * ky + 20);
@@ -234,9 +225,6 @@ export function sectionSVG(sec, { vex = 1, caption, width = 1600, siteLabel = 'P
   // buildings
   for (const b of sec.items.buildings)
     out.push(`<rect x="${X(b.s0)}" y="${Y(b.top)}" width="${Math.max(1, (b.s1 - b.s0) * kx)}" height="${Math.max(1, (b.top - b.base) * ky)}" fill="${b.receptor ? INK : MID}"/>`);
-  // the proposed facility
-  for (const b of sec.items.site)
-    out.push(`<rect x="${X(b.s0)}" y="${Y(b.top)}" width="${(b.s1 - b.s0) * kx}" height="${(b.top - b.base) * ky}" fill="${SPOT}" fill-opacity="0.75" stroke="${SPOT}" stroke-width="2"/>`);
   // pylons
   for (const p of sec.items.points.filter(p => p.kind === 'pylon')) {
     const g = ground(sec, p.s);
@@ -245,7 +233,6 @@ export function sectionSVG(sec, { vex = 1, caption, width = 1600, siteLabel = 'P
 
   // labels: one row each, greedily stacked so they do not overlap
   const labels = [
-    ...sec.items.site.map(b => ({ s: (b.s0 + b.s1) / 2, z: b.top, text: `${siteLabel} (${Math.round(b.top - b.base)} m)`, colour: SPOT, bold: true })),
     ...sec.items.points.map(p => ({ s: p.s, z: ground(sec, p.s) + (p.height || 0), text: p.label, colour: GREY })),
     ...sec.items.spans.map(sp => ({ s: (sp.s0 + sp.s1) / 2, z: ground(sec, (sp.s0 + sp.s1) / 2), text: sp.label, colour: GREY })),
     ...mergeRuns(sec.items.buildings.filter(b => b.receptor)).map(r => ({ s: r, z: ground(sec, r), text: 'School / care / community', colour: GREY })),
@@ -258,14 +245,14 @@ export function sectionSVG(sec, { vex = 1, caption, width = 1600, siteLabel = 'P
     rowsEnd[row] = x + w;
     const ly = m.t + row * rowH + 12;
     out.push(`<line x1="${x}" x2="${x}" y1="${ly + 4}" y2="${Y(lb.z) - 2}" stroke="${lb.colour}" stroke-width="1" opacity="0.7"/>`);
-    out.push(`<text x="${x + 3}" y="${ly}" fill="${lb.bold ? SPOT : INK}"${lb.bold ? ' font-weight="700"' : ''}>${esc(lb.text)}</text>`);
+    out.push(`<text x="${x + 3}" y="${ly}" fill="${INK}">${esc(lb.text)}</text>`);
   }
   // A and B
   out.push(`<text x="${X(0)}" y="${top + ph + 38}" font-weight="700">A</text>`);
   out.push(`<text x="${X(sec.length)}" y="${top + ph + 38}" font-weight="700" text-anchor="end">B</text>`);
 
   // caption band
-  out.push(`<rect x="0" y="${H}" width="${width}" height="4" fill="${SPOT}"/>`);
+  out.push(`<rect x="0" y="${H}" width="${width}" height="4" fill="${INK}"/>`);
   capLines.forEach((l, i) => out.push(`<text x="${m.l}" y="${H + 24 + i * 18}" fill="${i ? GREY : INK}"${i ? '' : ' font-weight="700"'}>${esc(l)}</text>`));
   out.push('</svg>');
   return out.join('\n');

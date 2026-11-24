@@ -6,9 +6,10 @@ Planning documents reduce proposed data-centre sites to red lines and grid
 references. This toolkit turns a site into evidence people can hold and share:
 
 - **3D-printable models.** These are multi-colour terrain models showing rivers,
-  power lines and substations, old mines and bings, homes and schools. A
-  removable block shows the proposed building wherever its footprint is
-  known.
+  power lines and substations, old mines and bings (spoil heaps), homes and
+  schools. In Scotland the terrain comes from Scottish Government LiDAR. The
+  models show the land as it is: they do not model the proposed buildings,
+  whose size and shape are rarely published precisely enough.
 - **Digital artefacts.** These are rotating GIFs, landscape images, cross-sections and
   interactive 3D viewers, sized for Facebook, WhatsApp, slides and
   leaflets.
@@ -18,7 +19,7 @@ exaggeration, because these are used as evidence.
 
 > **Status: early development (Phase 4 of 7).** The browser app and the Python
 > command-line tool both build multi-colour print files, captioned images and
-> offline 3D viewers, for 27 curated sites or any area you draw. Before/after images, the scale card and the
+> offline 3D viewers, for 27 curated sites or any area you draw. The scale card, info pack and
 > beginners' guides are still to come. See [PLAN.md](PLAN.md).
 
 ## For organisers
@@ -55,14 +56,17 @@ hyperscale build --site auchtertool-cato
 hyperscale build --min_lat 56.0916 --max_lat 56.1064 --min_lon -3.3054 --max_lon -3.2457 --stl
 ```
 
-### Presets, layers and the insert
+### Presets and layers
 
 ```bash
 hyperscale build --site auchtertool-cato --preset residues
-hyperscale build --polygon proposal.geojson --footprint proposal.geojson \
-                 --insert_height_m 24 --insert_height_source "Planning statement, p. 12" \
-                 --footprint_precision "digitised from images" --planning_ref 25/01234/EIA
 ```
+
+Elevation in Scotland comes from the Scottish Public Sector LiDAR terrain
+model (bare earth, read at 2 m from the public `srsp-open-data` bucket; newer
+surveys take priority). Any gaps are filled from Copernicus 30 m, and the
+manifest records how much. `--elevation copernicus` or `--elevation srtm`
+uses the coarser global sources instead.
 
 | Preset | Filament slots |
 |---|---|
@@ -72,8 +76,6 @@ hyperscale build --polygon proposal.geojson --footprint proposal.geojson \
 | `classic` | Land · Water · Roads · Buildings (the original layout) |
 | `single-colour` | one watertight STL |
 
-A proposed facility is printed as a **separate, removable block**, at true height by
-default. It sits in a recess with 0.2 mm clearance and optional 6 × 2 mm magnet holes.
 The underside of the base is engraved with the site name, the height exaggeration,
 the data sources, the date, a north arrow and a scale bar. Turn the model over to
 read them.
@@ -82,7 +84,6 @@ Outputs go to `./output/`:
 
 - `terrain_*.3mf`: one object each for Land, Water, Roads and Buildings, pre-assigned to filament slots 1–4
 - `terrain_*.stl`: with `--stl`, a single watertight body for one-colour printing
-- `insert_*.stl`: the removable data-centre block, when a footprint is given
 - `features_*.geojson`: power, rail, residues, receptors and land cover, for the viewer
 - `viewer_*.html`: with `--viewer`, the offline interactive 3D viewer at full resolution
 - `manifest_*.json`: statistics, printability check, pause heights for single-extruder colour changes, and full data provenance

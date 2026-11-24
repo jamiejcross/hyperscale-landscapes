@@ -15,14 +15,11 @@ const T = { float32: Float32Array, uint32: Uint32Array };
 const arr = k => { const [o, n, t] = D.layout[k]; const C = T[t]; return new C(buf, o, n / C.BYTES_PER_ELEMENT); };
 const layers = {};
 for (const id of D.layers) layers[id] = { positions: arr(`${id}_p`), indices: arr(`${id}_i`) };
-const insert = D.layout.site_p ? { positions: arr('site_p'), indices: arr('site_i') } : null;
-const before = {};
-for (const k of ['terrain', 'buildings']) if (D.layout[`before_${k}_p`]) before[k] = { positions: arr(`before_${k}_p`), indices: arr(`before_${k}_i`) };
 
 // ---- scene
 const scene = createScene($('view'));
 const drape = D.drape ? await new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = D.drape; }) : null;
-scene.setModel({ layers, insert, before: Object.keys(before).length ? before : null, colours: D.colours, grid: D.grid, landcover: drape && toCanvas(drape) });
+scene.setModel({ layers, colours: D.colours, grid: D.grid, landcover: drape && toCanvas(drape) });
 function toCanvas(img) { const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0); return c; }
 
 // ---- panel: title, layers, studio, caption

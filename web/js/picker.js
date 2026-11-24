@@ -5,16 +5,17 @@ import { allCoords, bboxOfCoords } from './geo.js';
 
 const L = window.L;
 
-export function createPicker(el, { onBBox, onFootprint, onSection = () => {} }) {
+export function createPicker(el, { onBBox, onSection = () => {} }) {
   const map = L.map(el, { zoomSnap: 0.25, keyboard: true }).setView([56.0, -3.8], 9);
   L.tileLayer(BASEMAP, {
     maxZoom: 19,
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map);
 
-  let rect = null, footprint = null, mode = null, start = null, poly = [], polyLine = null;
-  // Swiss palette: the model area in black, the site in the one spot colour.
-  const style = { color: '#d55e00', weight: 2, fillOpacity: 0.08 };
+  let rect = null, mode = null, start = null, poly = [], polyLine = null;
+  // Swiss palette: black and white only: the model area
+  // as a black outline, the site as a black pin with a white ring.
+  const style = { color: '#000000', weight: 2, fillOpacity: 0.08 };
   const areaStyle = { color: '#000', weight: 2, fillOpacity: 0.04, dashArray: null };
 
   function showBBox(b, fit = true) {
@@ -24,10 +25,7 @@ export function createPicker(el, { onBBox, onFootprint, onSection = () => {} }) 
     onBBox(b);
   }
 
-  function showFootprint(gj) {
-    footprint?.remove();
-    footprint = gj ? L.geoJSON(gj, { style: { ...style, fillOpacity: 0.3 } }).addTo(map) : null;
-  }
+
 
   function setMode(m) {
     mode = m; start = null; poly = []; polyLine?.remove(); polyLine = null;
@@ -51,7 +49,7 @@ export function createPicker(el, { onBBox, onFootprint, onSection = () => {} }) 
     showBBox({ minLat: b.getSouth(), maxLat: b.getNorth(), minLon: b.getWest(), maxLon: b.getEast() }, false);
   });
   map.on('click', e => {
-    if (mode !== 'polygon' && mode !== 'footprint' && mode !== 'section') return;
+    if (mode !== 'polygon' && mode !== 'section') return;
     poly.push([e.latlng.lng, e.latlng.lat]);
     polyLine?.remove();
     polyLine = L.polyline(poly.map(([x, y]) => [y, x]), style).addTo(map);
@@ -76,10 +74,8 @@ export function createPicker(el, { onBBox, onFootprint, onSection = () => {} }) 
     }
     if (poly.length < 3) return false;
     const gj = { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[...poly, poly[0]]] } };
-    const m = mode;
     setMode(null);
-    if (m === 'footprint') { showFootprint(gj); onFootprint(gj); }
-    else { showBBox(bboxOfCoords(allCoords(gj), 300), false); showFootprint(null); }
+    showBBox(bboxOfCoords(allCoords(gj), 300), false);
     return true;
   }
 
@@ -98,9 +94,9 @@ export function createPicker(el, { onBBox, onFootprint, onSection = () => {} }) 
   let pin = null;
   function showPin([lon, lat], label) {
     pin?.remove();
-    pin = L.circleMarker([lat, lon], { radius: 7, color: '#fff', weight: 2, fillColor: '#d55e00', fillOpacity: 1 })
+    pin = L.circleMarker([lat, lon], { radius: 7, color: '#fff', weight: 2, fillColor: '#000000', fillOpacity: 1 })
       .addTo(map).bindTooltip(label);
   }
 
-  return { map, showBBox, showFootprint, showPin, showSection, setMode, finishPolygon, search, goTo, get mode() { return mode; } };
+  return { map, showBBox, showPin, showSection, setMode, finishPolygon, search, goTo, get mode() { return mode; } };
 }
