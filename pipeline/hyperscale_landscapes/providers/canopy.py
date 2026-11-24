@@ -40,7 +40,7 @@ NOT_TREE_M = 2.5
 MAX_M = 45.0
 BUILDING_BUFFER_M = 2.0
 SEA_LEVEL_M = 0.3          # DTM at or below this is treated as sea/foreshore
-CACHE_VERSION = "v2"
+CACHE_VERSION = "v3"
 
 META_BASE = "https://dataforgood-fb-data.s3.amazonaws.com/forests/v1/alsgedi_global_v6_float"
 META_ZOOM = 9
@@ -54,6 +54,15 @@ META_CITATION = ("Meta and World Resources Institute (WRI) - 2024. High Resoluti
 LINE_BUFFER_M = {"line": 10.0, "minor_line": 4.0}
 SUPPORT_BUFFER_M = 8.0
 TURBINE_RADIUS_ASSUMED_M = 60.0
+
+# Smooth surfaces: canopy is rough at the metre scale; roofs, bridge decks
+# and embankments the building mask missed (not in OSM) are planes. A pixel
+# whose height departs from its local average by under SMOOTH_M (RMS over
+# 5 m) is smooth; smooth regions of SMOOTH_MIN_M2 or more, grown by
+# SMOOTH_GROW_M to take in their edges and ridges, are "not tree".
+SMOOTH_M = 0.25
+SMOOTH_MIN_M2 = 50
+SMOOTH_GROW_M = 3            # applied to LiDAR pixels only
 
 WATER_TAGS = {("natural", "water"), ("waterway", "riverbank"), ("landuse", "reservoir"), ("landuse", "basin")}
 
@@ -105,6 +114,43 @@ def _mask(elements, pick, transform, shape, buffer_m=0.0):
     if not shapes:
         return np.zeros(shape, dtype=bool)
     return rasterize(((s, 1) for s in shapes), out_shape=shape, transform=transform, dtype="uint8").astype(bool)
+
+
+def _copernicus_sea(box: BBox, cache_dir, transform, shape) -> np.ndarray:
+    """True where Copernicus GLO-30 is at or below sea level (it sets the sea to 0 m)."""
+    from rasterio.transform import from_origin
+    from rasterio.warp import Resampling, reproject
+    from .elevation import _fetch_copernicus
+    try:
+        cop, ext = _fetch_copernicus(box, Path(cache_dir) / "elevation")
+    except Exception as e:
+        log.warning("Copernicus sea mask unavailable (%s)", e)
+        return np.zeros(shape, bool)
+    cop = np.asarray(cop, dtype=np.float32)
+    h, w = cop.shape
+    src_t = from_origin(ext["west"], ext["north"], (ext["east"] - ext["west"]) / w, (ext["north"] - ext["south"]) / h)
+    out = np.full(shape, np.nan, dtype=np.float32)
+    reproject(source=cop, destination=out, src_transform=src_t, src_crs="EPSG:4326", dst_transform=transform,
+              dst_crs="EPSG:27700", resampling=Resampling.nearest, dst_nodata=np.nan)
+    return np.isfinite(out) & (out <= 0.5)
+
+
+def _smooth_surfaces(chm: np.ndarray) -> np.ndarray:
+    """Planar raised surfaces (unmapped roofs, decks): see SMOOTH_M."""
+    from scipy import ndimage as ndi
+    tall = chm >= NOT_TREE_M
+    if not tall.any():
+        return np.zeros(chm.shape, bool)
+    dev = chm - ndi.gaussian_filter(chm, 1.5 / RES_M)
+    rough = np.sqrt(np.maximum(ndi.uniform_filter(dev * dev, int(5 / RES_M)), 0))
+    smooth = tall & (rough < SMOOTH_M)
+    lab, n = ndi.label(smooth)
+    if n == 0:
+        return smooth
+    sizes = ndi.sum(smooth, lab, np.arange(1, n + 1)) * RES_M ** 2
+    keep = np.zeros(n + 1, bool); keep[1:] = sizes >= SMOOTH_MIN_M2
+    big = keep[lab]
+    return ndi.binary_dilation(big, iterations=int(SMOOTH_GROW_M / RES_M)) & tall
 
 
 def _structure_buffer(tags):
@@ -231,6 +277,10 @@ def compute(bb: dict, osm_elements: list, cache_dir: Path = DEFAULT_CACHE, force
     water = _mask(osm_elements, lambda t: any((k, t.get(k)) in WATER_TAGS for k in t) or "water" in t,
                   transform, shape)
     sea = np.zeros(shape, bool) if dtm is None else (np.isfinite(dtm) & (dtm <= SEA_LEVEL_M))
+    # Where the LiDAR has no terrain (often open sea), use Copernicus 30 m.
+    no_dtm = np.ones(shape, bool) if dtm is None else ~np.isfinite(dtm)
+    if no_dtm.any():
+        sea |= no_dtm & _copernicus_sea(box, cache_dir, transform, shape)
     structures = _mask(osm_elements, _structure_buffer, transform, shape)
     masked = buildings | water | sea | structures
 
@@ -248,6 +298,10 @@ def compute(bb: dict, osm_elements: list, cache_dir: Path = DEFAULT_CACHE, force
     valid = (lidar_px | fallback_px) & ~masked
     chm = np.where(valid, np.clip(chm, 0, MAX_M), 0).astype(np.float32)
     chm[chm < NOT_TREE_M] = 0
+    # LiDAR only: the Meta/WRI fallback is a smooth model output, so smoothness there means nothing.
+    smooth = _smooth_surfaces(chm) & lidar_px
+    smooth_ha = float((smooth & (chm > 0)).sum()) * RES_M ** 2 / 1e4
+    chm[smooth] = 0
 
     land = int((~masked).sum()) or 1
     dsm_progs = [p for p in dsm_used]
@@ -261,12 +315,15 @@ def compute(bb: dict, osm_elements: list, cache_dir: Path = DEFAULT_CACHE, force
         "pct_programme_mismatch": round(100 * float((mismatch & ~masked).sum()) / max(1, int((lidar_px & ~masked).sum())), 2),
         "fallback_dates": meta_dates,
         "canopy_over_5m_ha": round(float((chm > 5).sum()) * RES_M ** 2 / 1e4, 2),
+        "smooth_surfaces_removed_ha": round(smooth_ha, 2),
         "canopy_over_2_5m_ha": round(float((chm >= NOT_TREE_M).sum()) * RES_M ** 2 / 1e4, 2),
         "masked_pct": round(100 * float(masked.sum()) / masked.size, 2),
         "rules": {"not_tree_below_m": NOT_TREE_M, "clip_m": [0, MAX_M], "building_buffer_m": BUILDING_BUFFER_M,
                   "power_line_buffer_m": LINE_BUFFER_M, "support_buffer_m": SUPPORT_BUFFER_M,
                   "turbine_radius_assumed_m": TURBINE_RADIUS_ASSUMED_M,
-                  "sea_dtm_at_or_below_m": SEA_LEVEL_M, "resolution_m": RES_M},
+                  "sea_dtm_at_or_below_m": SEA_LEVEL_M, "sea_where_no_lidar": "Copernicus GLO-30 at or below 0.5 m",
+                  "resolution_m": RES_M,
+                  "smooth_surface": f"RMS departure < {SMOOTH_M} m over 5 m, regions >= {SMOOTH_MIN_M2} m2, grown {SMOOTH_GROW_M} m"},
         "sources": {"lidar": "Scottish Public Sector LiDAR DSM and DTM (OGL v3)",
                     "fallback": META_CITATION if fallback_px.any() else None},
     }

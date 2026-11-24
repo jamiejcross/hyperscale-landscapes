@@ -21,3 +21,17 @@ def test_programme_capture_table_covers_every_ranked_phase():
 def test_rings_skip_points_outside_the_query_box():
     way = {"type": "way", "geometry": [{"lat": 1, "lon": 2}, None, {"lat": 3, "lon": 4}]}
     assert canopy._rings(way) == [[(2, 1), (4, 3)]]
+
+
+def test_smooth_surfaces_are_not_trees_but_rough_canopy_is():
+    import numpy as np
+    rng = np.random.default_rng(0)
+    chm = np.zeros((120, 120), np.float32)
+    yy, xx = np.mgrid[0:60, 0:60]
+    chm[30:90, 0:60] = 8 + 0.1 * xx            # a sloping roof, 3600 m2, perfectly smooth
+    wood = rng.uniform(6, 18, (60, 60)).astype(np.float32)
+    from scipy import ndimage as ndi
+    chm[30:90, 60:120] = ndi.gaussian_filter(wood, 1.0)   # bumpy canopy
+    smooth = canopy._smooth_surfaces(chm)
+    assert smooth[40:80, 5:50].mean() > 0.95       # roof interior removed
+    assert smooth[40:80, 70:115].mean() < 0.05     # canopy kept
