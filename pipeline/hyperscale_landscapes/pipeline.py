@@ -108,6 +108,7 @@ class BuildOptions:
     footprint_precision: str | None = None   # exact / digitised / approximate
     planning_ref: str | None = None
     magnets: bool = True
+    viewer: bool = False              # also write the offline 3D viewer (HTML)
 
     @property
     def bbox_id(self) -> str:
@@ -1042,6 +1043,17 @@ def build(opts: BuildOptions) -> dict:
         out_geojson = out_dir / f"features_{opts.bbox_id}.geojson"
         _features_geojson(info["feature_list"], out_geojson, attribution)
 
+    # ---- Offline viewer (same file the web app downloads) ----
+    out_viewer = None
+    if opts.viewer:
+        from .export.viewer import write_viewer
+        out_viewer = out_dir / f"viewer_{opts.bbox_id}.html"
+        size = write_viewer(out_viewer, layer_meshes=meshes, insert=insert, opts=opts, preset=preset,
+                            features=info.get("feature_list"), sources_text=attribution,
+                            disclosure=exaggeration_note(opts),
+                            report={"buildings": r["counts"].get("buildings", 0)})
+        log.info("Viewer -> %s (%.1f MB)", out_viewer, size / 1e6)
+
     # ---- Printability check (land is the structural body) ----
     _progress(20, "Checking printability")
     n_oh, a_oh = checks.overhangs(terrain)
@@ -1068,7 +1080,8 @@ def build(opts: BuildOptions) -> dict:
         "outputs": {"3mf": str(out_3mf) if out_3mf else None,
                     "stl": str(out_stl) if out_stl else None,
                     "insert_stl": str(out_insert_stl) if out_insert_stl else None,
-                    "features_geojson": str(out_geojson) if out_geojson else None},
+                    "features_geojson": str(out_geojson) if out_geojson else None,
+                    "viewer": str(out_viewer) if out_viewer else None},
         "bbox": {"min_lat": opts.min_lat, "max_lat": opts.max_lat,
                  "min_lon": opts.min_lon, "max_lon": opts.max_lon},
         "options": {k: v for k, v in asdict(opts).items()

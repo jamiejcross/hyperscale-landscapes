@@ -16,15 +16,24 @@ references. This toolkit turns a site into evidence people can hold and share:
 Every model and image states its data sources and its vertical
 exaggeration, because these are used as evidence.
 
-> **Status: early development (Phase 3 of 7).** The browser app and the Python
-> command-line tool both build multi-colour print files with power, residue and
-> receptor layers. The digital artefacts (GIFs, images, viewers)
-> and the beginners' guides are still to come. See [PLAN.md](PLAN.md).
+> **Status: early development (Phase 4 of 7).** The browser app and the Python
+> command-line tool both build multi-colour print files, captioned images and
+> offline 3D viewers, for 27 curated sites or any area you draw. Rotating GIFs, cross-sections and the beginners'
+> guides are still to come. See [PLAN.md](PLAN.md).
 
 ## For organisers
 
 You don't need to install anything. Open the web app, pick a curated site or
-draw an area, preview it in 3D, and download a print file. It all runs in
+draw an area, and preview it in 3D. From there you can:
+
+- save **images** for Facebook, WhatsApp, slides or leaflets, with a caption
+  showing the sources and the height exaggeration built into the picture;
+- download an **interactive 3D viewer**, a single file that opens in any
+  browser, works offline, and can be emailed;
+- download a **print file** for a 3D printer.
+
+The preview offers a land-cover map or open satellite imagery (Sentinel-2,
+10 m) as the surface. It all runs in
 your browser. The browser's print files are lower resolution than the
 command-line tool's. For exhibitions or planning hearings, ask a maker or
 researcher to run the command-line tool.
@@ -70,6 +79,7 @@ Outputs go to `./output/`:
 - `terrain_*.stl`: with `--stl`, a single watertight body for one-colour printing
 - `insert_*.stl`: the removable data-centre block, when a footprint is given
 - `features_*.geojson`: power, rail, residues, receptors and land cover, for the viewer
+- `viewer_*.html`: with `--viewer`, the offline interactive 3D viewer at full resolution
 - `manifest_*.json`: statistics, printability check, pause heights for single-extruder colour changes, and full data provenance
 
 Downloads are cached in your user cache folder (`~/.cache/hyperscale-landscapes`

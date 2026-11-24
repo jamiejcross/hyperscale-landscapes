@@ -10,13 +10,16 @@ import { readBoundary } from './data/upload.js';
 import { buildModel, printObjects, pauseHeights } from './geom/model.js';
 import { createScene, landcoverCanvas } from './scene/scene.js';
 import { SURFACES, imageryCanvas } from './data/imagery.js';
+import { mountStudio } from './scene/studio.js';
+import { buildViewer } from './export/viewer.js';
+import { captionLines, altText as draftAlt } from './scene/caption.js';
 import { write3MF } from './export/threemf.js';
 import { writeSTL } from './export/stl.js';
 
 const $ = id => document.getElementById(id);
 const OSM_ATTR = '© OpenStreetMap contributors';
 const state = { bbox: null, name: '', site: null, bundle: null, footprint: null, model: null, layers: {}, presets: {}, surface: 'landcover' };
-let scene = null;
+let scene = null, studio = null;
 
 await loadStrings();
 state.layers = Object.fromEntries((await (await fetch('data/layers.json')).json()).layers.map(l => [l.id, l]));
@@ -199,11 +202,21 @@ function sourcesFor() {
 function showPreview() {
   const { model, osm, opts, form } = state.model;
   $('preview').hidden = false; $('export').hidden = false;
-  scene ||= createScene($('view'));
+  if (!scene) {
+    scene = createScene($('view'));
+    studio = mountStudio($('studio'), scene, {
+      caption: () => captionLines({ name: state.name, exaggeration: exaggerationText(), sources: sourcesText(),
+        footprint: state.model.opts.footprint ? t('caption.footprint', { precision: state.model.form.precision, ref: state.model.form.planningRef || 'not given' }) : null }),
+      filename: () => `${slug()}-${new Date().toISOString().slice(0, 10)}`,
+      printColours: printColourMap,
+      alt: () => draftAlt({ name: state.name, report: state.model.model.report, exaggeration: exaggerationText(), surface: SURFACES[state.surface].label.toLowerCase() }),
+      onChange: () => refreshCaption(),
+    });
+  }
   const colours = Object.fromEntries(Object.values(state.layers).map(l => [l.id, l.colour_screen]));
   colours.railDisused = state.layers.rail.colour_screen_disused;
-  scene.setModel({ layers: model.layers, insert: model.insert, colours, grid: model.grid,
-    landcover: landcoverCanvas(model.grid, osm.features) });
+  state.drape = landcoverCanvas(model.grid, osm.features);
+  scene.setModel({ layers: model.layers, insert: model.insert, colours, grid: model.grid, landcover: state.drape });
   const ul = $('layer-list'); ul.textContent = '';
   const shown = ['terrain', 'water', 'buildings', 'roads', 'rail', 'power', 'residues', 'receptors', ...(model.insert ? ['site'] : [])];
   for (const id of shown) {
@@ -215,6 +228,7 @@ function showPreview() {
   }
   ul.querySelectorAll('input').forEach(i => { i.onchange = () => scene.setVisible(i.dataset.layer, i.checked); });
   const counts = model.report.counts;
+  studio.update();
   scene.renderer.domElement.setAttribute('aria-label', altText(model, osm));
   $('caption').textContent = captionText(opts, form) + ` Counts: ${counts.buildings} buildings, ${counts.receptors} schools, care or community buildings, ${counts.roads} roads.`;
   $('dl-insert').hidden = !model.insert;
@@ -224,9 +238,35 @@ function showPreview() {
   $('preview').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 
-function captionText(opts, form) {
+// The disclosed exaggeration is always what is on screen: the model's own
+// factor times the studio's "extra height" (which also scales buildings).
+function exaggerationText() {
+  const k = scene?.view.heightScale ?? 1, z = state.model.opts.zExag;
+  const r = v => +v.toFixed(2);
+  return k === 1 ? t('caption.exag', { x: r(z) }) : `Height exaggerated ×${r(z * k)}; buildings ×${r(k)}`;
+}
+function sourcesText() {
   const sat = SURFACES[state.surface]?.attribution;
-  let s = `${state.name || 'Terrain model'}. ${t('caption.exag', { x: opts.zExag })}. ${ELEV_ATTRIBUTION}. Map data ${OSM_ATTR}.${sat ? ` ${sat}.` : ''} Generated ${new Date().toISOString().slice(0, 10)}.`;
+  return [ELEV_ATTRIBUTION, `Map data ${OSM_ATTR}`, sat].filter(Boolean).join('; ');
+}
+function printColourMap() {
+  const preset = state.presets[$('options').elements.preset.value];
+  const map = {};
+  for (const o of preset.objects) for (const l of o.layers) map[l] = o.colour;
+  map.site = '#FFFFFF';
+  return map;
+}
+function refreshCaption() {
+  if (!state.model) return;
+  const counts = state.model.model.report.counts;
+  $('caption').textContent = captionText(state.model.opts, state.model.form) + ` Counts: ${counts.buildings} buildings, ${counts.receptors} schools, care or community buildings, ${counts.roads} roads.`;
+}
+
+function captionText(opts, form, { print = false } = {}) {
+  // Print files state the model's own exaggeration; the studio's extra height is view-only.
+  const exag = print ? t('caption.exag', { x: opts.zExag }) : exaggerationText();
+  const src = print ? [ELEV_ATTRIBUTION, `Map data ${OSM_ATTR}`].join('; ') : sourcesText();
+  let s = `${state.name || 'Terrain model'}. ${exag}. ${src}. Generated ${new Date().toISOString().slice(0, 10)}.`;
   if (opts.footprint) s += ` ${t('caption.footprint', { precision: form.precision, ref: form.planningRef || 'not given' })}. Height ${opts.insertHeight} m (${form.insertSource || 'source not given'}).`;
   return s;
 }
@@ -248,11 +288,11 @@ async function applySurface(id) {
   state.surface = id;
   try {
     if (id === 'landcover') {
-      scene.setDrape(landcoverCanvas(model.grid, osm.features));
+      scene.setDrape(state.drape = landcoverCanvas(model.grid, osm.features));
       note.textContent = '';
     } else {
       note.textContent = 'Loading satellite imagery from EOX…';
-      scene.setDrape(await imageryCanvas(id, state.bbox, model.grid));
+      scene.setDrape(state.drape = await imageryCanvas(id, state.bbox, model.grid));
       note.textContent = SURFACES[id].note;
     }
   } catch (err) {
@@ -260,13 +300,10 @@ async function applySurface(id) {
     state.surface = 'landcover'; $('surface').value = 'landcover';
     scene.setDrape(landcoverCanvas(model.grid, osm.features));
   }
-  const counts = model.report.counts;
-  $('caption').textContent = captionText(opts, form) + ` Counts: ${counts.buildings} buildings, ${counts.receptors} schools, care or community buildings, ${counts.roads} roads.`;
+  refreshCaption();
 }
 $('surface').onchange = e => applySurface(e.target.value);
 
-$('preview').addEventListener('click', e => { const v = e.target.closest('[data-view]'); if (v) scene.setView(v.dataset.view); });
-$('spin').onchange = e => scene.setSpin(e.target.checked);
 
 // ---------------- Step 4: download ----------------
 function slug() { return (state.name || 'terrain').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'terrain'; }
@@ -286,7 +323,7 @@ $('dl-3mf').onclick = async () => {
       title: state.name || 'Terrain model', parts, separate,
       metadata: {
         Designer: 'Hyperscale Landscapes (browser)',
-        Description: captionText(opts, form),
+        Description: captionText(opts, form, { print: true }),
         Copyright: `${ELEV_ATTRIBUTION}; Map data ${OSM_ATTR}`,
         LicenseTerms: 'Map data ODbL 1.0',
         CreationDate: new Date().toISOString().slice(0, 10),
@@ -300,6 +337,32 @@ $('dl-stl').onclick = () => {
   const ids = ['terrain', 'water', 'buildings', 'receptors', 'roads', 'rail', 'railDisused', 'power', 'residues'];
   save(writeSTL(ids.map(i => model.layers[i]), `Hyperscale Landscapes: ${state.name}`.slice(0, 79)), `${slug()}.stl`);
 };
+$('dl-viewer').onclick = async () => {
+  const { model, opts, form } = state.model;
+  const btn = $('dl-viewer'), info = $('viewer-info');
+  btn.disabled = true; info.textContent = 'Packing the viewer…';
+  try {
+    const colours = Object.fromEntries(Object.values(state.layers).map(l => [l.id, l.colour_screen]));
+    colours.railDisused = state.layers.rail.colour_screen_disused;
+    const shown = ['terrain', 'water', 'buildings', 'roads', 'rail', 'power', 'residues', 'receptors', ...(model.insert ? ['site'] : [])]
+      .filter(id => id === 'site' || model.layers[id]?.indices.length);
+    const legend = shown.map(id => ({ id, name: state.layers[id].name, colour: state.layers[id].colour_screen, why: state.layers[id].why }));
+    const { w, h } = bboxSizeKm(state.bbox);
+    const caption = captionLines({ name: state.name, exaggeration: t('caption.exag', { x: opts.zExag }), sources: sourcesText(),
+      footprint: opts.footprint ? t('caption.footprint', { precision: form.precision, ref: form.planningRef || 'not given' }) : null });
+    const blob = await buildViewer({
+      model, legend, colours, printColours: printColourMap(), caption, zExag: opts.zExag, slug: slug(),
+      sub: `${state.bbox.minLat.toFixed(3)}–${state.bbox.maxLat.toFixed(3)}°N, ${Math.abs(state.bbox.maxLon).toFixed(3)}–${Math.abs(state.bbox.minLon).toFixed(3)}°W · ${w.toFixed(1)} × ${h.toFixed(1)} km · from the ${opts.printSize} mm print model`,
+      drape: state.drape,
+      alt: draftAlt({ name: state.name, report: model.report, exaggeration: t('caption.exag', { x: opts.zExag }), surface: SURFACES[state.surface].label.toLowerCase() }),
+    });
+    save(blob, `${slug()}-viewer.html`);
+    const mb = blob.size / 1e6;
+    info.textContent = `${mb.toFixed(1)} MB${mb > 8 ? ' (large for email: choose a smaller area or a smaller print size)' : ' (fine to email)'}.`;
+  } catch (err) { console.error(err); info.textContent = `Could not build the viewer: ${err.message}`; }
+  finally { btn.disabled = false; }
+};
 $('dl-insert').onclick = () => save(writeSTL([state.model.model.insert]), `${slug()}-data-centre-block.stl`);
 
 window.__app = state;   // for debugging and automated checks
+Object.defineProperty(window, "__studio", { get: () => studio });

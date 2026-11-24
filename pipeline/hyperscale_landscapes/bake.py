@@ -48,7 +48,7 @@ def bake(site_id: str) -> dict:
         with urllib.request.urlopen(req, timeout=60) as r:
             tiles[f"{z}/{x}/{y}"] = base64.b64encode(r.read()).decode()
     bundle = {"schema": "hyperscale-landscapes/site-bundle@1", "site": site_id,
-              "query": "web-v1", "fetched": time.strftime("%Y-%m-%d"),
+              "query": "web-v2", "fetched": time.strftime("%Y-%m-%d"),
               "attribution": "© OpenStreetMap contributors; elevation: Mapzen Terrain Tiles",
               "osm": osm, "elevation": {"zoom": ZOOM, "tiles": tiles}}
     out = sites / f"{site_id}.bundle.json.gz"

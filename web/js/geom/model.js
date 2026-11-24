@@ -30,6 +30,8 @@ export const MM = {
   buildingMin: 0.6, buildingBury: 1.0,
   clearance: 0.2, recessDepth: 2.0, floorMin: 1.0,
   engrave: 0.4,
+  waterDepth: 0.8,      // terrain is cut this far below sea and loch level
+  riverSink: 0.25,      // rivers sit this far below their banks
 };
 
 const ROAD_WIDTHS = {
@@ -71,13 +73,13 @@ function sampleHeights(grid, elev, opts) {
   const sea = new Uint8Array(nx * ny);
   let min = Infinity, max = -Infinity;
   for (let k = 0; k < e.length; k++) {
-    if (e[k] <= 0.5) { sea[k] = 1; e[k] = Math.max(e[k], 0); }   // bathymetry clamped to sea level
+    if (e[k] <= 0) { sea[k] = 1; e[k] = 0; }                     // bathymetry clamped to sea level
     min = Math.min(min, e[k]); max = Math.max(max, e[k]);
   }
   const z = new Float32Array(nx * ny);
   const k = opts.zExag * mmPerM;
   for (let i = 0; i < e.length; i++) z[i] = opts.base + (e[i] - min) * k;
-  return { z, sea, elevMin: min, elevMax: max };
+  return { z, e, sea, elevMin: min, elevMax: max };
 }
 
 // Bilinear terrain height (mm) at print coordinates.
@@ -193,6 +195,159 @@ export function fixDiagonals(mask, cx, cy, taken = null) {
     }
   }
   return mask;
+}
+
+// Vertex whose every existing neighbouring cell is in the mask.
+function vertexAllIn(grid, mask) {
+  const { nx, ny, cx, cy } = grid;
+  const v = new Uint8Array(nx * ny);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    let any = false, all = true;
+    for (const [ci, cj] of [[i - 1, j - 1], [i, j - 1], [i - 1, j], [i, j]]) {
+      if (ci < 0 || cj < 0 || ci >= cx || cj >= cy) continue;
+      any = true; if (!mask[cj * cx + ci]) all = false;
+    }
+    v[j * nx + i] = any && all ? 1 : 0;
+  }
+  return v;
+}
+
+// Sea from OpenStreetMap coastlines. Coastlines are drawn as a barrier that
+// divides the grid into regions; each region is then classed as sea or land
+// by sampling both sides of every coastline (by OSM convention the land is
+// on the left of a coastline way).  Returns null when no coastline is mapped
+// here, or when the result fails a sanity check.
+export function seaFromCoastlines(grid, coastlines, H, report = {}) {
+  if (!coastlines.length) return null;
+  const { cx, cy, dx, dy, Hmm } = grid;
+  const cv = canvasFor(grid);
+  // Clipped coastlines can stop just short of the edge of the model, which
+  // would let the fill run round the end. Extend ends near the edge outwards.
+  const near = 0.04 * Math.max(grid.Wmm, grid.Hmm), far = 2 * Math.hypot(grid.Wmm, grid.Hmm);
+  const edgeDist = ([x, y]) => Math.min(x, y, grid.Wmm - x, Hmm - y);
+  const lines = coastlines.map(c => {
+    const p = c.geometry.coordinates.map(([lon, lat]) => grid.mm(lon, lat));
+    const ext = (a, b) => {          // extend from b through a, beyond the edge
+      const L = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1;
+      return [a[0] + (a[0] - b[0]) / L * far, a[1] + (a[1] - b[1]) / L * far];
+    };
+    if (p.length >= 2 && edgeDist(p[0]) < near) p.unshift(ext(p[0], p[1]));
+    if (p.length >= 2 && edgeDist(p.at(-1)) < near) p.push(ext(p.at(-1), p.at(-2)));
+    return p;
+  });
+  // A barrier at least three cells wide, counting any coverage at all, so a
+  // 4-connected region can never slip through an anti-aliased diagonal.
+  cv.g.lineWidth = 3 * Math.max(dx, dy);
+  for (const p of lines) { cv.g.beginPath(); p.forEach(([x, y], k) => k ? cv.g.lineTo(x, y) : cv.g.moveTo(x, y)); cv.g.stroke(); }
+  const bd = cv.g.getImageData(0, 0, cx, cy).data;
+  const barrier = new Uint8Array(cx * cy);
+  for (let k = 0; k < barrier.length; k++) barrier[k] = bd[4 * k + 3] > 0 ? 1 : 0;
+  // Label the regions the barrier divides the grid into.
+  const comp = new Int32Array(cx * cy).fill(-1);
+  let nComp = 0;
+  for (let k0 = 0; k0 < comp.length; k0++) {
+    if (barrier[k0] || comp[k0] >= 0) continue;
+    const stack = [k0]; comp[k0] = nComp;
+    while (stack.length) {
+      const k = stack.pop(), i = k % cx, j = (k - i) / cx;
+      for (const [ii, jj] of [[i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1]]) {
+        if (ii < 0 || jj < 0 || ii >= cx || jj >= cy) continue;
+        const kk = jj * cx + ii;
+        if (!barrier[kk] && comp[kk] < 0) { comp[kk] = nComp; stack.push(kk); }
+      }
+    }
+    nComp++;
+  }
+  // Each region votes: points just right of a coastline (sea, by OSM
+  // convention) count +1, points just left (land) count -1.  A region is
+  // sea only if it wins, so a few stray samples across a narrow pier or
+  // harbour cannot flood the land.
+  const votes = new Float64Array(nComp);
+  const cellAt = (x, y) => {
+    const i = Math.floor(x / dx), j = Math.floor((Hmm - y) / dy);
+    return i < 0 || j < 0 || i >= cx || j >= cy ? -1 : j * cx + i;
+  };
+  const off = 3.5 * Math.max(dx, dy);
+  for (const p of lines) {
+    for (let n = 0; n < p.length - 1; n++) {
+      const [x0, y0] = p[n], [x1, y1] = p[n + 1], L = Math.hypot(x1 - x0, y1 - y0);
+      if (!L) continue;
+      const rx = (y1 - y0) / L, ry = -(x1 - x0) / L;          // right-hand normal (y up)
+      const steps = Math.max(1, Math.ceil(L / (2 * dx)));
+      for (let s = 0; s < steps; s++) {
+        const t = (s + 0.5) / steps, x = x0 + t * (x1 - x0), y = y0 + t * (y1 - y0);
+        const kr = cellAt(x + rx * off, y + ry * off), kl = cellAt(x - rx * off, y - ry * off);
+        if (kr >= 0 && comp[kr] >= 0) votes[comp[kr]] += 1;
+        if (kl >= 0 && comp[kl] >= 0) votes[comp[kl]] -= 1;
+      }
+    }
+  }
+  const sea = new Uint8Array(cx * cy);
+  for (let k = 0; k < sea.length; k++) if (comp[k] >= 0 && votes[comp[k]] > 0) sea[k] = 1;
+  // The coastline is the high-water line: barrier cells touching sea join it.
+  for (let k = 0; k < sea.length; k++) if (barrier[k]) {
+    const i = k % cx, j = (k - i) / cx;
+    if ((i > 0 && sea[k - 1]) || (i < cx - 1 && sea[k + 1]) || (j > 0 && sea[k - cx]) || (j < cy - 1 && sea[k + cx])) sea[k] = 2;
+  }
+  // Sanity check: sea should be low. If the filled side is mostly well above
+  // sea level the fill went the wrong way (a broken or clipped coastline).
+  const hs = [];
+  for (let k = 0; k < sea.length; k += 7) if (sea[k]) {
+    const i = k % cx, j = (k - i) / cx; hs.push(H.e[j * grid.nx + i]);
+  }
+  hs.sort((a, b) => a - b);
+  const median = hs.length ? hs[hs.length >> 1] : 0;
+  if (!hs.length || median > 8) {
+    report.warnings?.push(`Coastline fill rejected (median height of 'sea' ${median.toFixed(1)} m); using elevation instead.`);
+    return null;
+  }
+  report.sea = { source: 'OpenStreetMap coastline', cells: sea.reduce((a, b) => a + (b ? 1 : 0), 0) };
+  for (let k = 0; k < sea.length; k++) sea[k] = sea[k] ? 1 : 0;
+  return sea;
+}
+
+// Per-vertex water surface height (mm).  Sea: sea level.  Lochs, ponds and
+// reservoirs: level, at the lowest ground on their shore.  Rivers and burns:
+// following the ground, a little below their banks.
+function waterLevels(grid, water, sea, lakes, H, zAt, opts, report) {
+  const { nx, ny, cx, cy, mmPerM } = grid;
+  const zSea = opts.base + (0 - H.elevMin) * opts.zExag * mmPerM;
+  const cellLevel = new Float32Array(cx * cy).fill(NaN);
+  for (let k = 0; k < cellLevel.length; k++) if (water[k] && sea[k]) cellLevel[k] = zSea;
+  let nLakes = 0;
+  for (const w of lakes) {
+    for (const rs of polygonsOf(w.geometry)) {
+      const rings = rs.map(r => r.map(([lon, lat]) => grid.mm(lon, lat)));
+      let lvl = Infinity, minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+      for (const [x, y] of rings[0]) {
+        lvl = Math.min(lvl, zAt(x, y));
+        minx = Math.min(minx, x); maxx = Math.max(maxx, x); miny = Math.min(miny, y); maxy = Math.max(maxy, y);
+      }
+      const i0 = Math.max(0, Math.floor(minx / grid.dx)), i1 = Math.min(cx - 1, Math.ceil(maxx / grid.dx));
+      const j0 = Math.max(0, Math.floor((grid.Hmm - maxy) / grid.dy)), j1 = Math.min(cy - 1, Math.ceil((grid.Hmm - miny) / grid.dy));
+      let hit = false;
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const k = j * cx + i;
+        if (!water[k] || sea[k]) continue;
+        if (pointInPolygon((i + 0.5) * grid.dx, grid.Hmm - (j + 0.5) * grid.dy, rings)) {
+          cellLevel[k] = Number.isNaN(cellLevel[k]) ? lvl : Math.min(cellLevel[k], lvl); hit = true;
+        }
+      }
+      if (hit) nLakes++;
+    }
+  }
+  const Wv = new Float32Array(nx * ny).fill(Infinity);
+  for (let j = 0; j < cy; j++) for (let i = 0; i < cx; i++) {
+    const k = j * cx + i;
+    if (!water[k]) continue;
+    for (const v of [j * nx + i, j * nx + i + 1, (j + 1) * nx + i, (j + 1) * nx + i + 1]) {
+      const lvl = Number.isNaN(cellLevel[k]) ? H.z[v] - MM.riverSink : cellLevel[k];
+      if (lvl < Wv[v]) Wv[v] = lvl;
+    }
+  }
+  const nSea = sea.reduce((a, b) => a + b, 0);
+  report.water = { lakes: nLakes, seaCells: nSea, ...(nSea ? { seaLevelMm: +zSea.toFixed(2) } : {}) };
+  return Wv;
 }
 
 // Vertex is "in" a mask if any of its (up to four) cells is.
@@ -410,11 +565,23 @@ export function buildModel({ bbox, elev, osm, opts }) {
     if (recess && recess[k]) taken[k] = 3;
     if (pegcut && pegcut[k] && !taken[k]) taken[k] = 4;
   }
-  // sea cells count as water
-  const seaCells = new Uint8Array(cx * cy);
-  for (let j = 0; j < cy; j++) for (let i = 0; i < cx; i++) {
-    const a = j * nx + i;
-    if (H.sea[a] && H.sea[a + 1] && H.sea[a + nx] && H.sea[a + nx + 1]) seaCells[j * cx + i] = 1;
+  // Sea: from OSM coastlines where mapped, otherwise from elevation <= 0.
+  let seaCells = seaFromCoastlines(grid, osm.coastlines || [], H, report);
+  if (seaCells) {
+    // Second check: buildings do not stand in the sea.
+    let bIn = 0, bAll = 0;
+    for (let k = 0; k < seaCells.length; k++) if (buildingMask[k]) { bAll++; if (seaCells[k]) bIn++; }
+    if (bAll && bIn / bAll > 0.05) {
+      report.warnings.push(`Coastline fill rejected (${Math.round(100 * bIn / bAll)}% of building cells fell in the sea); using elevation instead.`);
+      delete report.sea; seaCells = null;
+    }
+  }
+  if (!seaCells) {
+    seaCells = new Uint8Array(cx * cy);
+    for (let j = 0; j < cy; j++) for (let i = 0; i < cx; i++) {
+      const a = j * nx + i;
+      if (H.sea[a] && H.sea[a + 1] && H.sea[a + nx] && H.sea[a + nx + 1]) seaCells[j * cx + i] = 1;
+    }
   }
   for (const id of order) {
     let m = layerCanvas[id] ? maskOf(layerCanvas[id]) : new Uint8Array(cx * cy);
@@ -431,8 +598,17 @@ export function buildModel({ bbox, elev, osm, opts }) {
     masks[id] = m;
   }
 
-  // ---- Terrain top with the recess ----
+  // ---- Water levels: sea and lochs are level; rivers sit below their banks ----
   const zTop = Float32Array.from(H.z);
+  const W = waterLevels(grid, masks.water, seaCells, osm.water, H, zAt, opts, report);
+  {
+    // Cut the terrain under water so the water fills a hollow, flush at the shore.
+    const all = vertexAllIn(grid, masks.water);
+    const floorMin = MM.floorMin + (opts.labels ? MM.engrave : 0);
+    for (let v = 0; v < all.length; v++) if (all[v]) zTop[v] = Math.max(Math.min(zTop[v], W[v] - MM.waterDepth), floorMin);
+  }
+
+  // ---- Terrain top with the recess ----
   let floor = null;
   if (recess) {
     const rv = vertexTouches(grid, recess);
@@ -465,7 +641,7 @@ export function buildModel({ bbox, elev, osm, opts }) {
   const slab = (id, raise) => masks[id] ? slabFromMask(grid, masks[id], v => H.z[v] + raise, v => H.z[v] - MM.bury) : null;
   const layers = {
     terrain: land,
-    water: slab('water', MM.raise.water),
+    water: masks.water ? slabFromMask(grid, masks.water, v => W[v], v => W[v] - MM.waterDepth - 0.3) : null,
     roads: slab('roads', MM.raise.roads),
     power: concat([slab('power', MM.raise.power), slab('powerLine', MM.raise.powerLine)]),
     rail: slab('rail', MM.raise.rail),

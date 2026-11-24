@@ -3,6 +3,7 @@
   way["building"]({{bbox}});
   way["highway"]({{bbox}});
   way["waterway"~"^(river|canal|stream|drain|ditch)$"]({{bbox}});
+  way["natural"="coastline"]({{bbox}});
   nwr["natural"="water"]({{bbox}});
   nwr["water"]({{bbox}});
   nwr["power"]({{bbox}});

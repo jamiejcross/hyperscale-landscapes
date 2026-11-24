@@ -114,15 +114,12 @@
         <h3><label for="surface">Surface</label></h3>
         <select id="surface"></select>
         <p id="surface-note" class="hint" aria-live="polite"></p>
-        <h3 data-i18n="preview.views"></h3>
-        <div class="inline">
-          <button type="button" data-view="oblique" data-i18n="view.oblique"></button>
-          <button type="button" data-view="top" data-i18n="view.top"></button>
-          <button type="button" data-view="low" data-i18n="view.low"></button>
-        </div>
-        <label class="check"><input type="checkbox" id="spin"> <span data-i18n="view.spin"></span></label>
       </aside>
     </div>
+    <details class="studio-wrap" open>
+      <summary>Studio: camera, light and images</summary>
+      <div id="studio"></div>
+    </details>
     <p id="caption" class="caption"></p>
   </section>
 
@@ -133,6 +130,12 @@
       <button type="button" id="dl-stl" data-i18n="export.stl"></button>
       <button type="button" id="dl-insert" data-i18n="export.insert" hidden></button>
     </div>
+    <h3>Digital artefacts</h3>
+    <div class="inline downloads">
+      <button type="button" id="dl-viewer">Interactive 3D viewer (HTML)</button>
+    </div>
+    <p class="hint">A single file that opens in any browser, works offline, and can be emailed. It has the same controls as this preview. Still images: use <em>Save PNG</em> in the studio above.</p>
+    <p id="viewer-info" class="hint" aria-live="polite"></p>
     <p class="hint" data-i18n="export.3mf.help"></p>
     <p class="note" data-i18n="export.lowres"></p>
     <p id="pauses" class="hint"></p>

@@ -125,6 +125,8 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="Leave out power, rail, residues and receptors")
     b.add_argument("--no_pegs", action="store_true", help="No pylon or turbine pegs")
     b.add_argument("--no_labels", action="store_true", help="No engraved base labels")
+    b.add_argument("--viewer", action="store_true",
+                   help="Also write the offline interactive 3D viewer (one HTML file)")
     ins = b.add_argument_group("data-centre insert")
     ins.add_argument("--footprint", help="GeoJSON polygon of the proposed facility")
     ins.add_argument("--insert_height_m", type=float,

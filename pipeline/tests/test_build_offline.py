@@ -65,3 +65,27 @@ def test_presets_and_insert(offline_cache, tmp_path):
                                 labels=False, cache_dir=str(offline_cache),
                                 out_dir=str(tmp_path / "single")))
     assert single["outputs"]["3mf"] is None and single["union"]["watertight"] is True
+
+
+def test_offline_viewer(offline_cache, tmp_path):
+    """The Python build writes the same single-file viewer as the web app,
+    with every script inlined (no external requests)."""
+    import base64
+    import gzip
+    import re
+    m = build(BuildOptions(**FIXTURE_BBOX, elevation="srtm", viewer=True, labels=False,
+                           name="Fixture", cache_dir=str(offline_cache), out_dir=str(tmp_path)))
+    html = open(m["outputs"]["viewer"], encoding="utf-8").read()
+    for placeholder in ("<!--IMPORTMAP-->", "<!--DATA-->", "<!--MAIN-->"):
+        assert placeholder not in html
+    # no external scripts, styles or fetches
+    assert not re.search(r'<script[^>]+src=|<link[^>]+href="http', html)
+    imports = json.loads(re.search(r'<script type="importmap">(.*?)</script>', html, re.S).group(1))["imports"]
+    assert set(imports) >= {"three", "hl/scene", "hl/studio", "hl/caption"}
+    assert all(v.startswith("data:text/javascript;base64,") for v in imports.values())
+    D = json.loads(re.search(r'<script id="terrain-data" type="application/json">(.*?)</script>', html, re.S).group(1))
+    raw = gzip.decompress(base64.b64decode(D["geom"]))
+    assert len(raw) == max(o + n for o, n, _ in D["layout"].values())
+    assert "terrain" in D["layers"] and D["caption"]["disclosure"].startswith("Height exaggerated")
+    assert "OpenStreetMap" in D["caption"]["sources"]
+    assert D["drape"].startswith("data:image/jpeg;base64,")

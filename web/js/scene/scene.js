@@ -69,9 +69,17 @@ export function createScene(container) {
   new ResizeObserver(resize).observe(container);
   resize();
 
-  function setSun(azDeg = 225, elDeg = 32) {
+  const view = { az: 225, el: 32, strength: 3.0, fill: 1.0, heightScale: 1, fov: 28, background: 'sky', print: false };
+
+  // Sun: azimuth clockwise from north, height above the horizon; it warms
+  // towards orange as it drops (as in the Mossmorran viewer).
+  function setSun(azDeg = view.az, elDeg = view.el, strength = view.strength, fill = view.fill) {
+    Object.assign(view, { az: azDeg, el: elDeg, strength, fill });
     const az = THREE.MathUtils.degToRad(azDeg), el = THREE.MathUtils.degToRad(elDeg), r = span * 2.5;
     sun.position.set(Math.sin(az) * Math.cos(el) * r, Math.sin(el) * r, -Math.cos(az) * Math.cos(el) * r);
+    sun.intensity = strength; hemi.intensity = fill;
+    const warm = THREE.MathUtils.clamp((elDeg - 3) / 30, 0, 1);
+    sun.color.setRGB(1, 0.78 + 0.18 * warm, 0.58 + 0.33 * warm);
     const sc = sun.shadow.camera;
     sc.left = sc.bottom = -span * 0.75; sc.right = sc.top = span * 0.75; sc.near = 1; sc.far = span * 6;
     sc.updateProjectionMatrix();
@@ -113,6 +121,7 @@ export function createScene(container) {
         mat = new THREE.MeshStandardMaterial({ color: colours[id] || colours[id.replace('Disused', '')] || '#cccccc', roughness: 0.8 });
       }
       const mesh = new THREE.Mesh(g, mat);
+      mesh.userData.mapMaterial = mat;
       mesh.castShadow = id !== 'water'; mesh.receiveShadow = true;
       mesh.name = id;
       inner.add(mesh); meshes[id] = mesh;
@@ -122,6 +131,7 @@ export function createScene(container) {
     inner.position.set(-grid.Wmm / 2, -grid.Hmm / 2, 0);
     ground.scale.set(span * 8, span * 8, 1);
     setSun();
+    setHeightScale(view.heightScale);
     setView('oblique', false);
   }
 
@@ -156,8 +166,63 @@ export function createScene(container) {
 
   function setSpin(on) { controls.autoRotate = on; }
 
+  // Lens: keep the framing while changing focal length (dolly to compensate).
+  function setFov(f) {
+    const dir = camera.position.clone().sub(controls.target);
+    dir.multiplyScalar(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / Math.tan(THREE.MathUtils.degToRad(f / 2)));
+    camera.position.copy(controls.target).add(dir);
+    camera.fov = f; camera.updateProjectionMatrix(); view.fov = f;
+  }
+  // 35 mm-equivalent focal length for the label
+  const focalMm = f => Math.round(18 / Math.tan(THREE.MathUtils.degToRad(f / 2)));
+
+  // View-only height scale on top of the model's exaggeration. Captions
+  // report the product, so the disclosed figure is always what is shown.
+  function setHeightScale(k) { model.scale.set(1, 1, k); view.heightScale = k; }
+
+  const BACKGROUNDS = {
+    sky: () => gradient([[0, '#7fa6c9'], [0.55, '#c9d9e4'], [1, '#e9e4da']]),
+    studio: () => gradient([[0, '#d9d6cf'], [1, '#a9a59c']]),
+    white: () => new THREE.Color(0xffffff),
+    dark: () => gradient([[0, '#2b2e33'], [1, '#141518']]),
+    clear: () => null,
+  };
+  function setBackground(name) {
+    view.background = name;
+    scene.background = (BACKGROUNDS[name] || BACKGROUNDS.sky)();
+    ground.material.opacity = name === 'dark' ? 0.45 : 0.28;
+  }
+
+  // Print colours: show each layer in the filament colour of its print object.
+  function setPrintColours(on, colours = {}) {
+    view.print = on;
+    for (const [id, m] of Object.entries(meshes)) {
+      if (!m.userData.mapMaterial) continue;
+      if (!on) { m.material = m.userData.mapMaterial; continue; }
+      const c = colours[id] || colours[id.replace('Disused', '')];
+      if (!c) continue;
+      m.userData.printMaterial ||= new THREE.MeshStandardMaterial({ roughness: 0.6 });
+      m.userData.printMaterial.color.set(c);
+      m.material = m.userData.printMaterial;
+    }
+  }
+  function setShadow(on) { ground.visible = on; }
+
+  // Render at `mult` x the on-screen size and return the pixels on a canvas.
+  function grab(mult = 2) {
+    const w = container.clientWidth, h = container.clientHeight, pr = renderer.getPixelRatio();
+    renderer.setPixelRatio(mult); renderer.setSize(w, h, false);
+    renderer.render(scene, camera);
+    const c = document.createElement('canvas');
+    c.width = renderer.domElement.width; c.height = renderer.domElement.height;
+    c.getContext('2d').drawImage(renderer.domElement, 0, 0);
+    renderer.setPixelRatio(pr); renderer.setSize(w, h, false);
+    return c;
+  }
+
   renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
-  return { renderer, scene, camera, controls, setModel, setDrape, setVisible, setView, setSpin, setSun, meshes };
+  return { renderer, scene, camera, controls, view, meshes, focalMm, setModel, setDrape, setVisible, setView, setSpin,
+    setSun, setFov, setHeightScale, setBackground, setPrintColours, setShadow, grab };
 }
 
 // Separate wall triangles (|normal z| small) from the top/bottom caps.

@@ -7,7 +7,7 @@
 import { OVERPASS_MIRRORS } from '../config.js';
 import { cacheGet, cacheSet } from './cache.js';
 
-export const QUERY_VERSION = 'web-v1';
+export const QUERY_VERSION = 'web-v2';   // v2 adds natural=coastline
 let lastRequest = 0;
 
 export async function loadQuery(bbox) {
@@ -121,7 +121,7 @@ function geometryOf(el, linear) {
 
 // Split raw Overpass JSON into the layers the model uses.
 export function parseOSM(osm) {
-  const out = { buildings: [], roads: [], waterways: [], water: [], features: [] };
+  const out = { buildings: [], roads: [], waterways: [], water: [], coastlines: [], features: [] };
   for (const el of osm.elements || []) {
     const t = el.tags || {};
     if (t.building && el.type === 'way') {
@@ -145,6 +145,18 @@ export function parseOSM(osm) {
     if (t.waterway && el.type === 'way') {
       const g = geometryOf(el, true);
       if (g) out.waterways.push({ geometry: g, kind: t.waterway, tags: cleanTags(t, 'water') });
+      continue;
+    }
+    if (t.natural === 'coastline' && el.type === 'way') {
+      // Keep as lines (direction matters: land on the left). `out geom(bbox)`
+      // leaves nulls where the way leaves the box: split there rather than
+      // joining across the gap.
+      let run = [];
+      for (const p of [...(el.geometry || []), null]) {
+        if (p) { run.push([p.lon, p.lat]); continue; }
+        if (run.length >= 2) out.coastlines.push({ geometry: { type: 'LineString', coordinates: run } });
+        run = [];
+      }
       continue;
     }
     if (t.natural === 'water' || t.water) {
