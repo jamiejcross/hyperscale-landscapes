@@ -8,7 +8,7 @@ import { fetchOSM, parseOSM } from './data/overpass.js';
 import { loadElevation, ATTRIBUTION as ELEV_ATTRIBUTION } from './data/elevation.js';
 import { readBoundary } from './data/upload.js';
 import { buildModel, printObjects, pauseHeights } from './geom/model.js';
-import { createScene, landcoverCanvas } from './scene/scene.js';
+import { createScene, landcoverCanvas, layerSwatch } from './scene/scene.js';
 import { contourCanvas } from './scene/contours.js';
 import { SURFACES, imageryCanvas } from './data/imagery.js';
 import { mountStudio } from './scene/studio.js';
@@ -177,6 +177,9 @@ $('options').onsubmit = async e => {
 const elevAttr = () => state.model?.elev?.attribution || ELEV_ATTRIBUTION;
 
 // ---------------- Step 3: preview ----------------
+// Layer swatches follow the style (the field look has its own colours).
+const paintSwatches = () => document.querySelectorAll('#layer-list .swatch[data-swatch]')
+  .forEach(s => { s.style.background = layerSwatch(s.dataset.swatch, scene.view.look, s.dataset.screen); });
 function showPreview() {
   const { model, osm, opts, form } = state.model;
   $('preview').hidden = false; $('export').hidden = false;
@@ -187,7 +190,7 @@ function showPreview() {
       filename: () => `${slug()}-${new Date().toISOString().slice(0, 10)}`,
       printColours: printColourMap,
       alt: () => draftAlt({ name: state.name, report: state.model.model.report, exaggeration: exaggerationText(), surface: SURFACES[state.surface].label.toLowerCase() }),
-      onChange: () => { refreshCaption(); writeUrl(); },
+      onChange: () => { refreshCaption(); writeUrl(); paintSwatches(); },
     });
     scene.controls.addEventListener('change', writeUrl);
   }
@@ -200,7 +203,7 @@ function showPreview() {
   for (const id of shown) {
     const L = state.layers[id];
     const li = document.createElement('li');
-    li.innerHTML = `<label class="check"><input type="checkbox" checked data-layer="${id}"><span class="swatch" style="background:${L.colour_screen}"></span>${L.name}</label>
+    li.innerHTML = `<label class="check"><input type="checkbox" checked data-layer="${id}"><span class="swatch" data-swatch="${id}" data-screen="${L.colour_screen}" style="background:${layerSwatch(id, scene.view.look, L.colour_screen)}"></span>${L.name}</label>
       <details><summary>${t('preview.why')}</summary><p>${L.why}</p></details>`;
     ul.append(li);
   }

@@ -2,7 +2,7 @@
 // in the form of JC's Mossmorran viewer). It reads the model from the
 // #terrain-data script tag, decodes the gzipped geometry, and uses the same
 // scene, studio and caption code as the web app.
-import { createScene } from 'hl/scene';
+import { createScene, layerSwatch } from 'hl/scene';
 import { mountStudio } from 'hl/studio';
 import { parseView, urlWriter } from 'hl/urlstate';
 
@@ -33,7 +33,7 @@ $('sub').textContent = D.sub;
 const ul = $('layers');
 for (const L of D.legend) {
   const li = document.createElement('li');
-  li.innerHTML = `<label class="check"><input type="checkbox" checked data-layer="${L.id}"><span class="swatch" style="background:${L.colour}"></span>${L.name}</label>
+  li.innerHTML = `<label class="check"><input type="checkbox" checked data-layer="${L.id}"><span class="swatch" data-swatch="${L.id}" data-screen="${L.colour}" style="background:${L.colour}"></span>${L.name}</label>
     <details><summary>Why this matters</summary><p>${L.why}</p></details>`;
   ul.append(li);
 }
@@ -50,7 +50,10 @@ const writeUrl = urlWriter(() => { const a = scene.cameraAngles(); return { styl
 const studio = mountStudio($('studio'), scene, {
   caption, filename: () => `${D.slug}-${new Date().toISOString().slice(0, 10)}`,
   printColours: () => D.printColours, alt: () => D.alt,
-  onChange: () => { $('caption').textContent = `${exag()}. ${D.caption.sources}. ${D.caption.footer}.`; writeUrl(); },
+  onChange: () => {
+    $('caption').textContent = `${exag()}. ${D.caption.sources}. ${D.caption.footer}.`; writeUrl();
+    document.querySelectorAll('.swatch[data-swatch]').forEach(s => { s.style.background = layerSwatch(s.dataset.swatch, scene.view.look, s.dataset.screen); });
+  },
 });
 {
   const v = parseView(location.search);

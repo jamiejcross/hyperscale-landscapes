@@ -28,18 +28,29 @@ export const LANDCOVER_COLOURS = {
 const LAND_BASE = '#BDB08E';
 export const LOOKS = { mossmorran: 'Mossmorran', field: 'Field' };
 
-// Field style: a flatter, paler land-cover palette (same classes as above),
-// plus the slab and water colours. Presentation only.
+// Field style land-cover palette (same classes as above): saturated
+// yellow-greens and olives with clear light/dark contrast, after slab's
+// field look. Presentation only.
 export const FIELD_LANDCOVER_COLOURS = {
-  'landuse:farmland': '#D9D3B0', 'landuse:meadow': '#CBD5B0', 'landuse:grass': '#CBD5B0',
-  'landuse:forest': '#A3B58F', 'natural:wood': '#A3B58F', 'natural:scrub': '#B8C29E',
-  'natural:heath': '#CDBFAE', 'natural:moor': '#CDBFAE', 'natural:grassland': '#CBD5B0',
-  'natural:wetland': '#B9C7C2', 'landuse:residential': '#E2DDD4', 'landuse:farmyard': '#D8CFBE',
-  'landuse:cemetery': '#C5CDB8', 'landuse:allotments': '#CFD3AE', 'landuse:recreation_ground': '#CBD5B0',
-  'landuse:commercial': '#DCD6D6', 'landuse:retail': '#DCD6D6', 'landuse:railway': '#D3CEC6',
-  'natural:bare_rock': '#D0CCC6', 'natural:scree': '#D0CCC6',
+  'landuse:farmland': '#e2d9a8', 'landuse:meadow': '#cbcd82', 'landuse:grass': '#cbcd82',
+  'landuse:forest': '#6f7d52', 'natural:wood': '#6f7d52', 'natural:scrub': '#aeb088',
+  'natural:heath': '#b5a989', 'natural:moor': '#b5a989', 'natural:grassland': '#cbcd82',
+  'natural:wetland': '#a9bfa9', 'landuse:residential': '#e8dfcf', 'landuse:farmyard': '#d9cba9',
+  'landuse:cemetery': '#b9bf86', 'landuse:allotments': '#b9bf86', 'landuse:recreation_ground': '#cbcd82',
+  'landuse:commercial': '#d8d1c7', 'landuse:retail': '#d8d1c7', 'landuse:railway': '#d8d1c7',
+  'natural:bare_rock': '#a39c88', 'natural:scree': '#a39c88',
 };
-const FIELD_LAND_BASE = '#DAD3BC';
+const FIELD_LAND_BASE = '#d6d09a';
+// The evidence layers in field (screen and legend only; print colours are
+// unchanged). Power keeps its own colour.
+export const FIELD_LAYER_COLOURS = {
+  terrain: FIELD_LAND_BASE, water: '#83bec5', buildings: '#f1ece2', roads: '#f3eee4', rail: '#3a332b',
+  residues: '#c98aa0', receptors: '#6aa9c9',
+};
+// The swatch colour for a layer in a look (falls back to its screen colour).
+export function layerSwatch(id, look, screenColour) {
+  return (look === 'field' && FIELD_LAYER_COLOURS[id]) || screenColour;
+}
 // Screen-only meshes from buildModel, and the layer whose colour they take.
 const SCREEN_OF = { powerPoints: 'power', waterAreas: 'water', waterLines: 'water' };
 // Object IDs for the ink pass (1-15): a change of ID between neighbouring pixels is an edge.
@@ -47,7 +58,7 @@ const SCREEN_OF = { powerPoints: 'power', waterAreas: 'water', waterLines: 'wate
 const INK_IDS = { terrain: 1, 'terrain-steep': 1, 'terrain-sides': 2, 'terrain-base': 3, water: 4, waterAreas: 4, waterLines: 1, buildings: 5,
   receptors: 6, powerPoints: 7, roads: 8, power: 9, rail: 10, railDisused: 11, residues: 12 };
 const FIELD = {
-  wallLight: '#f4f2ee', wallDark: '#c9c5bd', base: '#9b968c', channel: '#a9a27f',
+  wallLight: '#f4f2ee', wallDark: '#c9c5bd', base: '#9b968c', channel: '#a9a27f', roof: '#d6cdbd',
   water: '#7fbcc4', waterOpacity: 0.5,
   tones: [0.62, 0.84, 1.0],      // three toon steps (shadow side, mid, lit)
   fov: 20, minEl: 12, maxEl: 70,  // camera
@@ -166,9 +177,26 @@ export function createScene(container) {
       if (kind === 'terrain-sides') return new THREE.MeshBasicMaterial({ vertexColors: true });
       if (kind === 'terrain-steep') return toon({ color: FIELD.channel });     // channel banks inside the land
       if (kind === 'water') return toon({ color: FIELD.water, transparent: true, opacity: FIELD.waterOpacity, depthWrite: false });
-      return toon({ color: colour });
+      if (mesh.userData.id === 'buildings') return roofsAndWalls(toon({ flatShading: true }));
+      return toon({ color: FIELD_LAYER_COLOURS[SCREEN_OF[mesh.userData.id] || mesh.userData.id] || colour, flatShading: mesh.userData.id === 'receptors' });
     },
   };
+  // Buildings in field: walls and flat roofs in two colours, chosen per face
+  // from its direction (roofs face up), so no geometry changes.
+  function roofsAndWalls(mat) {
+    const wall = new THREE.Color(FIELD_LAYER_COLOURS.buildings), roof = new THREE.Color(FIELD.roof);
+    mat.onBeforeCompile = sh => {
+      sh.uniforms.wallColour = { value: wall }; sh.uniforms.roofColour = { value: roof };
+      sh.fragmentShader = sh.fragmentShader
+        .replace('void main() {', 'uniform vec3 wallColour;\nuniform vec3 roofColour;\nvoid main() {')
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          vec3 faceN = normalize(cross(dFdx(vViewPosition), dFdy(vViewPosition)));
+          float upness = dot(faceN, normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz));
+          diffuseColor.rgb = mix(wallColour, roofColour, step(0.7, abs(upness)));`);
+    };
+    mat.customProgramCacheKey = () => 'field-roofs-walls';
+    return mat;
+  }
   // One shared ramp texture for every toon material.
   let ramp = null;
   function toonRamp() {
@@ -267,13 +295,13 @@ export function createScene(container) {
     for (const k of Object.keys(meshes)) { inner.remove(meshes[k]); disposeMesh(meshes[k]); delete meshes[k]; }
     for (const k of Object.keys(shown)) delete shown[k];
     vectors = vec; modelSize = { Wmm: grid.Wmm, Hmm: grid.Hmm };
-    residueColour = colours.residues || residueColour;
+    residueColour = FIELD_LAYER_COLOURS.residues;
     setDrapeTextures(landcover, kind);
     span = Math.max(grid.Wmm, grid.Hmm);
     let zmax = 0;
     const add = (id, g, kind, colour) => {
       const mesh = new THREE.Mesh(g);
-      mesh.userData = { kind, colour, looks: {}, override: {}, inkId: INK_IDS[id] ?? 15 };
+      mesh.userData = { id, kind, colour, looks: {}, override: {}, inkId: INK_IDS[id] ?? 15 };
       mesh.castShadow = kind !== 'water'; mesh.receiveShadow = true;
       mesh.name = id;
       applyMaterial(mesh);
