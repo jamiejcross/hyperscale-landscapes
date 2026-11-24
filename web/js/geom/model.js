@@ -519,6 +519,12 @@ export function buildModel({ bbox, elev, osm, opts }) {
     const width = WATERWAY_WIDTHS[w.kind] ?? 4;
     strokeLine(cv('water'), grid, w.geometry, Math.max(width * mmPerM, w.kind === 'river' || w.kind === 'canal' ? minW : MM.minRoad));
   }
+  // Vectors for the field style's painted overlays (screen only): the same
+  // features drawn here, in print mm. They do not feed the print layers.
+  const vectors = { roads: [], rail: [], railDisused: [], powerLines: [], residues: [] };
+  const toMm = c => { const out = []; for (const [lon, lat] of c) { const [x, y] = grid.mm(lon, lat); out.push(+x.toFixed(2), +y.toFixed(2)); } return out; };
+  const linesOf = geometry => geometry.type === 'LineString' ? [geometry.coordinates]
+    : geometry.type === 'MultiLineString' ? geometry.coordinates : polygonsOf(geometry).flat();
   // roads
   const profile = ROAD_PROFILES[opts.roads] || ROAD_PROFILES['major-residential'];
   let nRoads = 0;
@@ -527,6 +533,7 @@ export function buildModel({ bbox, elev, osm, opts }) {
     let w = ROAD_WIDTHS[r.kind] ?? 5;
     const tw = parseFloat(r.tags.width); if (!Number.isNaN(tw)) w = tw;
     strokeLine(cv('roads'), grid, r.geometry, Math.max(w * mmPerM, MM.minRoad)); nRoads++;
+    for (const l of linesOf(r.geometry)) vectors.roads.push({ k: r.kind, p: toMm(l) });
   }
   // power, rail, residues
   const pegs = [];
@@ -537,6 +544,7 @@ export function buildModel({ bbox, elev, osm, opts }) {
     if (f.layer === 'power') {
       if ((f.kind === 'line' || f.kind === 'minor_line') && g.type === 'LineString') {
         strokeLine(cv('powerLine'), grid, g, Math.max((f.kind === 'line' ? 10 : 6) * mmPerM, f.kind === 'line' ? 1.0 : minW));
+        vectors.powerLines.push({ k: f.kind, p: toMm(g.coordinates) });
       } else if (g.type === 'Polygon' || g.type === 'MultiPolygon') {
         if (f.status === 'proposed' || f.status === 'construction') strokeLine(cv('power'), grid, g, MM.outline);
         else fillPolys(cv('power'), grid, g);
@@ -549,9 +557,13 @@ export function buildModel({ bbox, elev, osm, opts }) {
       if (['tram', 'subway'].includes(f.kind) || f.status === 'proposed') continue;
       const w = Math.max((['rail', 'preserved'].includes(f.kind) ? 6 : 4) * mmPerM, minW);
       strokeLine(cv(f.status === 'disused' ? 'railDisused' : 'rail'), grid, g, w);
+      vectors[f.status === 'disused' ? 'railDisused' : 'rail'].push({ k: f.kind, p: toMm(g.coordinates) });
     } else if (f.layer === 'residues') {
-      if (g.type === 'Point') disc(cv('residues'), grid, g.coordinates, MM.pointDisc);
-      else if (g.type !== 'LineString') fillPolys(cv('residues'), grid, g);
+      if (g.type === 'Point') { disc(cv('residues'), grid, g.coordinates, MM.pointDisc); vectors.residues.push({ disc: [...toMm([g.coordinates]), MM.pointDisc] }); }
+      else if (g.type !== 'LineString') {
+        fillPolys(cv('residues'), grid, g);
+        for (const rings of polygonsOf(g)) vectors.residues.push({ rings: rings.map(toMm) });
+      }
     }
   }
   for (const p of pegs) square(cv('pegcut'), grid, p.at, p.side * 1.5);
@@ -626,11 +638,12 @@ export function buildModel({ bbox, elev, osm, opts }) {
 
   // ---- Overlay slabs ----
   const slab = (id, raise) => masks[id] ? slabFromMask(grid, masks[id], v => H.z[v] + raise, v => H.z[v] - MM.bury) : null;
+  const powerAreas = slab('power', MM.raise.power);
   const layers = {
     terrain: land,
     water: masks.water ? slabFromMask(grid, masks.water, v => W[v], v => W[v] - MM.waterDepth - 0.3) : null,
     roads: slab('roads', MM.raise.roads),
-    power: concat([slab('power', MM.raise.power), slab('powerLine', MM.raise.powerLine)]),
+    power: concat([powerAreas, slab('powerLine', MM.raise.powerLine)]),
     rail: slab('rail', MM.raise.rail),
     railDisused: slab('railDisused', MM.raise.railDisused),   // printed with 'rail', drawn in its own colour
     residues: slab('residues', MM.raise.residues),
@@ -659,11 +672,14 @@ export function buildModel({ bbox, elev, osm, opts }) {
     return box(x, y, p.side, z0, zAt(x, y) + p.h);
   });
   layers.power = concat([layers.power, ...pegMeshes]);
+  // Screen only (field style): power without the line strips, which are
+  // painted into the surface there. Not a print layer.
+  const screen = { powerPoints: concat([powerAreas, ...pegMeshes]) };
 
   report.counts = { buildings: bl.length, receptors: rl.length, roads: nRoads, pegs: pegMeshes.filter(Boolean).length };
   report.grid = { cols: nx, rows: grid.ny, cellMm: +grid.dx.toFixed(3) };
   report.elevation = { minM: H.elevMin, maxM: H.elevMax };
-  return { grid, layers, report, heights: H.z };
+  return { grid, layers, report, heights: H.z, vectors, screen };
 }
 
 function clamp(v, a, b) { return Math.min(Math.max(v, a), b); }

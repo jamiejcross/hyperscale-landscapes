@@ -194,7 +194,7 @@ function showPreview() {
   const colours = Object.fromEntries(Object.values(state.layers).map(l => [l.id, l.colour_screen]));
   colours.railDisused = state.layers.rail.colour_screen_disused;
   state.drape = landcoverCanvas(model.grid, osm.features);
-  scene.setModel({ layers: model.layers, colours, grid: model.grid, landcover: state.drape, drapeKind: 'landcover' });
+  scene.setModel({ layers: model.layers, colours, grid: model.grid, landcover: state.drape, drapeKind: 'landcover', vectors: model.vectors, screen: model.screen });
   const ul = $('layer-list'); ul.textContent = '';
   const shown = ['terrain', 'water', 'buildings', 'roads', 'rail', 'power', 'residues', 'receptors'];
   for (const id of shown) {
@@ -280,7 +280,9 @@ async function applySurface(id) {
       note.textContent = `Contours every ${c.interval} m; heavier line every ${c.indexInterval} m. Drawn from the elevation data used for the model.`;
     } else {
       note.textContent = 'Loading satellite imagery from EOX…';
-      scene.setDrape(state.drape = await imageryCanvas(id, state.bbox, model.grid));
+      const img = await imageryCanvas(id, state.bbox, model.grid);
+      if (state.surface !== id || state.model?.model !== model) return;   // the choice changed while loading
+      scene.setDrape(state.drape = img);
       note.textContent = SURFACES[id].note;
     }
   } catch (err) {

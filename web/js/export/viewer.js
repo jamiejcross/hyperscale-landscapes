@@ -10,6 +10,7 @@ const MODULES = {
   'three/addons/RoomEnvironment.js': 'vendor/three/addons/RoomEnvironment.js',
   'hl/scene': 'js/scene/scene.js',
   'hl/ink': 'js/scene/ink.js',
+  'hl/overlays': 'js/scene/overlays.js',
   'hl/urlstate': 'js/urlstate.js',
   'hl/studio': 'js/scene/studio.js',
   'hl/caption': 'js/scene/caption.js',
@@ -28,7 +29,8 @@ const dataURL = text => `data:text/javascript;base64,${b64(new TextEncoder().enc
 const rewrite = text => text.replaceAll("from './caption.js'", "from 'hl/caption'")
   .replaceAll("from './turntable.js'", "from 'hl/turntable'")
   .replaceAll("from './scene.js'", "from 'hl/scene'")
-  .replaceAll("from './ink.js'", "from 'hl/ink'");
+  .replaceAll("from './ink.js'", "from 'hl/ink'")
+  .replaceAll("from './overlays.js'", "from 'hl/overlays'");
 
 export async function buildViewer({ model, legend, colours, printColours, caption, sub, drape, drapeKind = null, zExag, slug, alt }) {
   // Pack every non-empty layer into one gzipped buffer.
@@ -45,13 +47,22 @@ export async function buildViewer({ model, legend, colours, printColours, captio
     add(`${id}_p`, m.positions, 'float32');
     add(`${id}_i`, m.indices, 'uint32');
   }
+  // Field style: screen-only meshes and the painted-route vectors.
+  const screenIds = [];
+  for (const [id, m] of Object.entries(model.screen || {})) {
+    if (!m || !m.indices.length) continue;
+    screenIds.push(id);
+    add(`screen:${id}_p`, m.positions, 'float32');
+    add(`screen:${id}_i`, m.indices, 'uint32');
+  }
+  if (model.vectors) add('vectors', new TextEncoder().encode(JSON.stringify(model.vectors)), 'json');
   const raw = new Uint8Array(offset);
   let o = 0; for (const p of parts) { raw.set(p, o); o += p.byteLength; }
   const geom = b64(gzipSync(raw, { level: 9 }));
 
   const D = {
     schema: 'hyperscale-landscapes/viewer@1',
-    layers: ids, layout, geom,
+    layers: ids, screen: screenIds, layout, geom,
     grid: { Wmm: model.grid.Wmm, Hmm: model.grid.Hmm },
     colours, printColours, legend, caption, sub, zExag, slug, alt,
     drape: drape ? drape.toDataURL('image/jpeg', 0.85) : null, drapeKind,

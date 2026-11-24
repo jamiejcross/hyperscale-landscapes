@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/RoomEnvironment.js';
 import { createInk } from './ink.js';
+import { paintOverlays } from './overlays.js';
 
 export const LANDCOVER_COLOURS = {
   'landuse:farmland': '#C9C08A', 'landuse:meadow': '#B5C98A', 'landuse:grass': '#B5C98A',
@@ -39,6 +40,8 @@ export const FIELD_LANDCOVER_COLOURS = {
   'natural:bare_rock': '#D0CCC6', 'natural:scree': '#D0CCC6',
 };
 const FIELD_LAND_BASE = '#DAD3BC';
+// Screen-only meshes from buildModel, and the layer whose colour they take.
+const SCREEN_OF = { powerPoints: 'power' };
 const FIELD = {
   wallLight: '#f4f2ee', wallDark: '#c9c5bd', base: '#9b968c',
   water: '#7fbcc4', waterOpacity: 0.5,
@@ -169,13 +172,49 @@ export function createScene(container) {
     }
     return ramp;
   }
-  // The field drape: land cover redrawn in the field palette; any other drape
-  // (satellite, contours) is used as it is.
-  let drapeKind = null, fieldDrapeTex = null;
+  // The field drape, up to 4096 px across: the base drape (land cover redrawn
+  // in the field palette; satellite or contours as they are) with routes and
+  // residue areas painted on top. Painting happens when the model came with
+  // vectors (the web app and its offline viewer) and print colours are off;
+  // then the raised route strips are hidden instead (see refreshVisibility).
+  let drapeKind = null, fieldDrapeTex = null, fieldBase = null, fieldCanvas = null;
+  let vectors = null, modelSize = null, residueColour = '#c98aa0';
+  const shown = {};                                  // layer checkboxes: id -> on
+  const painted = () => view.look === 'field' && !view.print && !!vectors;
   function fieldDrape() {
-    if (drapeKind !== 'landcover' || !drapeTex) return drapeTex;
-    fieldDrapeTex ||= canvasTexture(recolour(drapeTex.image, paletteMap()), renderer);
+    if (!drapeTex) return null;
+    if (!fieldBase) {
+      const img = drapeTex.image, W = Math.min(4096, renderer.capabilities.maxTextureSize);
+      const H = Math.round(W * img.height / img.width);
+      fieldBase = document.createElement('canvas'); fieldBase.width = W; fieldBase.height = H;
+      const g = fieldBase.getContext('2d', { willReadFrequently: drapeKind === 'landcover' });
+      g.imageSmoothingQuality = 'high'; g.drawImage(img, 0, 0, W, H);
+      if (drapeKind === 'landcover') recolour(fieldBase, paletteMap());
+      fieldCanvas = document.createElement('canvas'); fieldCanvas.width = W; fieldCanvas.height = H;
+      fieldDrapeTex = canvasTexture(fieldCanvas, renderer);
+      paintField();
+    }
     return fieldDrapeTex;
+  }
+  function paintField() {
+    if (!fieldCanvas) return;
+    const g = fieldCanvas.getContext('2d');
+    g.drawImage(fieldBase, 0, 0);
+    if (painted()) {
+      paintOverlays(g, vectors, { Wmm: modelSize.Wmm, Hmm: modelSize.Hmm, residueColour,
+        show: { roads: shown.roads !== false, rail: shown.rail !== false, power: shown.power !== false, residues: shown.residues !== false } });
+    }
+    fieldDrapeTex.needsUpdate = true;
+  }
+  // Route strips hidden while they are painted; power keeps its substations
+  // and pegs as a screen-only mesh (powerPoints) so they still cast shadows.
+  const PAINTED_MESHES = new Set(['roads', 'rail', 'railDisused', 'power', 'residues']);
+  function refreshVisibility() {
+    const p = painted();
+    for (const [k, m] of Object.entries(meshes)) {
+      if (k === 'powerPoints') m.visible = p && shown.power !== false;
+      else m.visible = shown[k] !== false && !(p && PAINTED_MESHES.has(k));
+    }
   }
   // Light or dark slab walls by facing direction relative to the sun.
   function shadeWalls() {
@@ -216,8 +255,13 @@ export function createScene(container) {
   // layers: {id: mesh}; colours: {id: '#rrggbb'}; landcover: the drape canvas
   // or null; drapeKind: 'landcover' when it is the land-cover map (the field
   // style redraws that in its own palette), else anything.
-  function setModel({ layers, colours, landcover, grid, drapeKind: kind = null }) {
+  // vectors / screen: the field style's painted routes and screen-only meshes
+  // (from buildModel); absent for models from the Python tool.
+  function setModel({ layers, colours, landcover, grid, drapeKind: kind = null, vectors: vec = null, screen = {} }) {
     for (const k of Object.keys(meshes)) { inner.remove(meshes[k]); disposeMesh(meshes[k]); delete meshes[k]; }
+    for (const k of Object.keys(shown)) delete shown[k];
+    vectors = vec; modelSize = { Wmm: grid.Wmm, Hmm: grid.Hmm };
+    residueColour = colours.residues || residueColour;
     setDrapeTextures(landcover, kind);
     span = Math.max(grid.Wmm, grid.Hmm);
     let zmax = 0;
@@ -250,6 +294,10 @@ export function createScene(container) {
       add(id, g, kind, colours[id] || colours[id.replace('Disused', '')] || '#cccccc');
       for (let k = 2; k < m.positions.length; k += 3) zmax = Math.max(zmax, m.positions[k]);
     }
+    for (const [id, m] of Object.entries(screen || {})) {
+      if (m?.indices.length) add(id, geometry(m), 'layer', colours[SCREEN_OF[id]] || '#cccccc');
+    }
+    refreshVisibility();
     H = zmax;
     shadeWalls();
     inner.position.set(-grid.Wmm / 2, -grid.Hmm / 2, 0);
@@ -261,7 +309,7 @@ export function createScene(container) {
 
   // Swap the drape on the land top (land cover or satellite) without rebuilding.
   function setDrapeTextures(canvas, kind) {
-    drapeTex?.dispose(); fieldDrapeTex?.dispose(); fieldDrapeTex = null;
+    drapeTex?.dispose(); fieldDrapeTex?.dispose(); fieldDrapeTex = null; fieldBase = fieldCanvas = null;
     drapeTex = canvas ? canvasTexture(canvas, renderer) : null;
     drapeKind = kind;
   }
@@ -290,6 +338,8 @@ export function createScene(container) {
     if (field) { mossBackground = view.background; mossFov = camera.fov; }
     view.look = look;
     for (const m of Object.values(meshes)) applyMaterial(m);
+    refreshVisibility();
+    if (field) paintField();
     scene.environment = field ? null : roomEnv;
     renderer.toneMapping = field ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
     if (field) { hemi.color.set(0xffffff); hemi.groundColor.set(0xc9c5bd); }
@@ -336,7 +386,9 @@ export function createScene(container) {
 
 
   function setVisible(id, on) {
-    for (const k of [id, `${id}Disused`, `${id}-sides`, `${id}-base`]) if (meshes[k]) meshes[k].visible = on;
+    for (const k of [id, `${id}Disused`, `${id}-sides`, `${id}-base`]) shown[k] = on;
+    refreshVisibility();
+    if (['roads', 'rail', 'power', 'residues'].includes(id) && painted()) paintField();
   }
 
   function setView(name, animate = true) {
@@ -419,6 +471,7 @@ export function createScene(container) {
     }
   }
   function setPrintColours(on, colours = {}) {
+    const changed = view.print !== on;
     view.print = on;
     for (const [id, m] of Object.entries(meshes)) {
       const c = colours[id] || colours[id.replace('Disused', '')];
@@ -429,6 +482,8 @@ export function createScene(container) {
       if (!c && m.userData.printMaterial) { m.userData.printMaterial.dispose(); m.userData.printMaterial = null; }
       applyMaterial(m);
     }
+    // Print colours show the printed strips, so the painted routes step aside.
+    if (changed) { refreshVisibility(); if (view.look === 'field') paintField(); }
   }
   function setShadow(on) { ground.visible = on; }
 
@@ -544,7 +599,7 @@ function strataTexture(renderer) {
   const t = canvasTexture(c, renderer); t.wrapS = THREE.RepeatWrapping; return t;
 }
 
-// Redraw a land-cover canvas in another palette: each pixel takes the target
+// Redraw a land-cover canvas (in place) in another palette: each pixel takes the target
 // colour of the nearest source colour (so anti-aliased edges and JPEG noise
 // in an offline viewer's drape map cleanly).
 function paletteMap() {
@@ -552,9 +607,8 @@ function paletteMap() {
   const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
   return pairs.map(([a, b]) => [rgb(a), rgb(b)]);
 }
-function recolour(img, map) {
-  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
-  const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+function recolour(c, map) {
+  const g = c.getContext('2d');
   const id = g.getImageData(0, 0, c.width, c.height), d = id.data, memo = new Map();
   for (let i = 0; i < d.length; i += 4) {
     const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];

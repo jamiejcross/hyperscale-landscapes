@@ -14,13 +14,16 @@ const bin = Uint8Array.from(atob(D.geom), c => c.charCodeAt(0));
 const buf = await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
 const T = { float32: Float32Array, uint32: Uint32Array };
 const arr = k => { const [o, n, t] = D.layout[k]; const C = T[t]; return new C(buf, o, n / C.BYTES_PER_ELEMENT); };
-const layers = {};
+const layers = {}, screen = {};
 for (const id of D.layers) layers[id] = { positions: arr(`${id}_p`), indices: arr(`${id}_i`) };
+for (const id of D.screen || []) screen[id] = { positions: arr(`screen:${id}_p`), indices: arr(`screen:${id}_i`) };
+const vectors = D.layout.vectors
+  ? JSON.parse(new TextDecoder().decode(new Uint8Array(buf, D.layout.vectors[0], D.layout.vectors[1]))) : null;
 
 // ---- scene
 const scene = createScene($('view'));
 const drape = D.drape ? await new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = D.drape; }) : null;
-scene.setModel({ layers, colours: D.colours, grid: D.grid, landcover: drape && toCanvas(drape), drapeKind: D.drapeKind });
+scene.setModel({ layers, colours: D.colours, grid: D.grid, landcover: drape && toCanvas(drape), drapeKind: D.drapeKind, vectors, screen });
 function toCanvas(img) { const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0); return c; }
 
 // ---- panel: title, layers, studio, caption
@@ -77,4 +80,5 @@ new MutationObserver(offsetView).observe(document.body, { attributes: true, attr
 addEventListener('resize', offsetView);
 offsetView();
 $('loading').remove();
+window.__scene = scene;   // for automated checks
 window.__ready = true;

@@ -71,6 +71,8 @@ const CAPTURE = surface => `(async () => {
   const wait = (f, ms = 120000) => new Promise((res, rej) => { const t0 = Date.now();
     (function poll() { try { if (f()) return res(); } catch {} if (Date.now() - t0 > ms) return rej(new Error('timed out')); setTimeout(poll, 200); })(); });
   await wait(() => window.__app?.model && window.__scene);
+  await new Promise(r => setTimeout(r, 300));
+  await wait(() => !/Loading/.test(document.getElementById('surface-note').textContent));   // the default surface
   const sf = document.getElementById('surface');
   if (sf.value !== ${JSON.stringify(surface)}) { sf.value = ${JSON.stringify(surface)}; sf.dispatchEvent(new Event('change')); }
   await wait(() => !/Loading/.test(document.getElementById('surface-note').textContent));
