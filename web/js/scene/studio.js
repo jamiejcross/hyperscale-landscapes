@@ -95,7 +95,11 @@ export function mountStudio(el, scene, host) {
   const inkLabel = () => { q('inkV').value = `${(+q('ink').value).toFixed(1)} px`; };
   q('ink').addEventListener('input', () => { scene.setInkWidth(+q('ink').value); inkLabel(); });
   inkLabel();
+  let mossShadow = true;
   q('look').addEventListener('change', e => {
+    // Ground shadow: off by default in field; the Mossmorran setting comes back on the way out.
+    if (e.target.value === 'field') { mossShadow = q('shadow').checked; q('shadow').checked = false; }
+    else q('shadow').checked = mossShadow;
     scene.setLook(e.target.value);
     q('inkRow').hidden = e.target.value !== 'field';     // the outline only exists in field
     q('bg').value = scene.view.background;     // each look brings its own background and lens

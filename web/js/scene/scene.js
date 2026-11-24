@@ -59,8 +59,8 @@ const INK_IDS = { terrain: 1, 'terrain-steep': 1, 'terrain-sides': 2, 'terrain-b
   receptors: 6, powerPoints: 7, roads: 8, power: 9, rail: 10, railDisused: 11, residues: 12 };
 const FIELD = {
   wallLight: '#f4f2ee', wallDark: '#c9c5bd', base: '#9b968c', channel: '#a9a27f', roof: '#d6cdbd',
-  water: '#7fbcc4', waterOpacity: 0.5,
-  tones: [0.62, 0.84, 1.0],      // three toon steps (shadow side, mid, lit)
+  water: '#83bec5', groundShadow: 0.08,
+  tones: [0.70, 0.87, 1.0],      // three toon steps (shadow side, mid, lit)
   fov: 20, minEl: 12, maxEl: 70,  // camera
 };
 
@@ -127,8 +127,9 @@ export function createScene(container) {
   new ResizeObserver(resize).observe(container);
   resize();
 
-  // Measured: at 0.9 a lit, level surface renders at its own colour (±2/255).
-  const FIELD_SUN = 0.9, FIELD_FILL = 0.9;
+  // Measured with the [0.70, 0.87, 1.0] tones: at 0.79 a lit, level surface
+  // renders at its own colour (within 2/255).
+  const FIELD_SUN = 0.79, FIELD_FILL = 0.79;
   const view = { az: 225, el: 32, strength: 3.0, fill: 1.0, heightScale: 1, fov: 28, background: 'sky', print: false, look: 'mossmorran', ink: true, inkWidth: 1.8 };
 
   // Sun: azimuth clockwise from north, height above the horizon; it warms
@@ -176,7 +177,7 @@ export function createScene(container) {
       if (kind === 'terrain-base') return new THREE.MeshBasicMaterial({ color: FIELD.base });
       if (kind === 'terrain-sides') return new THREE.MeshBasicMaterial({ vertexColors: true });
       if (kind === 'terrain-steep') return toon({ color: FIELD.channel });     // channel banks inside the land
-      if (kind === 'water') return toon({ color: FIELD.water, transparent: true, opacity: FIELD.waterOpacity, depthWrite: false });
+      if (kind === 'water') return new THREE.MeshBasicMaterial({ color: FIELD.water });   // flat, opaque; ink gives the shoreline
       if (mesh.userData.id === 'buildings') return roofsAndWalls(toon({ flatShading: true }));
       return toon({ color: FIELD_LAYER_COLOURS[SCREEN_OF[mesh.userData.id] || mesh.userData.id] || colour, flatShading: mesh.userData.id === 'receptors' });
     },
@@ -495,7 +496,7 @@ export function createScene(container) {
     view.background = name;
     if (scene.background?.isTexture) scene.background.dispose();
     scene.background = (BACKGROUNDS[name] || BACKGROUNDS.sky)();
-    ground.material.opacity = name === 'dark' ? 0.45 : 0.28;
+    ground.material.opacity = view.look === 'field' ? FIELD.groundShadow : name === 'dark' ? 0.45 : 0.28;
   }
 
   // Print colours: show each layer in the filament colour of its print object.
