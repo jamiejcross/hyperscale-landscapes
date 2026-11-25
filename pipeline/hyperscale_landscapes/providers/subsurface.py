@@ -119,14 +119,21 @@ def is_coal_plan(plan: dict) -> bool:
 
 def classify_pit(pit: dict, plans: list[dict], commodity: str | None = None) -> str:
     """coal | quarry | unknown (brief, Stage 1). A coal Mine Plans record in the
-    same council area wins; then a quarry name or non-coal commodity."""
+    same council area wins; then a quarry name or non-coal commodity; then a
+    name saying "Colliery" (a colliery is a coal mine: flagged coal_by_name)."""
     if commodity:
         return "coal" if "coal" in commodity.lower() else "quarry"
     if any(is_coal_plan(p) for p in plans):
         return "coal"
     if re.search(r"quarr", pit.get("name", ""), re.I):
         return "quarry"
+    if is_colliery_name(pit.get("name", "")):
+        return "coal"
     return "unknown"
+
+
+def is_colliery_name(name: str) -> bool:
+    return bool(re.search(r"\bcollier(y|ies)\b", name or "", re.I))
 
 
 # ---------------------------------------------------------------- network, cached
@@ -394,6 +401,9 @@ def fetch(site: dict, cache_dir: Path = DEFAULT_CACHE, step_m: float = STEP_M) -
         # Flag the case where a quarry-named pit is called coal through a stripped name.
         p["coal_by_stripped_name"] = bool(p["class"] == "coal" and re.search(r"quarr", p["name"], re.I)
                                           and all(pl["matched_as"] != p["name"].upper() for pl in p["plans"]))
+        # Coal by the name alone ("... Colliery"), with no coal mine plan matched.
+        p["coal_by_name"] = bool(p["class"] == "coal" and not any(is_coal_plan(pl) for pl in p["plans"])
+                                 and is_colliery_name(p["name"]))
     versions = sorted({(u.get("VERSION"), u.get("RELEASED")) for u in walls["units"] if u.get("VERSION")})
     year = time.strftime("%Y")
     return {

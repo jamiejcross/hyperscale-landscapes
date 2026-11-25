@@ -28,6 +28,7 @@ test('collieries by name count as coal, labelled as such', () => {
   assert.equal(displayClass({ name: 'Wellington Pit', class: 'unknown' }), 'unknown');
   assert.equal(displayClass({ name: 'Colliery Quarry', class: 'quarry' }), 'quarry');   // only unknowns are promoted
   assert.equal(groupPits([c])[0].note, 'colliery · no mine plan matched');
+  assert.equal(groupPits([{ ...c, class: 'coal', coal_by_name: true }])[0].note, 'colliery · no mine plan matched');   // flagged by the pipeline
 });
 
 test('one group per name; quarries only when asked for', () => {

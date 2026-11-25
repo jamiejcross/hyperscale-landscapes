@@ -45,6 +45,10 @@ def test_classify_pit():
     assert classify_pit({"name": "Camilla"}, []) == "unknown"
     assert classify_pit({"name": "Camilla"}, [], commodity="Sandstone") == "quarry"
     assert classify_pit({"name": "X"}, [], commodity="Coal, deep") == "coal"
+    assert classify_pit({"name": "Dalzell Colliery"}, []) == "coal"           # coal by name (flagged)
+    assert classify_pit({"name": "Parkneuk Colliery Pits Nos 1 & 2"}, []) == "coal"
+    assert classify_pit({"name": "Wellington Pit"}, []) == "unknown"
+    assert classify_pit({"name": "Colliery Quarry"}, []) == "quarry"         # a quarry name wins
 
 
 def test_wall_points_order_and_spacing():

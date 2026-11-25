@@ -13,8 +13,9 @@ export function abandonedYear(pit) {
 // Class as drawn:
 //  - a quarry-named pit that only matched a coal plan once "Quarry/Quarries"
 //    was stripped from its name is drawn as a quarry;
-//  - a pit of unknown type whose BritPits name says "Colliery" is drawn as a
-//    coal mine (a colliery is a coal mine), labelled as known by name only.
+//  - a colliery-named pit is coal by its name alone: the pipeline flags it
+//    (coal_by_name); bundles baked before that rule carry it as unknown, so
+//    the same rule is applied here too. Labelled as known by name only.
 export const collieryByName = p => p.class === 'unknown' && /\bcollier(y|ies)\b/i.test(p.name || '');
 export const displayClass = p => (p.coal_by_stripped_name ? 'quarry' : collieryByName(p) ? 'coal' : p.class);
 
@@ -35,7 +36,7 @@ export function groupPits(pits, { showQuarries = false } = {}) {
     const cls = displayClass(p);
     if (cls === 'quarry' && !showQuarries) continue;
     const g = groups.get(p.name) || { name: p.name, pits: [], classes: new Set(), years: [], shared: false, byName: false };
-    g.pits.push(p); g.classes.add(cls); g.shared ||= !!p.coal_by_stripped_name; g.byName ||= collieryByName(p);
+    g.pits.push(p); g.classes.add(cls); g.shared ||= !!p.coal_by_stripped_name; g.byName ||= !!p.coal_by_name || collieryByName(p);
     const y = cls === 'coal' && abandonedYear(p); if (y) g.years.push(y);
     groups.set(p.name, g);
   }

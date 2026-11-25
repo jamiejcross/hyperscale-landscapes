@@ -219,6 +219,7 @@ def subsurface_section(site: dict, bb: dict) -> dict:
     for p in sub["pits"]:
         x, y = to_xy(p["lon"], p["lat"])
         pits.append({**{k: p[k] for k in ("ref", "name", "status", "class", "plans", "coal_by_stripped_name")},
+                     "coal_by_name": bool(p.get("coal_by_name")),
                      "x": r1(x), "y": r1(y)})
     return {"fetched": sub["fetched"], "walls": {"step_m": sub["walls"]["step_m"], "units": sub["walls"]["units"],
                                                  "sides": sides},
