@@ -3,6 +3,7 @@
 // downloadable offline viewer.  Saved images always carry the caption strip.
 import { withCaption } from './caption.js';
 import { LOOKS } from './scene.js';
+import { PALETTES } from './palettes.js';
 import { SIZES, makeGIF, makeVideo, videoType } from './turntable.js';
 
 const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'N'];
@@ -17,6 +18,7 @@ export function mountStudio(el, scene, host) {
         ${Object.entries(LOOKS).map(([k, label]) => `<option value="${k}"${k === scene.view.look ? ' selected' : ''}>${label}</option>`).join('')}
       </select>
       <label class="range" name="inkRow" hidden>Outline <input type="range" name="ink" min="1" max="3" step="0.1" value="1.8"><output name="inkV"></output></label>
+      <label class="check" name="brushRow" hidden><input type="checkbox" name="brush"${scene.view.brushwork ? ' checked' : ''}> Brushwork (a texture, not data)</label>
       <p class="hint">Changes how the model is drawn on screen and in saved images. Print files are not affected.</p>
     </fieldset>
     <fieldset><legend>Camera</legend>
@@ -44,7 +46,7 @@ export function mountStudio(el, scene, host) {
     <fieldset><legend>Background</legend>
       <select name="bg" aria-label="Background">
         <option value="sky">Sky</option><option value="studio">Studio grey</option>
-        <option value="white">White</option><option value="dark">Charcoal</option>
+        <option value="white">White</option><option value="guthrie">Guthrie sky</option><option value="dark">Charcoal</option>
         <option value="clear">Transparent</option>
       </select>
     </fieldset>
@@ -95,22 +97,30 @@ export function mountStudio(el, scene, host) {
   const inkLabel = () => { q('inkV').value = `${(+q('ink').value).toFixed(1)} px`; };
   q('ink').addEventListener('input', () => { scene.setInkWidth(+q('ink').value); inkLabel(); });
   inkLabel();
+  q('brush').addEventListener('change', e => scene.setBrushwork(e.target.checked));
   let mossShadow = true;
   q('look').addEventListener('change', e => {
-    // Ground shadow: off by default in field; the Mossmorran setting comes back on the way out.
-    if (e.target.value === 'field') { mossShadow = q('shadow').checked; q('shadow').checked = false; }
-    else q('shadow').checked = mossShadow;
-    scene.setLook(e.target.value);
-    q('inkRow').hidden = e.target.value !== 'field';     // the outline only exists in field
+    // Ground shadow: off by default in the stylised looks; the Mossmorran setting comes back on the way out.
+    const to = e.target.value, from = scene.view.look;
+    if (to !== 'mossmorran' && from === 'mossmorran') { mossShadow = q('shadow').checked; q('shadow').checked = false; }
+    else if (to === 'mossmorran') q('shadow').checked = mossShadow;
+    scene.setLook(to);
+    q('inkRow').hidden = to === 'mossmorran';           // the outline only exists in the stylised looks
+    q('brushRow').hidden = !PALETTES[to]?.brushwork;    // Guthrie only
     q('bg').value = scene.view.background;     // each look brings its own background and lens
     q('fov').value = Math.round(scene.view.fov); q('fovV').value = `${scene.focalMm(scene.view.fov)} mm`;
     update();
   });
   el.addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) scene.setView(b.dataset.view); });
 
+  // The caption for saved images and animations, with the look's note (Guthrie) in the small print.
+  function caption() {
+    const c = host.caption(), note = PALETTES[scene.view.look]?.captionNote;
+    return note ? { ...c, footer: `${c.footer} · ${note}` } : c;
+  }
   // The captioned image, without downloading it (also used by artefact exports).
   function compose(mult = +q('res').value) {
-    return withCaption(scene.grab(mult), host.caption(), { dark: scene.view.background === 'dark' });
+    return withCaption(scene.grab(mult), caption(), { dark: scene.view.background === 'dark' });
   }
 
   async function grab() {
@@ -143,12 +153,12 @@ export function mountStudio(el, scene, host) {
     btns.forEach(b => { b.disabled = true; });
     try {
       if (kind === 'gif') {
-        const r = await makeGIF(scene, host.caption(), animOpts(12), m => { info.textContent = m; });
+        const r = await makeGIF(scene, caption(), animOpts(12), m => { info.textContent = m; });
         download(r.blob, `${host.filename()}.gif`);
         info.textContent = `GIF: ${r.w} × ${r.h} px, ${(r.blob.size / 1e6).toFixed(1)} MB.`;
         return r;
       }
-      const r = await makeVideo(scene, host.caption(), animOpts(30), m => { info.textContent = m; });
+      const r = await makeVideo(scene, caption(), animOpts(30), m => { info.textContent = m; });
       download(r.blob, `${host.filename()}.${r.ext}`);
       info.textContent = `Video (${r.ext.toUpperCase()}): ${(r.blob.size / 1e6).toFixed(1)} MB.`;
       return r;
@@ -164,5 +174,6 @@ export function mountStudio(el, scene, host) {
     if (look === scene.view.look || !q('look').querySelector(`option[value="${look}"]`)) return;
     q('look').value = look; q('look').dispatchEvent(new Event('change'));
   }
-  return { update, grab, compose, runAnim, animOpts, setLook, reset: update };
+  function setBrushwork(on) { q('brush').checked = !!on; scene.setBrushwork(!!on); }
+  return { update, grab, compose, caption, runAnim, animOpts, setLook, setBrushwork, reset: update };
 }

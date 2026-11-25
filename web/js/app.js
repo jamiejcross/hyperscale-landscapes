@@ -12,6 +12,7 @@ import { createScene, landcoverCanvas, layerSwatch } from './scene/scene.js';
 import { contourCanvas } from './scene/contours.js';
 import { SURFACES, imageryCanvas } from './data/imagery.js';
 import { mountStudio } from './scene/studio.js';
+import { PALETTES } from './scene/palettes.js';
 import { buildViewer } from './export/viewer.js';
 import { computeSection, sectionSVG, svgToPNG } from './export/section.js';
 import { fontFaceCSS } from './fonts.js';
@@ -219,7 +220,7 @@ function showPreview() {
   const colours = Object.fromEntries(Object.values(state.layers).map(l => [l.id, l.colour_screen]));
   colours.railDisused = state.layers.rail.colour_screen_disused;
   state.drape = landcoverCanvas(model.grid, osm.features);
-  scene.setModel({ layers: model.layers, colours, grid: model.grid, landcover: state.drape, drapeKind: 'landcover', vectors: model.vectors, screen: model.screen });
+  scene.setModel({ layers: model.layers, colours, grid: model.grid, landcover: state.drape, drapeKind: 'landcover', vectors: model.vectors, screen: model.screen, seed: siteSeed() });
   const ul = $('layer-list'); ul.textContent = '';
   const shown = ['terrain', 'water', 'buildings', 'roads', 'rail', 'power', 'residues', 'receptors'];
   for (const id of shown) {
@@ -266,7 +267,8 @@ function printColourMap() {
 function refreshCaption() {
   if (!state.model) return;
   const counts = state.model.model.report.counts;
-  $('caption').textContent = captionText(state.model.opts, state.model.form) + ` Counts: ${counts.buildings} buildings, ${counts.receptors} schools, care or community buildings, ${counts.roads} roads.`;
+  $('caption').textContent = captionText(state.model.opts, state.model.form) + ` Counts: ${counts.buildings} buildings, ${counts.receptors} schools, care or community buildings, ${counts.roads} roads.`
+    + (PALETTES[scene?.view.look]?.captionNote ? ` ${PALETTES[scene.view.look].captionNote}.` : '');
 }
 
 function captionText(opts, form, { print = false } = {}) {
@@ -322,6 +324,8 @@ $('surface').onchange = e => applySurface(e.target.value);
 
 
 // ---------------- Step 4: download ----------------
+// Seed for the Guthrie brushwork: the curated site's id, else the area name.
+function siteSeed() { return (state.site && $('site-select').value) || slug(); }
 function slug() { return (state.name || 'terrain').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'terrain'; }
 function save(blob, name) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
@@ -366,6 +370,7 @@ $('dl-viewer').onclick = async () => {
     const caption = captionLines({ name: state.name, exaggeration: t('caption.exag', { x: opts.zExag }), sources: sourcesText(), legend: boundaryLegend() });
     const blob = await buildViewer({
       model, legend, colours, printColours: printColourMap(), caption, zExag: opts.zExag, slug: slug(),
+      seed: siteSeed(), view: { look: scene.view.look, brushwork: scene.view.brushwork },
       sub: `${state.bbox.minLat.toFixed(3)}–${state.bbox.maxLat.toFixed(3)}°N, ${Math.abs(state.bbox.maxLon).toFixed(3)}–${Math.abs(state.bbox.minLon).toFixed(3)}°W · ${w.toFixed(1)} × ${h.toFixed(1)} km · from the ${opts.printSize} mm print model`,
       drape: state.drape, drapeKind: state.surface === 'landcover' ? 'landcover' : state.surface,
       alt: draftAlt({ name: state.name, report: model.report, exaggeration: t('caption.exag', { x: opts.zExag }), surface: SURFACES[state.surface].label.toLowerCase() }),

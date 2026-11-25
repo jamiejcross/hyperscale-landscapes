@@ -9,6 +9,7 @@ const MODULES = {
   'three/addons/OrbitControls.js': 'vendor/three/addons/OrbitControls.js',
   'three/addons/RoomEnvironment.js': 'vendor/three/addons/RoomEnvironment.js',
   'hl/scene': 'js/scene/scene.js',
+  'hl/palettes': 'js/scene/palettes.js',
   'hl/ink': 'js/scene/ink.js',
   'hl/ink-math': 'js/scene/ink-math.js',
   'hl/overlays': 'js/scene/overlays.js',
@@ -30,11 +31,12 @@ const dataURL = text => `data:text/javascript;base64,${b64(new TextEncoder().enc
 const rewrite = text => text.replaceAll("from './caption.js'", "from 'hl/caption'")
   .replaceAll("from './turntable.js'", "from 'hl/turntable'")
   .replaceAll("from './scene.js'", "from 'hl/scene'")
+  .replaceAll("from './palettes.js'", "from 'hl/palettes'")
   .replaceAll("from './ink.js'", "from 'hl/ink'")
   .replaceAll("from './ink-math.js'", "from 'hl/ink-math'")
   .replaceAll("from './overlays.js'", "from 'hl/overlays'");
 
-export async function buildViewer({ model, legend, colours, printColours, caption, sub, drape, drapeKind = null, zExag, slug, alt }) {
+export async function buildViewer({ model, legend, colours, printColours, caption, sub, drape, drapeKind = null, zExag, slug, alt, seed = null, view = null }) {
   // Pack every non-empty layer into one gzipped buffer.
   const parts = [], layout = {}, ids = [];
   let offset = 0;
@@ -66,7 +68,7 @@ export async function buildViewer({ model, legend, colours, printColours, captio
     schema: 'hyperscale-landscapes/viewer@1',
     layers: ids, screen: screenIds, layout, geom,
     grid: { Wmm: model.grid.Wmm, Hmm: model.grid.Hmm },
-    colours, printColours, legend, caption, sub, zExag, slug, alt,
+    colours, printColours, legend, caption, sub, zExag, slug, alt, seed, view,
     drape: drape ? drape.toDataURL('image/jpeg', 0.85) : null, drapeKind,
   };
 

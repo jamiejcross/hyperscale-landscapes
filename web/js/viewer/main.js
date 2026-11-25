@@ -5,6 +5,7 @@
 import { createScene, layerSwatch } from 'hl/scene';
 import { mountStudio } from 'hl/studio';
 import { parseView, urlWriter } from 'hl/urlstate';
+import { PALETTES } from 'hl/palettes';
 
 const D = JSON.parse(document.getElementById('terrain-data').textContent);
 const $ = id => document.getElementById(id);
@@ -23,7 +24,7 @@ const vectors = D.layout.vectors
 // ---- scene
 const scene = createScene($('view'));
 const drape = D.drape ? await new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = D.drape; }) : null;
-scene.setModel({ layers, colours: D.colours, grid: D.grid, landcover: drape && toCanvas(drape), drapeKind: D.drapeKind, vectors, screen });
+scene.setModel({ layers, colours: D.colours, grid: D.grid, landcover: drape && toCanvas(drape), drapeKind: D.drapeKind, vectors, screen, seed: D.seed ?? D.slug });
 function toCanvas(img) { const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0); return c; }
 
 // ---- panel: title, layers, studio, caption
@@ -51,13 +52,15 @@ const studio = mountStudio($('studio'), scene, {
   caption, filename: () => `${D.slug}-${new Date().toISOString().slice(0, 10)}`,
   printColours: () => D.printColours, alt: () => D.alt,
   onChange: () => {
-    $('caption').textContent = `${exag()}. ${D.caption.sources}. ${D.caption.footer}.`; writeUrl();
+    const note = PALETTES[scene.view.look]?.captionNote;
+    $('caption').textContent = `${exag()}. ${D.caption.sources}. ${D.caption.footer}${note ? ` · ${note}` : ''}.`; writeUrl();
     document.querySelectorAll('.swatch[data-swatch]').forEach(s => { s.style.background = layerSwatch(s.dataset.swatch, scene.view.look, s.dataset.screen); });
   },
 });
 {
   const v = parseView(location.search);
-  if (v.style) studio.setLook(v.style);
+  if (typeof D.view?.brushwork === 'boolean') studio.setBrushwork(D.view.brushwork);
+  if (v.style || D.view?.look) studio.setLook(v.style || D.view.look);
   if (v.az != null || v.el != null) { const a = scene.cameraAngles(); scene.setCameraAngles(v.az ?? a.az, v.el ?? a.el); }
   scene.controls.addEventListener('change', writeUrl);
 }

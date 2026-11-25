@@ -22,6 +22,7 @@ MODULES = {
     "three/addons/OrbitControls.js": "vendor/three/addons/OrbitControls.js",
     "three/addons/RoomEnvironment.js": "vendor/three/addons/RoomEnvironment.js",
     "hl/scene": "js/scene/scene.js",
+    "hl/palettes": "js/scene/palettes.js",
     "hl/ink": "js/scene/ink.js",
     "hl/ink-math": "js/scene/ink-math.js",
     "hl/overlays": "js/scene/overlays.js",
@@ -134,6 +135,7 @@ def write_viewer(path, *, layer_meshes: dict, opts, preset: dict, features,
         text = ((w / rel).read_text().replace("from './caption.js'", "from 'hl/caption'")
                 .replace("from './turntable.js'", "from 'hl/turntable'")
                 .replace("from './scene.js'", "from 'hl/scene'")
+                .replace("from './palettes.js'", "from 'hl/palettes'")
                 .replace("from './ink.js'", "from 'hl/ink'")
                 .replace("from './ink-math.js'", "from 'hl/ink-math'")
                 .replace("from './overlays.js'", "from 'hl/overlays'"))

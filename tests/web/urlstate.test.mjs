@@ -35,3 +35,9 @@ test('a written view reads back the same', () => {
   const v = { site: 'cockenzie', style: 'field', az: 225, el: 32 };
   assert.deepEqual(parseView(viewSearch('', v)), v);
 });
+
+test('guthrie style round-trips through the URL', () => {
+  const s = viewSearch('', { site: 'auchtertool-cato', style: 'guthrie', az: 225, el: 30 });
+  assert.equal(s, '?site=auchtertool-cato&style=guthrie&az=225&el=30');
+  assert.deepEqual(parseView(s), { site: 'auchtertool-cato', style: 'guthrie', az: 225, el: 30 });
+});

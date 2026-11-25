@@ -15,6 +15,7 @@
 > - A second, switchable *presentation* style: toon shading, flat slab walls, ink outlines, white ground, 20° lens. Mossmorran stays the default. It never changes print files, sections or manifests. Field's colours (teal water, warm greys) are an agreed exception to "strictly black and white", for this optional style only.
 > - Shareable view URLs: `?site=&style=&az=&el=` (camera angles; elevation held to 12–70°).
 > - **Parked:** the site boundary drawn as a route-style line on the terrain. No site has a sourced red-line boundary yet (`data/sites/TODO.md` item 3), so there is nothing to draw. Build and test it against the first sourced boundary.
+> **Guthrie style, 25 Nov 2026** (JC's brief, `docs/claude-code-prompt-guthrie-style.md`): a third presentation style, the field look recoloured after a pastoral by Sir James Guthrie (public domain). Palettes for field and guthrie live in `web/js/scene/palettes.js`. Its optional **brushwork is a texture, not data**: seeded strokes painted on the land-cover drape only, deterministic per site, and never mentioned in captions as information. Captions in this style carry "Colours after Sir James Guthrie". `tools/palette_check.mjs` checks evidence colours under colour-blind simulation.
 > - **Possible later phase, not started:** procedural scenery (instanced trees from OSM woodland or Meta/WRI canopy height; pitched roofs) and an ESA WorldCover fallback for land cover. If done, captions must say the scenery is illustrative, and each source's licence goes through §10.3 first.
 
 ---

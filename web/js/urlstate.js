@@ -1,5 +1,5 @@
 // Shareable view state in the page URL:
-//   ?site=<id>&style=field|mossmorran&az=<deg>&el=<deg>
+//   ?site=<id>&style=mossmorran|field|guthrie&az=<deg>&el=<deg>
 // az and el are the CAMERA's angles as seen from the model's centre: az is
 // the compass bearing the camera stands at (clockwise from north, so 135 is
 // looking from the south-east), el its height above the horizon, held to
@@ -7,7 +7,7 @@
 // Pure functions, plus a throttled writer; no other imports, so Node can
 // test this file directly.
 
-export const STYLES = ['mossmorran', 'field'];
+export const STYLES = ['mossmorran', 'field', 'guthrie'];
 export const EL_MIN = 12, EL_MAX = 70;
 const SITE_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
