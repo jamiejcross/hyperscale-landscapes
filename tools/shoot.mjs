@@ -26,6 +26,7 @@ const STYLE = opt('style', 'guthrie'), LABEL = opt('label', ''), AZ = opt('az', 
 const SURFACE = opt('surface', 'landcover');
 const HIDE = opt('hide', '').split(',').filter(Boolean);   // layer ids to switch off, e.g. buildings
 const EVAL = opt('eval', '');
+const WALLS = args.includes('--walls');                    // also save the unfolded-walls export (SVG + PNG)
 const UPLOAD = opt('upload', '');                          // a boundary file (GeoJSON) to upload, as a user would                              // debugging: JS run in the page before the grab
 const CHROME = opt('chrome', process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
 
@@ -93,10 +94,18 @@ const CAPTURE = (surface, hide, extra, upload) => `(async () => {
   const sc = window.__scene;
   for (const id of ${JSON.stringify(hide)}) sc.setVisible(id, false);
   ${extra}
+  let walls = null;
+  if (${WALLS} && window.__studio && sc.geology?.instance) {
+    const mod = await import('/js/export/walls.js');
+    const svg = mod.wallsSVG({ geology: sc.geology.instance, look: sc.view.look, caption: window.__studio.wallsCaption(), pitsShown: sc.pits?.shown });
+    const blob = await mod.wallsPNG(svg, 1.5);
+    const png = await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(blob); });
+    walls = { svg, png };
+  }
   sc.pause();
   const c = sc.grab(2); sc.resume();
   return { png: c.toDataURL('image/png'), w: c.width, h: c.height, look: sc.view.look,
-    angles: sc.cameraAngles(), status: document.getElementById('build-status').textContent, info: window.__shootInfo };
+    angles: sc.cameraAngles(), status: document.getElementById('build-status').textContent, info: window.__shootInfo, walls, file: window.__shootFile };
 })()`;
 
 fs.mkdirSync(OUT, { recursive: true });
@@ -110,7 +119,15 @@ try {
     const file = path.join(OUT, `${site}-${STYLE}${LABEL ? `-${LABEL}` : ''}.png`);
     fs.writeFileSync(file, Buffer.from(r.png.split(',')[1], 'base64'));
     console.log(`${path.relative(ROOT, file)}  ${r.w}×${r.h}  ${r.look}  az ${r.angles.az.toFixed(0)} el ${r.angles.el.toFixed(0)}  (${r.status})`);
-    if (r.info) console.log(`  ${r.info}`);   // set window.__shootInfo in --eval to report something
+    if (r.info) console.log(`  ${r.info}`);
+    if (r.file) {      // set window.__shootFile = { name, text } in --eval to save a file the page made
+      fs.writeFileSync(path.join(OUT, r.file.name), r.file.text); console.log(`${path.relative(ROOT, path.join(OUT, r.file.name))}  (${(r.file.text.length / 1e6).toFixed(1)} MB)`);
+    }
+    if (r.walls) {
+      const base = path.join(OUT, `${site}-${STYLE}-walls`);
+      fs.writeFileSync(`${base}.svg`, r.walls.svg); fs.writeFileSync(`${base}.png`, Buffer.from(r.walls.png.split(',')[1], 'base64'));
+      console.log(`${path.relative(ROOT, base)}.png / .svg  (${(r.walls.svg.length / 1e6).toFixed(1)} MB SVG)`);
+    }   // set window.__shootInfo in --eval to report something
   }
 } finally {
   ws.close(); chrome.kill(); server.close();

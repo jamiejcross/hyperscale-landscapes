@@ -13,10 +13,11 @@ import {
   SIDES, wallAtlas, profileAt, zBelow, depositThickness, depositPattern, sheetThickness, patternOf, unitColour,
   runs, seamLevels, distanceToSide,
 } from './geology-math.js';
+import { BOREHOLE_NEAR_M } from './subsurface-info.js';
 
 const CW = 4096, SH = 512;                 // atlas: 4 strips of CW x SH
 const FONT = 'DejaVu Sans, Helvetica, Arial, sans-serif';
-const BOREHOLE_NEAR_M = 50, PIT_NEAR_M = 1000;
+const PIT_NEAR_M = 1000;
 const LOOK_STYLE = {
   field: { softenTowards: [236, 230, 214], softenBy: 0.45, turf: '#5e6a3c', seams: '#15110e', coalTint: 'rgba(70,58,30,0.22)' },
 };
@@ -40,7 +41,10 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
   const mmPerM = grid.mmPerM, Wm = grid.Wmm / mmPerM, Hm = grid.Hmm / mmPerM;
   const textures = {}, materials = {};
 
-  function paint(look) {
+  // textScale: how much wider than on the model each texel will be shown,
+  // relative to its height (1 on the model; the unfolded-walls diagram uses
+  // its own vertical scale), so that lettering comes out upright.
+  function paint(look, textScale = 1) {
     const P = palettes[look]?.geology || {}, S = { ...LOOK_STYLE.field, ...P }, ink = palettes[look]?.ink || inkDefault;
     const cv = document.createElement('canvas'); cv.width = CW; cv.height = SH * 4;
     const c = cv.getContext('2d');
@@ -48,7 +52,7 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
     const yOf = (k, z) => k * SH + SH * (1 - (z - zmin) / dz);
     const sideLenM = k => (k % 2 === 0 ? Wm : Hm);
     // wall texels are not square: scale text widths so letters look upright
-    const FX = k => (dz / SH) / ((k % 2 === 0 ? grid.Wmm : grid.Hmm) / CW);
+    const FX = k => (dz / SH) / ((k % 2 === 0 ? grid.Wmm : grid.Hmm) / CW) * textScale;
     const aspect = (k, x, y, fn) => { c.save(); c.translate(x, y); c.scale(FX(k), 1); fn(); c.restore(); };
     const colour = u => unitColour(u, { units: P.units, softenTowards: S.softenTowards, softenBy: S.softenBy });
     const nominal = sub.nominal_thickness_m;
@@ -194,8 +198,10 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
       });
     }
 
-    // 7. boreholes within 50 m of a wall: a red line to the recorded depth
-    for (const bh of sub.boreholes || []) {
+    // 7. boreholes within 50 m of a wall: a red line to the recorded depth.
+    // Deepest first, so where labels would overlap the deeper borehole keeps its label.
+    const placed = [[], [], [], []];
+    for (const bh of [...(sub.boreholes || [])].sort((a, b) => (b.length_m || 0) - (a.length_m || 0))) {
       if (!(bh.length_m > 0)) continue;
       let best = null;
       for (let k = 0; k < 4; k++) { const d = distanceToSide(k, bh.x, bh.y, Wm, Hm); if (!best || d.d < best.d) best = { ...d, k }; }
@@ -214,6 +220,9 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
       c.font = `bold 18px ${FONT}`; const w = Math.max(...lines.map(l => c.measureText(l).width)) + 14;
       const fx = D.FX(best.k), lx = x + 12 + w * fx > CW ? x - 12 - w * fx : x + 12;
       const ly = Math.min(D.bottom - lines.length * 22 - 10, y0 + (y1 - y0) * 0.45);
+      const box = [Math.min(lx, lx + (w + 4) * fx) - 4, ly - 6, Math.max(lx, lx + (w + 4) * fx) + 4, ly + lines.length * 22 + 4];
+      if (placed[best.k].some(b => box[0] < b[2] && b[0] < box[2] && box[1] < b[3] && b[1] < box[3])) continue;   // would cover another label
+      placed[best.k].push(box);
       D.aspect(best.k, lx, ly, () => {
         c.fillStyle = 'rgba(255,255,255,0.93)'; c.fillRect(-4, -6, w + 4, lines.length * 22 + 10);
         c.strokeStyle = RED; c.lineWidth = 2; c.strokeRect(-4, -6, w + 4, lines.length * 22 + 10);
@@ -222,9 +231,7 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
       });
     }
 
-    const tex = new THREE.CanvasTexture(cv);
-    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
-    return tex;
+    return cv;
   }
   const sideRuns = [], sideDraw = [];
   let lastPanel = null;
@@ -248,7 +255,39 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
     return best;
   }
 
-  function texture(look) { return (textures[look] ||= paint(look)); }
+  function texture(look) {
+    if (!textures[look]) {
+      const tex = new THREE.CanvasTexture(paint(look));
+      tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+      textures[look] = tex;
+    }
+    return textures[look];
+  }
+  const geoLook = look => (palettes[look]?.geology ? look : 'field');
+  // The atlas for a diagram at vertical exaggeration `vex` (true scale = 1):
+  // a fresh canvas with 4 strips of CW x SH, south, east, north, west, each
+  // spanning the slab from its base (zmin) to zmax.
+  function atlas(look, vex = zExag) { const keep = lastPanel; try { return paint(geoLook(look), vex / zExag); } finally { lastPanel = keep; } }
+  // A legend swatch (canvas) for a unit, drawn as the walls draw it.
+  function swatch(unit, look, { cover = false, w = 44, h = 26 } = {}) {
+    const P = palettes[geoLook(look)]?.geology || {}, S = { ...LOOK_STYLE.field, ...P }, ink = palettes[geoLook(look)]?.ink || inkDefault;
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    const c = cv.getContext('2d');
+    c.fillStyle = unitColour(unit, { units: P.units, softenTowards: S.softenTowards, softenBy: S.softenBy }); c.fillRect(0, 0, w, h);
+    pattern(c, cover ? depositPattern(unit.LEX_D) : patternOf(unit), 0, w, 0, h, ink);
+    c.strokeStyle = ink; c.lineWidth = 1.5; c.strokeRect(0.75, 0.75, w - 1.5, h - 1.5);
+    return cv;
+  }
+  // Coal-bearing ground swatch: the tint and schematic seams.
+  function coalSwatch(look, { w = 44, h = 26 } = {}) {
+    const S = { ...LOOK_STYLE.field, ...(palettes[geoLook(look)]?.geology || {}) }, ink = palettes[geoLook(look)]?.ink || inkDefault;
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    const c = cv.getContext('2d');
+    c.fillStyle = '#d9cfa8'; c.fillRect(0, 0, w, h); c.fillStyle = S.coalTint; c.fillRect(0, 0, w, h);
+    c.fillStyle = S.seams; for (const y of [5, 13, 20]) c.fillRect(0, y, w, 3);
+    c.strokeStyle = ink; c.lineWidth = 1.5; c.strokeRect(0.75, 0.75, w - 1.5, h - 1.5);
+    return cv;
+  }
   function material(look) {
     if (!materials[look]) {
       const map = texture(palettes[look]?.geology ? look : 'field');
@@ -273,7 +312,8 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
     geo.deleteAttribute('uv'); geo.deleteAttribute('color'); geo.dispose();   // position/normal belong to the walls
     mesh.removeFromParent();
   }
-  return { mesh, setLook, shade, dispose, get panel() { return lastPanel; }, attribution: sub.attribution, nonCommercial: !!sub.nonCommercial };
+  return { mesh, setLook, shade, dispose, atlas, swatch, coalSwatch, sub, surf, zmin, zmax, zExag, mmPerM, Wm, Hm, CW, SH,
+    get panel() { return lastPanel; }, attribution: sub.attribution, nonCommercial: !!sub.nonCommercial };
 }
 
 // ---- rock patterns, drawn in canvas px and clipped by the caller ----

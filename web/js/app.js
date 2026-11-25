@@ -9,6 +9,8 @@ import { loadElevation, ATTRIBUTION as ELEV_ATTRIBUTION } from './data/elevation
 import { readBoundary } from './data/upload.js';
 import { buildModel, printObjects, pauseHeights } from './geom/model.js';
 import { createScene, landcoverCanvas, layerSwatch, DEFAULT_LOOK } from './scene/scene.js';
+import { mountExtras, EXTRAS_KEYS } from './scene/extras.js';
+import { legendModel, subsurfaceCounts } from './scene/subsurface-info.js';
 import { contourCanvas } from './scene/contours.js';
 import { SURFACES, imageryCanvas } from './data/imagery.js';
 import { mountStudio, geologyNote } from './scene/studio.js';
@@ -211,7 +213,7 @@ function showPreview() {
     studio = mountStudio($('studio'), scene, {
       caption: () => captionLines({ name: state.name, exaggeration: exaggerationText(), sources: sourcesText(), legend: boundaryLegend() }),
       filename: () => `${slug()}-${new Date().toISOString().slice(0, 10)}`,
-      printColours: printColourMap,
+      printColours: printColourMap, fontCSS: fontFaceCSS,
       alt: () => draftAlt({ name: state.name, report: state.model.model.report, exaggeration: exaggerationText(), surface: SURFACES[state.surface].label.toLowerCase() }),
       onChange: () => { refreshCaption(); writeUrl(); paintSwatches(); },
     });
@@ -234,39 +236,10 @@ function showPreview() {
     ul.append(li);
   }
   ul.querySelectorAll('input').forEach(i => { i.onchange = () => scene.setVisible(i.dataset.layer, i.checked); });
-  // 3D props from the site bundle (screen only; drawn sites only).
-  const pc = scene.setProps(state.bundle?.props, { grid: model.grid, heights: model.heights, zExag: opts.zExag, seed: siteSeed() });
-  const propRows = [['trees', pc?.trees], ['turbines', pc?.turbines], ['pylons', (pc?.towers || 0) + (pc?.poles || 0) + (pc?.lineSegments || 0)]];
-  for (const [kind, n] of propRows) {
-    if (!n) continue;
-    const li = document.createElement('li');
-    const slider = kind === 'trees'
-      ? `<label class="range">${t('props.trees.height', { x: `<output>${opts.zExag}</output>` })}<input type="range" min="1" max="4" step="0.5" value="${opts.zExag}" data-tree-factor></label>` : '';
-    li.innerHTML = `<label class="check"><input type="checkbox" checked data-prop="${kind}">${t(`props.${kind}`)}</label>${slider}
-      <details><summary>${t('preview.why')}</summary><p>${t(`props.${kind}.why`)}</p></details>`;
-    ul.append(li);
-  }
-  ul.querySelectorAll('input[data-prop]').forEach(i => { i.onchange = () => { scene.setPropsVisible(i.dataset.prop, i.checked); if (i.dataset.prop === 'pylons') scene.setPropsVisible('lines', i.checked); }; });
-  // Geology walls from the bundle (on by default where there are samples).
-  scene.setGeology(state.bundle?.subsurface, { grid: model.grid, zExag: opts.zExag, on: true });
-  const pitCounts = scene.setPits(state.bundle?.subsurface, { grid: model.grid, heights: model.heights, on: true });
-  // One row per class of pit (BGS BritPits), each with its own toggle; quarries start off.
-  const PIT_SWATCH = {
-    coal: `background:${EVIDENCE.coal}`,
-    unknown: `background:#fffaec;outline:1.5px dashed ${EVIDENCE.coal};outline-offset:-1.5px`,
-    quarry: `background:#fffaec;outline:1.5px solid ${EVIDENCE.coal};outline-offset:-1.5px`,
-  };
-  for (const cls of ['coal', 'unknown', 'quarry']) {
-    if (!pitCounts?.[cls]) continue;
-    const on = scene.pits.shown[cls], li = document.createElement('li');
-    li.innerHTML = `<label class="check"><input type="checkbox"${on ? ' checked' : ''} data-pits="${cls}"><span class="swatch" style="${PIT_SWATCH[cls]}"></span>${t(`pits.${cls}`)} (${pitCounts[cls]})</label>
-      <details><summary>${t('preview.why')}</summary><p>${t(`pits.${cls}.why`)}</p></details>`;
-    ul.append(li);
-    li.querySelector('[data-pits]').onchange = e => { scene.showPitClass(cls, e.target.checked); refreshCaption(); };
-  }
+  // Site extras from the bundle: 3D props, geology walls, pits (screen only; shared with the offline viewer).
+  mountExtras(ul, scene, { props: state.bundle?.props, subsurface: state.bundle?.subsurface, grid: model.grid, heights: model.heights,
+    zExag: opts.zExag, seed: siteSeed(), text: t, onChange: () => { refreshCaption(); studio.renderLegend(); } });
   studio.refreshGeology();
-  const tf = ul.querySelector('[data-tree-factor]');
-  if (tf) tf.oninput = () => { scene.setTreeFactor(+tf.value); tf.parentElement.querySelector('output').textContent = tf.value; };
   const counts = model.report.counts;
   studio.update();
   if (pendingView) {           // a view from a shared link, applied once
@@ -276,7 +249,7 @@ function showPreview() {
   }
   writeUrl();
   scene.renderer.domElement.setAttribute('aria-label', altText(model, osm));
-  $('caption').textContent = captionText(opts, form) + ` Counts: ${counts.buildings} buildings, ${counts.receptors} schools, care or community buildings, ${counts.roads} roads.`;
+  refreshCaption();
   $('pauses').textContent = 'Single-colour printers: pause to change filament at ' +
     pauseHeights(model, opts.base).map(p => `${p.zMm} mm (${p.changeTo})`).join(', ') + '.';
   $('preview').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
@@ -304,9 +277,16 @@ function refreshCaption() {
   const counts = state.model.model.report.counts;
   $('caption').textContent = captionText(state.model.opts, state.model.form) + ` Counts: ${counts.buildings} buildings, ${counts.receptors} schools, care or community buildings, ${counts.roads} roads.`
     + (PALETTES[scene?.view.look]?.captionNote ? ` ${PALETTES[scene.view.look].captionNote}.` : '')
-    + (scene && geologyNote(scene) ? ` ${geologyNote(scene)}.` : '');
+    + (scene && geologyNote(scene) ? ` ${geologyNote(scene)}. ${geologyCounts()}` : '');
 }
 
+// Counts for the on-page caption when the geology or pits are shown (from the bundle).
+function geologyCounts() {
+  const g = scene.geology, G = g?.instance; if (!g?.sub) return '';
+  const c = subsurfaceCounts(g.sub, legendModel(g.sub, { Wm: G?.Wm, Hm: G?.Hm }));
+  const n = Object.values(c.wall_samples).reduce((a, b) => a + b, 0);
+  return `BGS records: ${n} geology samples along the walls (every ${c.sample_step_m} m); ${c.pits.coal} coal-mine, ${c.pits.unknown} unknown-type and ${c.pits.quarry} quarry points (BritPits); ${c.boreholes_on_walls} of ${c.boreholes_in_bundle} boreholes drawn on the walls; ${c.mine_plans} mine plan${c.mine_plans === 1 ? '' : 's'} matched.`;
+}
 function captionText(opts, form, { print = false } = {}) {
   // Print files state the model's own exaggeration; the studio's extra height is view-only.
   const exag = print ? t('caption.exag', { x: opts.zExag }) : exaggerationText();
@@ -407,6 +387,8 @@ $('dl-viewer').onclick = async () => {
     const blob = await buildViewer({
       model, legend, colours, printColours: printColourMap(), caption, zExag: opts.zExag, slug: slug(),
       seed: siteSeed(), view: { look: scene.view.look, brushwork: scene.view.brushwork },
+      props: state.bundle?.props || null, subsurface: state.bundle?.subsurface || null,
+      text: Object.fromEntries(EXTRAS_KEYS.map(k => [k, t(k)])),
       sub: `${state.bbox.minLat.toFixed(3)}–${state.bbox.maxLat.toFixed(3)}°N, ${Math.abs(state.bbox.maxLon).toFixed(3)}–${Math.abs(state.bbox.minLon).toFixed(3)}°W · ${w.toFixed(1)} × ${h.toFixed(1)} km · from the ${opts.printSize} mm print model`,
       drape: state.drape, drapeKind: state.surface === 'landcover' ? 'landcover' : state.surface,
       alt: draftAlt({ name: state.name, report: model.report, exaggeration: t('caption.exag', { x: opts.zExag }), surface: SURFACES[state.surface].label.toLowerCase() }),
@@ -461,4 +443,5 @@ if (pendingView.site) {
 window.__app = state;   // for debugging and automated checks
 Object.defineProperty(window, "__studio", { get: () => studio });
 Object.defineProperty(window, "__scene", { get: () => scene });
+Object.defineProperty(window, "__studio", { get: () => studio });
 window.__picker = picker;

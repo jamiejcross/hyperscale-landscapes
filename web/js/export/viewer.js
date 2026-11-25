@@ -4,10 +4,9 @@
 import { gzipSync } from '../../vendor/fflate.js';
 import { fontFaceCSS } from '../fonts.js';
 
-const MODULES = {
+export const MODULES = {
   three: 'vendor/three/three.module.min.js',
   'three/addons/OrbitControls.js': 'vendor/three/addons/OrbitControls.js',
-  'three/addons/RoomEnvironment.js': 'vendor/three/addons/RoomEnvironment.js',
   'hl/scene': 'js/scene/scene.js',
   'hl/palettes': 'js/scene/palettes.js',
   'hl/ink': 'js/scene/ink.js',
@@ -17,8 +16,19 @@ const MODULES = {
   'hl/studio': 'js/scene/studio.js',
   'hl/caption': 'js/scene/caption.js',
   'hl/turntable': 'js/scene/turntable.js',
+  'hl/props': 'js/scene/props.js',
+  'hl/props-math': 'js/scene/props-math.js',
+  'hl/geology': 'js/scene/geology.js',
+  'hl/geology-math': 'js/scene/geology-math.js',
+  'hl/pits': 'js/scene/pits.js',
+  'hl/pits-math': 'js/scene/pits-math.js',
+  'hl/subsurface-info': 'js/scene/subsurface-info.js',
+  'hl/extras': 'js/scene/extras.js',
+  'hl/export/walls': 'js/export/walls.js',
+  'hl/data/props': 'js/data/props.js',
   gifenc: 'vendor/gifenc.js',
 };
+const KEY_OF = Object.fromEntries(Object.entries(MODULES).map(([k, p]) => [p, k]));
 
 function b64(bytes) {
   let s = '';
@@ -27,16 +37,22 @@ function b64(bytes) {
 }
 const dataURL = text => `data:text/javascript;base64,${b64(new TextEncoder().encode(text))}`;
 
-// Relative imports cannot resolve from a data: URL, so point them at the map.
-const rewrite = text => text.replaceAll("from './caption.js'", "from 'hl/caption'")
-  .replaceAll("from './turntable.js'", "from 'hl/turntable'")
-  .replaceAll("from './scene.js'", "from 'hl/scene'")
-  .replaceAll("from './palettes.js'", "from 'hl/palettes'")
-  .replaceAll("from './ink.js'", "from 'hl/ink'")
-  .replaceAll("from './ink-math.js'", "from 'hl/ink-math'")
-  .replaceAll("from './overlays.js'", "from 'hl/overlays'");
+// Relative imports cannot resolve from a data: URL, so point each at its
+// name in the import map (resolved from the importing module's folder).
+// A relative import of a file not in MODULES is an error, not a silent gap.
+export function rewrite(text, from) {
+  const dir = from.split('/').slice(0, -1);
+  return text.replace(/(\bfrom\s*|\bimport\s*)(['"])(\.{1,2}\/[^'"]+)\2/g, (all, kw, q, spec) => {
+    const parts = [...dir];
+    for (const seg of spec.split('/')) { if (seg === '..') parts.pop(); else if (seg !== '.') parts.push(seg); }
+    const key = KEY_OF[parts.join('/')];
+    if (!key) throw new Error(`offline viewer: ${from} imports ${spec}, which is not packed`);
+    return `${kw}${q}${key}${q}`;
+  });
+}
 
-export async function buildViewer({ model, legend, colours, printColours, caption, sub, drape, drapeKind = null, zExag, slug, alt, seed = null, view = null }) {
+export async function buildViewer({ model, legend, colours, printColours, caption, sub, drape, drapeKind = null, zExag, slug, alt, seed = null, view = null,
+  props = null, subsurface = null, text = {} }) {
   // Pack every non-empty layer into one gzipped buffer.
   const parts = [], layout = {}, ids = [];
   let offset = 0;
@@ -60,6 +76,11 @@ export async function buildViewer({ model, legend, colours, printColours, captio
     add(`screen:${id}_i`, m.indices, 'uint32');
   }
   if (model.vectors) add('vectors', new TextEncoder().encode(JSON.stringify(model.vectors)), 'json');
+  // Site extras (screen only): the height grid for placing props and pits,
+  // and the bundle's props and subsurface sections as they are.
+  if (model.heights && (props || subsurface)) add('heights', model.heights, 'float32');
+  if (props) add('props', new TextEncoder().encode(JSON.stringify(props)), 'json');
+  if (subsurface) add('subsurface', new TextEncoder().encode(JSON.stringify(subsurface)), 'json');
   const raw = new Uint8Array(offset);
   let o = 0; for (const p of parts) { raw.set(p, o); o += p.byteLength; }
   const geom = b64(gzipSync(raw, { level: 9 }));
@@ -67,7 +88,7 @@ export async function buildViewer({ model, legend, colours, printColours, captio
   const D = {
     schema: 'hyperscale-landscapes/viewer@1',
     layers: ids, screen: screenIds, layout, geom,
-    grid: { Wmm: model.grid.Wmm, Hmm: model.grid.Hmm },
+    grid: Object.fromEntries(['Wmm', 'Hmm', 'mmPerM', 'nx', 'ny', 'dx', 'dy'].map(k => [k, model.grid[k]])), text,
     colours, printColours, legend, caption, sub, zExag, slug, alt, seed, view,
     drape: drape ? drape.toDataURL('image/jpeg', 0.85) : null, drapeKind,
   };
@@ -79,7 +100,7 @@ export async function buildViewer({ model, legend, colours, printColours, captio
   ]);
   const main = sources.pop();
   const fontCSS = await fontFaceCSS();
-  const imports = Object.fromEntries(Object.keys(MODULES).map((k, i) => [k, dataURL(rewrite(sources[i]))]));
+  const imports = Object.fromEntries(Object.entries(MODULES).map(([k, p], i) => [k, dataURL(rewrite(sources[i], p))]));
   const html = template
     .replace('<!--FONTS-->', () => `<style>${fontCSS}</style>`)
     .replace('<!--IMPORTMAP-->', () => `<script type="importmap">${JSON.stringify({ imports })}</script>`)

@@ -439,7 +439,7 @@ export function createScene(container) {
     pits?.dispose(); pits = null;
     const terr = meshes.terrain;
     if (sub && grid && heights && terr) {
-      pitsMeta = { attribution: sub.attribution, nonCommercial: !!sub.nonCommercial };
+      pitsMeta = { attribution: sub.attribution, nonCommercial: !!sub.nonCommercial, sub };
       pits = createPits({ sub, grid, heights, terrain: terr.geometry.attributes.position.array, coal: EVIDENCE.coal });
       if (pits) inner.add(pits.group);
     }
@@ -627,7 +627,7 @@ export function createScene(container) {
   return { renderer, scene, camera, controls, view, meshes, focalMm, setModel, setDrape, setLook, setVisible, setView, setSpin,
     cameraAngles, setCameraAngles, setInkWidth, setBrushwork,
     setSun, setFov, setHeightScale, setBackground, setPrintColours, setScreenColours, setShadow, grab,
-    pause, resume, renderAt, orbitStart, orbitTo, orbitEnd, setGeology, showGeology, setPits, showPits, showPitClass, get geology() { return (geology || pits) && { walls: !!geology, panel: geology?.panel, on: geologyOn, shown: !!geology?.mesh.visible || (!!pits && pitsOn && pits.anyShown), attribution: geology?.attribution ?? pitsMeta.attribution, nonCommercial: geology ? geology.nonCommercial : pitsMeta.nonCommercial }; }, setProps, setPropsVisible, setTreeFactor, get props() { return props; }, get pits() { return pits; } };
+    pause, resume, renderAt, orbitStart, orbitTo, orbitEnd, setGeology, showGeology, setPits, showPits, showPitClass, get geology() { return (geology || pits) && { walls: !!geology, panel: geology?.panel, on: geologyOn, shown: !!geology?.mesh.visible || (!!pits && pitsOn && pits.anyShown), attribution: geology?.attribution ?? pitsMeta.attribution, sub: geology?.sub ?? pitsMeta.sub, instance: geology, nonCommercial: geology ? geology.nonCommercial : pitsMeta.nonCommercial }; }, setProps, setPropsVisible, setTreeFactor, get props() { return props; }, get pits() { return pits; } };
 }
 
 // Separate wall triangles (|normal z| small) from the top cap and the

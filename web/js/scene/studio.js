@@ -5,15 +5,19 @@ import { withCaption } from './caption.js';
 import { LOOKS } from './scene.js';
 import { PALETTES } from './palettes.js';
 import { SIZES, makeGIF, makeVideo, videoType } from './turntable.js';
+import { captionNote, subsurfaceManifest } from './subsurface-info.js';
+import { wallsSVG, wallsPNG, legendItems, markSVG, diagramVex } from '../export/walls.js';
 
 const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'N'];
 
-// Caption note for the geology walls when they are on screen (BGS licence terms).
+// Caption note for the geology walls and pits when they are on screen: the
+// BGS attribution, the non-commercial notice and the sources, from the data.
 export function geologyNote(scene) {
   const g = scene.geology;
   if (!g?.shown) return '';
-  return `${g.attribution}${g.nonCommercial ? ' (non-commercial use)' : ''}`;
+  return g.sub ? captionNote(g.sub) : `${g.attribution}${g.nonCommercial ? ' (non-commercial use only)' : ''}`;
 }
+const escHTML = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 export function mountStudio(el, scene, host) {
   // host: { caption(): {title, disclosure, sources, footer, top}, filename(): string,
@@ -50,6 +54,16 @@ export function mountStudio(el, scene, host) {
       <label class="check" name="geoRow" hidden><input type="checkbox" name="geology" checked> Geology walls (BGS; screen only)</label>
       <label class="check"><input type="checkbox" name="shadow"> Ground shadow</label>
       <label class="check"><input type="checkbox" name="print"> Print colours</label>
+    </fieldset>
+    <fieldset name="geoPanel" hidden><legend>Geology legend (BGS)</legend>
+      <div name="geoLegend" class="geo-legend"></div>
+      <div class="inline">
+        <button type="button" name="wallsPng">Unfolded walls (PNG)</button>
+        <button type="button" name="wallsSvg">SVG</button>
+        <button type="button" name="geoManifest">Sources (JSON)</button>
+      </div>
+      <p class="hint">The four walls laid out flat at true horizontal scale, with this legend and the BGS notice. Non-commercial use only.</p>
+      <p class="hint" name="geoInfo" aria-live="polite"></p>
     </fieldset>
     <fieldset><legend>Background</legend>
       <select name="bg" aria-label="Background">
@@ -111,6 +125,7 @@ export function mountStudio(el, scene, host) {
   q('look').addEventListener('change', e => {
     const to = e.target.value;
     scene.setLook(to);
+    renderLegend();
     q('brushRow').hidden = !PALETTES[to]?.brushwork;    // Guthrie only
     q('bg').value = scene.view.background;     // each look brings its own background
     update();
@@ -179,7 +194,44 @@ export function mountStudio(el, scene, host) {
     q('look').value = look; q('look').dispatchEvent(new Event('change'));
   }
   function setBrushwork(on) { q('brush').checked = !!on; scene.setBrushwork(!!on); }
-  // Geology walls: the toggle shows only when the site has wall samples.
-  function refreshGeology() { q('geoRow').hidden = !scene.geology?.walls; update(); }
-  return { refreshGeology, update, grab, compose, caption, runAnim, animOpts, setLook, setBrushwork, reset: update };
+  // Geology walls: the toggle and the legend show only when the site has wall samples.
+  function refreshGeology() { q('geoRow').hidden = q('geoPanel').hidden = !scene.geology?.walls; renderLegend(); update(); }
+
+  // ---- geology legend and the unfolded-walls export ----
+  function renderLegend() {
+    const G = scene.geology?.instance, box = q('geoLegend');
+    if (!G) { box.innerHTML = ''; return; }
+    box.innerHTML = legendItems({ geology: G, look: scene.view.look, pitsShown: scene.pits?.shown }).map(it => {
+      if (it.head) return `<h3>${escHTML(it.head)}</h3>`;
+      if (it.note) return `<p class="hint">${escHTML(it.note)}</p>`;
+      const icon = it.swatch ? `<img alt="" src="${it.swatch.toDataURL('image/png')}" width="26" height="16">`
+        : `<svg width="26" height="18" viewBox="0 -2 26 20" aria-hidden="true">${markSVG(it.mark, 0, 0)}</svg>`;
+      return `<div class="geo-row">${icon}<span>${escHTML(it.text)}</span></div>`;
+    }).join('');
+  }
+  function wallsCaption() { const c = host.caption(), note = PALETTES[scene.view.look]?.captionNote; return note ? { ...c, footer: `${c.footer} · ${note}` } : c; }
+  // (the BGS sources go in the export's own caption, so the plain caption is used)
+  async function walls(kind) {
+    const G = scene.geology?.instance; if (!G) return null;
+    const info = q('geoInfo'); info.textContent = 'Drawing the walls…';
+    try {
+      const svg = wallsSVG({ geology: G, look: scene.view.look, caption: wallsCaption(), pitsShown: scene.pits?.shown, fontCSS: (await host.fontCSS?.()) || '' });
+      const blob = kind === 'svg' ? new Blob([svg], { type: 'image/svg+xml' }) : await wallsPNG(svg, 2);
+      download(blob, `${host.filename()}-walls.${kind}`);
+      info.textContent = `Unfolded walls (${kind.toUpperCase()}): ${(blob.size / 1e6).toFixed(1)} MB.`;
+      return { svg, blob };
+    } catch (e) { info.textContent = `Could not draw the walls: ${e.message}`; throw e; }
+  }
+  function manifest() {
+    const G = scene.geology?.instance, sub = scene.geology?.sub; if (!sub) return null;
+    const c = host.caption();
+    const m = subsurfaceManifest(sub, { name: c.title, Wm: G?.Wm, Hm: G?.Hm, zExag: G?.zExag,
+      vex: G ? diagramVex({ dzTrueM: (G.zmax - G.zmin) / (G.mmPerM * G.zExag), kx: 1720 / (G.Wm + G.Hm), zExag: G.zExag }) : null });
+    download(new Blob([JSON.stringify(m, null, 2)], { type: 'application/json' }), `${host.filename()}-subsurface.json`);
+    return m;
+  }
+  q('wallsPng').addEventListener('click', () => walls('png'));
+  q('wallsSvg').addEventListener('click', () => walls('svg'));
+  q('geoManifest').addEventListener('click', manifest);
+  return { refreshGeology, renderLegend, walls, wallsCaption, manifest, update, grab, compose, caption, runAnim, animOpts, setLook, setBrushwork, reset: update };
 }

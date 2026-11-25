@@ -1,9 +1,10 @@
 // Runtime of the downloadable offline viewer (one self-contained HTML file,
-// in the form of JC's Mossmorran viewer). It reads the model from the
+// after JC's Mossmorran viewer). It reads the model from the
 // #terrain-data script tag, decodes the gzipped geometry, and uses the same
 // scene, studio and caption code as the web app.
 import { createScene, layerSwatch } from 'hl/scene';
-import { mountStudio } from 'hl/studio';
+import { mountStudio, geologyNote } from 'hl/studio';
+import { mountExtras } from 'hl/extras';
 import { parseView, urlWriter } from 'hl/urlstate';
 import { PALETTES } from 'hl/palettes';
 
@@ -18,8 +19,10 @@ const arr = k => { const [o, n, t] = D.layout[k]; const C = T[t]; return new C(b
 const layers = {}, screen = {};
 for (const id of D.layers) layers[id] = { positions: arr(`${id}_p`), indices: arr(`${id}_i`) };
 for (const id of D.screen || []) screen[id] = { positions: arr(`screen:${id}_p`), indices: arr(`screen:${id}_i`) };
-const vectors = D.layout.vectors
-  ? JSON.parse(new TextDecoder().decode(new Uint8Array(buf, D.layout.vectors[0], D.layout.vectors[1]))) : null;
+const json = k => (D.layout[k] ? JSON.parse(new TextDecoder().decode(new Uint8Array(buf, D.layout[k][0], D.layout[k][1]))) : null);
+const vectors = json('vectors');
+// site extras (props, geology walls, pits), as in the web app
+const heights = D.layout.heights ? arr('heights') : null, propsData = json('props'), subsurface = json('subsurface');
 
 // ---- scene
 const scene = createScene($('view'));
@@ -39,6 +42,7 @@ for (const L of D.legend) {
   ul.append(li);
 }
 ul.querySelectorAll('input').forEach(i => { i.onchange = () => scene.setVisible(i.dataset.layer, i.checked); });
+const text = (k, vars = {}) => Object.entries(vars).reduce((s, [a, v]) => s.replaceAll(`{${a}}`, v), D.text?.[k] ?? k);
 
 const exag = () => {
   const k = scene.view.heightScale, z = D.zExag, r = v => +v.toFixed(2);
@@ -51,12 +55,18 @@ const writeUrl = urlWriter(() => { const a = scene.cameraAngles(); return { styl
 const studio = mountStudio($('studio'), scene, {
   caption, filename: () => `${D.slug}-${new Date().toISOString().slice(0, 10)}`,
   printColours: () => D.printColours, alt: () => D.alt,
+  fontCSS: () => [...document.querySelectorAll('style')].map(s => s.textContent).filter(t => t.includes('@font-face')).join(''),
   onChange: () => {
-    const note = PALETTES[scene.view.look]?.captionNote;
-    $('caption').textContent = `${exag()}. ${D.caption.sources}. ${D.caption.footer}${note ? ` · ${note}` : ''}.`; writeUrl();
+    const notes = [PALETTES[scene.view.look]?.captionNote, geologyNote(scene)].filter(Boolean).join(' · ');
+    $('caption').textContent = `${exag()}. ${D.caption.sources}. ${D.caption.footer}${notes ? ` · ${notes}` : ''}.`; writeUrl();
     document.querySelectorAll('.swatch[data-swatch]').forEach(s => { s.style.background = layerSwatch(s.dataset.swatch, scene.view.look, s.dataset.screen); });
   },
 });
+if (heights && (propsData || subsurface)) {
+  mountExtras(ul, scene, { props: propsData, subsurface, grid: D.grid, heights, zExag: D.zExag, seed: D.seed ?? D.slug, text,
+    onChange: () => { studio.renderLegend(); studio.update(); } });
+  studio.refreshGeology();
+}
 {
   const v = parseView(location.search);
   if (typeof D.view?.brushwork === 'boolean') studio.setBrushwork(D.view.brushwork);
