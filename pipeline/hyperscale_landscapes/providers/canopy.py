@@ -48,11 +48,14 @@ META_CITATION = ("Meta and World Resources Institute (WRI) - 2024. High Resoluti
                  "Source imagery for CHM © 2016 Maxar. CC BY 4.0")
 
 # Structures the DSM sees that are not trees, masked with these buffers (m).
-# Lines: the conductors hang up to ~10 m either side of a transmission line's
-# centre line; turbines: the rotor sweeps its radius (OSM rotor:diameter/2,
-# else an assumed 60 m).
-LINE_BUFFER_M = {"line": 10.0, "minor_line": 4.0}
-SUPPORT_BUFFER_M = 8.0
+# Lines by voltage: a 400 kV double-circuit tower carries its outer
+# conductors ~10-15 m from the centre line, and they swing in the wind;
+# turbines: the rotor sweeps its radius (OSM rotor:diameter/2, else an
+# assumed 60 m). Found at Plean, where the 400 kV Beauly-Denny line showed
+# as 35-45 m "trees" with a 10 m buffer.
+LINE_BUFFER_BY_KV = [(275, 20.0), (100, 12.0), (0, 10.0)]     # power=line: (from kV, buffer m)
+LINE_BUFFER_M = {"line": 10.0, "minor_line": 4.0}              # fallback when no voltage tag
+SUPPORT_BUFFER_M = {"tower": 15.0, "portal": 15.0, "pole": 4.0}
 TURBINE_RADIUS_ASSUMED_M = 60.0
 
 # Smooth surfaces: canopy is rough at the metre scale; roofs, bridge decks
@@ -156,10 +159,16 @@ def _smooth_surfaces(chm: np.ndarray) -> np.ndarray:
 def _structure_buffer(tags):
     """Mask buffer (m) for power lines, supports and wind turbines; False otherwise."""
     p = tags.get("power")
+    if p == "line":
+        try:
+            kv = max(float(v) for v in str(tags.get("voltage", "")).split(";") if v.strip()) / 1000
+        except ValueError:
+            return LINE_BUFFER_M["line"]
+        return next(b for lo, b in LINE_BUFFER_BY_KV if kv >= lo)
     if p in LINE_BUFFER_M:
         return LINE_BUFFER_M[p]
-    if p in ("tower", "pole", "portal"):
-        return SUPPORT_BUFFER_M
+    if p in SUPPORT_BUFFER_M:
+        return SUPPORT_BUFFER_M[p]
     if p == "generator" and (tags.get("generator:source") == "wind" or tags.get("generator:method") == "wind_turbine"):
         try:
             return float(str(tags.get("rotor:diameter", "")).split()[0]) / 2
@@ -247,8 +256,16 @@ def compute(bb: dict, osm_elements: list, cache_dir: Path = DEFAULT_CACHE, force
     if (cache / key).exists() and not force:
         z = np.load(cache / key, allow_pickle=False)
         meta = json.loads(str(z["meta"]))
-        return {"chm": z["chm_dm"].astype(np.float32) / 10, "valid": z["valid"], "meta": meta,
-                "transform": from_origin(*meta["origin"], RES_M, RES_M), "crs": "EPSG:27700"}
+        transform = from_origin(*meta["origin"], RES_M, RES_M)
+        chm = z["chm_dm"].astype(np.float32) / 10
+        valid = z["valid"]
+        if osm_elements:      # structure masks are cheap: apply the current rules to the cached grid
+            s = _mask(osm_elements, _structure_buffer, transform, chm.shape)
+            chm[s] = 0; valid = valid & ~s
+            meta["canopy_over_5m_ha"] = round(float((chm > 5).sum()) * RES_M ** 2 / 1e4, 2)
+            meta["rules"]["power_line_buffer_m"] = {"by_kV_from": LINE_BUFFER_BY_KV, **LINE_BUFFER_M}
+            meta["rules"]["support_buffer_m"] = SUPPORT_BUFFER_M
+        return {"chm": chm, "valid": valid, "meta": meta, "transform": transform, "crs": "EPSG:27700"}
 
     e0, n0, e1, n1 = _bbox_osgb_bounds(box, pad_m=0.0)
     cols, rows = int(math.ceil((e1 - e0) / RES_M)), int(math.ceil((n1 - n0) / RES_M))
@@ -319,7 +336,7 @@ def compute(bb: dict, osm_elements: list, cache_dir: Path = DEFAULT_CACHE, force
         "canopy_over_2_5m_ha": round(float((chm >= NOT_TREE_M).sum()) * RES_M ** 2 / 1e4, 2),
         "masked_pct": round(100 * float(masked.sum()) / masked.size, 2),
         "rules": {"not_tree_below_m": NOT_TREE_M, "clip_m": [0, MAX_M], "building_buffer_m": BUILDING_BUFFER_M,
-                  "power_line_buffer_m": LINE_BUFFER_M, "support_buffer_m": SUPPORT_BUFFER_M,
+                  "power_line_buffer_m": {"by_kV_from": LINE_BUFFER_BY_KV, **LINE_BUFFER_M}, "support_buffer_m": SUPPORT_BUFFER_M,
                   "turbine_radius_assumed_m": TURBINE_RADIUS_ASSUMED_M,
                   "sea_dtm_at_or_below_m": SEA_LEVEL_M, "sea_where_no_lidar": "Copernicus GLO-30 at or below 0.5 m",
                   "resolution_m": RES_M,

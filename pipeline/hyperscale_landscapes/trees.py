@@ -117,7 +117,7 @@ def for_site(site_id: str, cache_dir=None, force: bool = False) -> dict:
     cache_dir = Path(cache_dir or DEFAULT_CACHE)
     site = json.loads((data_dir() / "sites" / f"{site_id}.geojson").read_text())
     bb = site["properties"]["model_bbox"]
-    key = cache_dir / "canopy" / (f"trees_v1_{canopy.CACHE_VERSION}_{bb['min_lat']:.5f}_{bb['max_lat']:.5f}_"
+    key = cache_dir / "canopy" / (f"trees_v2_{canopy.CACHE_VERSION}_{bb['min_lat']:.5f}_{bb['max_lat']:.5f}_"
                                   f"{bb['min_lon']:.5f}_{bb['max_lon']:.5f}.npz")
     if key.exists() and not force:
         z = np.load(key, allow_pickle=False)
@@ -145,3 +145,199 @@ def for_site(site_id: str, cache_dir=None, force: bool = False) -> dict:
     np.savez_compressed(key, x=x, y=y, h=th["h"], crown_r=th["crown_r"], count=th["count"],
                         info=np.array(json.dumps(info)))
     return {"x": x, "y": y, "h": th["h"], "crown_r": th["crown_r"], "count": th["count"], **info}
+
+
+# ---------------------------------------------------------------------------
+# Stage 3: tree type, by precedence OSM > NWSS > NFI > default
+# ---------------------------------------------------------------------------
+
+ARCHETYPES = ["broadleaf", "spruce", "scots_pine", "birch", "young"]      # uint8 codes 0..4
+SOURCES = ["default", "osm", "nwss", "nfi"]                               # uint8 codes 0..3
+OSM_RADIUS_M = 3.0
+
+# NWSS: canopy-forming structures only (regeneration and shrub layers are
+# mostly below the 4 m tree-top threshold); species marked "+" are shrubs.
+NWSS_STRUCTURES = {"Mature", "Veteran", "Pole immature"}
+NWSS_TYPES = {"Native woodland", "Nearly-native woodland"}               # plus any PAWS-surveyed wood
+SCOTS_PINE = {"Scots pine"}
+BIRCH = {"Birch", "Downy birch", "Silver birch"}
+CONIFERS = {"Austrian pine", "Bishop pine", "Coast redwood", "Corsican pine", "Douglas fir", "European larch",
+            "Grand fir", "Hybrid larch", "Japanese cedar", "Japanese larch", "Lawsons cypress", "Leyland cypress",
+            "Lodgepole pine", "Maritime pine", "Noble fir", "Norway spruce", "Omorika spruce", "Other pines",
+            "Radiata pine", "Silver fir", "Sitka spruce", "Wellingtonia", "Western hemlock", "Western red cedar", "Yew"}
+
+# NFI interpreted forest type -> archetype proportions (None: no symbol).
+NFI_RULES = {
+    "Conifer": {"spruce": 1.0},
+    "Broadleaved": {"broadleaf": 1.0},
+    "Mixed mainly conifer": {"spruce": 0.7, "broadleaf": 0.3},
+    "Mixed mainly broadleaved": {"spruce": 0.3, "broadleaf": 0.7},
+    "Young trees": {"young": 1.0},
+    "Coppice": {"broadleaf": 1.0},
+    "Coppice with standards": {"broadleaf": 1.0},
+    "Shrub": {"young": 1.0},
+    "Ground prep": {"young": 1.0},
+    "Failed": {"young": 1.0},
+    "Felled": None,
+}   # anything else (Assumed woodland, Low density, Windblow, non-woodland) falls through to the default
+
+
+def nwss_archetype(species: str):
+    """Archetype for an NWSS species name, or None for shrubs."""
+    if "+" in species:
+        return None
+    name = species.replace("*", "").strip()
+    if name in SCOTS_PINE:
+        return "scots_pine"
+    if name in BIRCH:
+        return "birch"
+    if name in CONIFERS:
+        return "spruce"
+    return "broadleaf"
+
+
+def osm_archetype(tags: dict):
+    g = (tags.get("genus") or "").lower()
+    sp = (tags.get("species") or tags.get("taxon") or "").lower()
+    if "pinus sylvestris" in sp:
+        return "scots_pine"
+    if g == "betula" or sp.startswith("betula"):
+        return "birch"
+    if g in ("picea", "abies", "larix", "pseudotsuga", "pinus", "taxus", "thuja", "tsuga", "cupressus", "cedrus") \
+            or tags.get("leaf_type") == "needleleaved":
+        return "spruce"
+    if g or sp or tags.get("leaf_type") == "broadleaved":
+        return "broadleaf"
+    return None
+
+
+def _unit_hash(x, y):
+    """Deterministic value in [0, 1) per position (decimetres), for by-proportion picks."""
+    xi = np.round(np.asarray(x) * 10).astype(np.int64).astype(np.uint64)
+    yi = np.round(np.asarray(y) * 10).astype(np.int64).astype(np.uint64)
+    h = xi * np.uint64(0x9E3779B97F4A7C15) ^ (yi + np.uint64(0x632BE59BD9B4E019)) * np.uint64(0xBF58476D1CE4E5B9)
+    h ^= h >> np.uint64(31)
+    h *= np.uint64(0x94D049BB133111EB)
+    h ^= h >> np.uint64(29)
+    return (h >> np.uint64(11)).astype(np.float64) / float(1 << 53)
+
+
+def _pick(weights: dict, u: float) -> str:
+    total = sum(weights.values())
+    acc = 0.0
+    for k in sorted(weights):            # sorted: the same answer on every run
+        acc += weights[k] / total
+        if u < acc:
+            return k
+    return sorted(weights)[-1]
+
+
+def classify(x, y, h, woodland: dict, crs_transform=None) -> dict:
+    """Archetype and source per tree top (National Grid x, y in metres).
+
+    Returns {"archetype": uint8[], "source": uint8[], "drop": bool[] (felled),
+    "warnings": [...], "unmapped_species": [...], "rules": {...}}.
+    """
+    from pyproj import Transformer
+    from shapely import STRtree, points
+    from shapely.geometry import shape
+
+    n = len(x)
+    arche = np.zeros(n, np.uint8)
+    src = np.zeros(n, np.uint8)
+    drop = np.zeros(n, bool)
+    done = np.zeros(n, bool)
+    u = _unit_hash(x, y)
+    pts = points(np.column_stack([x, y])) if n else []
+    warnings, unmapped = [], set()
+
+    # 1. OSM individual trees within 3 m.
+    tr = Transformer.from_crs("EPSG:4326", "EPSG:27700", always_xy=True)
+    osm = [(tr.transform(t["lon"], t["lat"]), osm_archetype(t["tags"])) for t in woodland.get("osm_trees", [])]
+    osm = [(p, a) for p, a in osm if a]
+    if osm and n:
+        ox = np.array([p[0] for p, _ in osm]); oy = np.array([p[1] for p, _ in osm])
+        for i in range(n):
+            d = np.hypot(ox - x[i], oy - y[i]); j = int(np.argmin(d))
+            if d[j] <= OSM_RADIUS_M:
+                arche[i] = ARCHETYPES.index(osm[j][1]); src[i] = 1; done[i] = True
+
+    # 2. NWSS woods, by species proportions.
+    by_wood: dict = {}
+    for r in woodland.get("nwss_species", []):
+        if r.get("STRUCTURE") not in NWSS_STRUCTURES or not r.get("SP_STR_PCT"):
+            continue
+        a = nwss_archetype(r["SPECIES"] or "")
+        if a is None:
+            continue
+        w = by_wood.setdefault(r["SCPTDATA_I"], {})
+        w[a] = w.get(a, 0) + float(r["SP_STR_PCT"])
+    nwss = [f for f in woodland.get("nwss", []) if f.get("geometry") and
+            (f["properties"].get("TYPE") in NWSS_TYPES or f["properties"].get("PAWS_SURVY") == "Yes")
+            and by_wood.get(f["properties"].get("SCPTDATA_I"))]
+    if nwss and n:
+        tree = STRtree([shape(f["geometry"]) for f in nwss])
+        pi, gi = tree.query(pts, predicate="within")
+        for i, g in zip(pi, gi):
+            if done[i]:
+                continue
+            arche[i] = ARCHETYPES.index(_pick(by_wood[nwss[g]["properties"]["SCPTDATA_I"]], u[i]))
+            src[i] = 2; done[i] = True
+
+    # 3. NFI interpreted forest type.
+    nfi = [f for f in woodland.get("nfi", []) if f.get("geometry") and f["properties"].get("IFT_IOA") in NFI_RULES]
+    felled_tall = 0
+    if nfi and n:
+        tree = STRtree([shape(f["geometry"]) for f in nfi])
+        pi, gi = tree.query(pts, predicate="within")
+        for i, g in zip(pi, gi):
+            if done[i]:
+                continue
+            rule = NFI_RULES[nfi[g]["properties"]["IFT_IOA"]]
+            done[i] = True
+            if rule is None:                     # felled: no symbol
+                drop[i] = True
+                felled_tall += int(h[i] >= 8)
+                continue
+            arche[i] = ARCHETYPES.index(_pick(rule, u[i])); src[i] = 3
+    if felled_tall:
+        warnings.append(f"{felled_tall} tree tops of 8 m or more fall in NFI 'Felled' woodland: "
+                        "the LiDAR and NFI dates differ (felled after the survey, or regrown)")
+
+    # 4. Default: broadleaf (park, street and hedgerow trees).
+    for r in woodland.get("nwss_species", []):
+        if r.get("SPECIES") and nwss_archetype(r["SPECIES"]) == "broadleaf":
+            name = r["SPECIES"].replace("*", "").strip()
+            if name not in {"Ash", "Aspen", "Beech", "Sycamore", "Hazel", "Hawthorn", "Holly", "Rowan", "Elder",
+                            "Common alder", "Goat willow", "Grey willow", "Sessile oak", "Pedunculate oak",
+                            "Intermediate oak", "Other oak", "Wych elm", "Gean wild cherry", "Bird cherry"}:
+                unmapped.add(name)          # mapped to broadleaf by default; listed so it can be checked
+    return {"archetype": arche, "source": src, "drop": drop, "warnings": warnings,
+            "broadleaf_by_default_species": sorted(unmapped),
+            "rules": {"precedence": "OSM tree within 3 m > NWSS wood (species proportions) > NFI type > broadleaf",
+                      "nwss_structures": sorted(NWSS_STRUCTURES), "nwss_types": sorted(NWSS_TYPES) + ["PAWS-surveyed"],
+                      "nfi": {k: v for k, v in NFI_RULES.items()}, "by_proportion": "deterministic, seeded by position"}}
+
+
+def typed_for_site(site_id: str, cache_dir=None, force: bool = False) -> dict:
+    """Stage-2 tops plus Stage-3 types for a curated site (felled tops removed)."""
+    import json
+    from .paths import data_dir
+    from .providers import DEFAULT_CACHE, woodland as wl
+
+    t = for_site(site_id, cache_dir, force)
+    import gzip
+    bb = json.loads((data_dir() / "sites" / f"{site_id}.geojson").read_text())["properties"]["model_bbox"]
+    elements = json.loads(gzip.decompress((data_dir() / "sites" / f"{site_id}.bundle.json.gz").read_bytes()))["osm"]["elements"]
+    w = wl.fetch(bb, cache_dir or DEFAULT_CACHE, osm_elements=elements)
+    c = classify(t["x"], t["y"], t["h"], w)
+    keep = ~c["drop"]
+    out = {k: t[k][keep] for k in ("x", "y", "h", "crown_r", "count")}
+    out.update(archetype=c["archetype"][keep], source=c["source"][keep])
+    out["typing"] = {"warnings": c["warnings"], "rules": c["rules"], "dropped_felled": int(c["drop"].sum()),
+                     "broadleaf_by_default_species": c["broadleaf_by_default_species"],
+                     "woodland_fetched": w["fetched"], "sources": w["sources"],
+                     "by_archetype": {a: int((out["archetype"] == i).sum()) for i, a in enumerate(ARCHETYPES)},
+                     "by_source": {s: int((out["source"] == i).sum()) for i, s in enumerate(SOURCES)}}
+    out.update({k: t[k] for k in ("summary", "rules", "chm", "height_m")})
+    return out

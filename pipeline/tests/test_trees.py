@@ -76,3 +76,87 @@ def test_cap_enlarges_the_cell_and_says_so():
     assert out["summary"]["drawn"] <= 1000 and out["summary"]["capped"]
     assert out["summary"]["thin_cell_m"] > 10
     assert out["count"].sum() == 5000
+
+
+# ---- Stage 3: tree type precedence ----
+
+def _sq(x0, y0, s, props):
+    return {"type": "Feature", "properties": props,
+            "geometry": {"type": "Polygon", "coordinates": [[[x0, y0], [x0 + s, y0], [x0 + s, y0 + s], [x0, y0 + s], [x0, y0]]]}}
+
+
+def _woodland():
+    # NFI conifer square at 0-100 m; NWSS birch/pine wood overlapping its east half; NFI felled at 200-300 m.
+    return {
+        "nfi": [_sq(300000, 700000, 100, {"IFT_IOA": "Conifer"}), _sq(300200, 700000, 100, {"IFT_IOA": "Felled"}),
+                _sq(300400, 700000, 100, {"IFT_IOA": "Mixed mainly conifer"})],
+        "nwss": [_sq(300050, 700000, 50, {"SCPTDATA_I": 1, "TYPE": "Native woodland"}),
+                 _sq(300600, 700000, 50, {"SCPTDATA_I": 2, "TYPE": "Open land habitat"})],
+        "nwss_species": [
+            {"SCPTDATA_I": 1, "SPECIES": "Silver birch *", "STRUCTURE": "Mature", "SP_STR_PCT": 60},
+            {"SCPTDATA_I": 1, "SPECIES": "Scots pine *", "STRUCTURE": "Pole immature", "SP_STR_PCT": 40},
+            {"SCPTDATA_I": 1, "SPECIES": "Gorse *+", "STRUCTURE": "Shrub", "SP_STR_PCT": 50},
+            {"SCPTDATA_I": 1, "SPECIES": "Rowan *", "STRUCTURE": "Visible regeneration", "SP_STR_PCT": 30},
+            {"SCPTDATA_I": 2, "SPECIES": "Ash *", "STRUCTURE": "Mature", "SP_STR_PCT": 100}],
+        "osm_trees": [],
+    }
+
+
+def test_type_precedence_nwss_over_nfi_and_default_outside():
+    import numpy as np
+    w = _woodland()
+    x = np.array([300020.0, 300075.0, 300250.0, 300700.0, 300625.0])
+    y = np.array([700050.0, 700025.0, 700050.0, 700050.0, 700025.0])
+    c = trees.classify(x, y, np.array([12.0, 12.0, 15.0, 10.0, 10.0]), w)
+    A, S = trees.ARCHETYPES, trees.SOURCES
+    assert (A[c["archetype"][0]], S[c["source"][0]]) == ("spruce", "nfi")          # NFI conifer
+    assert S[c["source"][1]] == "nwss" and A[c["archetype"][1]] in ("birch", "scots_pine")   # NWSS wins
+    assert c["drop"][2] and c["warnings"]                                           # felled + tall -> dropped, warned
+    assert (A[c["archetype"][3]], S[c["source"][3]]) == ("broadleaf", "default")     # outside everything
+    assert S[c["source"][4]] == "default"                                           # open-land NWSS ignored
+
+
+def test_nwss_proportions_follow_canopy_species_only():
+    import numpy as np
+    w = _woodland()
+    rng = np.random.default_rng(3)
+    x = rng.uniform(300051, 300099, 4000); y = rng.uniform(700001, 700049, 4000)
+    c = trees.classify(x, y, np.full(4000, 10.0), w)
+    a = np.array(trees.ARCHETYPES)[c["archetype"]]
+    birch = (a == "birch").mean(); pine = (a == "scots_pine").mean()
+    assert abs(birch - 0.6) < 0.03 and abs(pine - 0.4) < 0.03       # gorse (shrub) and regeneration ignored
+    c2 = trees.classify(x, y, np.full(4000, 10.0), w)
+    assert (c2["archetype"] == c["archetype"]).all()                 # deterministic
+
+
+def test_nfi_mixed_mainly_conifer_is_70_30():
+    import numpy as np
+    w = _woodland()
+    rng = np.random.default_rng(4)
+    x = rng.uniform(300401, 300499, 5000); y = rng.uniform(700001, 700099, 5000)
+    a = np.array(trees.ARCHETYPES)[trees.classify(x, y, np.full(5000, 10.0), w)["archetype"]]
+    assert abs((a == "spruce").mean() - 0.7) < 0.03
+
+
+def test_species_and_osm_mapping():
+    assert trees.nwss_archetype("Scots pine *") == "scots_pine"
+    assert trees.nwss_archetype("Downy birch *") == "birch"
+    assert trees.nwss_archetype("Dwarf birch *+") is None
+    assert trees.nwss_archetype("Hybrid larch") == "spruce"
+    assert trees.nwss_archetype("Sessile oak *") == "broadleaf"
+    assert trees.osm_archetype({"species": "Pinus sylvestris"}) == "scots_pine"
+    assert trees.osm_archetype({"genus": "Betula"}) == "birch"
+    assert trees.osm_archetype({"leaf_type": "needleleaved"}) == "spruce"
+    assert trees.osm_archetype({"leaf_type": "broadleaved"}) == "broadleaf"
+    assert trees.osm_archetype({}) is None
+
+
+def test_osm_tree_within_3m_wins():
+    import numpy as np
+    from pyproj import Transformer
+    w = _woodland()
+    lon, lat = Transformer.from_crs("EPSG:27700", "EPSG:4326", always_xy=True).transform(300021.0, 700051.0)
+    w["osm_trees"] = [{"lon": lon, "lat": lat, "tags": {"genus": "Betula"}}]
+    c = trees.classify(np.array([300020.0, 300030.0]), np.array([700050.0, 700050.0]), np.array([10.0, 10.0]), w)
+    assert trees.SOURCES[c["source"][0]] == "osm" and trees.ARCHETYPES[c["archetype"][0]] == "birch"
+    assert trees.SOURCES[c["source"][1]] == "nfi"                    # 10 m away: not matched

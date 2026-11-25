@@ -4,9 +4,13 @@ from hyperscale_landscapes.providers import canopy, lidar
 
 def test_structure_buffers():
     sb = canopy._structure_buffer
-    assert sb({"power": "line", "voltage": "132000"}) == 10.0
+    assert sb({"power": "line", "voltage": "400000"}) == 20.0
+    assert sb({"power": "line", "voltage": "132000"}) == 12.0
+    assert sb({"power": "line", "voltage": "33000"}) == 10.0
+    assert sb({"power": "line", "voltage": "275000;132000"}) == 20.0
+    assert sb({"power": "line"}) == 10.0
     assert sb({"power": "minor_line"}) == 4.0
-    assert sb({"power": "tower"}) == canopy.SUPPORT_BUFFER_M
+    assert sb({"power": "tower"}) == 15.0 and sb({"power": "pole"}) == 4.0
     assert sb({"power": "generator", "generator:source": "wind", "rotor:diameter": "92 m"}) == 46.0
     assert sb({"power": "generator", "generator:source": "wind"}) == canopy.TURBINE_RADIUS_ASSUMED_M
     assert sb({"power": "generator", "generator:source": "solar"}) is False
