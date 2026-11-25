@@ -100,3 +100,17 @@ until each licence has been confirmed.
 - Historic Environment Scotland / Canmore records
 - Local development plan allocations (Spatial Hub)
 - OS Terrain 50 (OGL v3.0, believed; not yet needed)
+
+## Subsurface geology and coal (added 25 Nov 2026; geology brief, Stage 1)
+
+Outputs that use BGS Geology 50k carry `nonCommercial: true` and an NC notice in the caption, like the EOX satellite layer.
+
+| Source | Used for | Licence | Attribution | Status |
+|---|---|---|---|---|
+| BGS Geology 50k (WMS `BGS_Detailed_Geology`, version 9.25, released 31 Mar 2025) | bedrock, superficial, artificial ground and mass movement along the slab walls | JC holds a BGS licence for non-commercial use, which covers this project | Contains British Geological Survey materials © UKRI <year> | licence held by JC; **non-commercial only** |
+| BGS minerals WMS: `Shallow.Coal` | opencast coal resource extent at the walls | BGS WMS terms: **to verify** | Contains British Geological Survey materials © UKRI <year> | to verify |
+| BGS minerals WMS: `Mines.and.quarries` (BritPits) | pit names, positions (EASTING/NORTHING) and status | BGS WMS terms: **to verify** | Contains British Geological Survey materials © UKRI <year> | to verify |
+| BGS Borehole Index (ArcGIS REST, `GeoIndex_Onshore/boreholes`) | borehole positions, depths, log links (scanned logs linked, not read) | **to verify** | Contains British Geological Survey materials © UKRI <year> | to verify |
+| BGS Mine Plans (OGC API `mine_plans`) | abandonment plan metadata: catalogue number, year, seam names, scan availability | metadata and scans: Mining Remediation Authority terms, **to verify**; link: https://www.miningremediation.co.uk | per MRA terms | to verify |
+| Mining Remediation Authority, *Development High Risk Area* (ArcGIS FeatureServer `DevelopmentHighRiskArea`, org `Qn4lKcPDVHNivEyr`) | **not used yet**: found 25 Nov 2026, queryable, 40,186 polygons, last edited 27 Apr 2026 | OGL according to a third-party metadata record (Natural Resources Wales): **to verify** at source | — | not used |
+| Mining Remediation Authority, *Mine Entries 2026* and *Mine Entry Zone of Influence 2026* (ArcGIS tile services) | **not used**: PNG tiles only, no attributes or query | — | — | not used |
