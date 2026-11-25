@@ -41,7 +41,7 @@ export function overlayWidth(kind, drapeWidth = OVERLAY.baseWidth) {
 // show: { roads, rail, power, residues } booleans (the layer checkboxes).
 // residueColour: the residues layer colour.
 // colours: { roadFill, roadCasing, rail, power } for the current look (defaults: field).
-export function paintOverlays(g, vectors, { Wmm, Hmm, show = {}, residueColour = '#c98aa0', colours = {} }) {
+export function paintOverlays(g, vectors, { Wmm, Hmm, show = {}, residueColour = '#c98a93', colours = {} }) {
   const C = { roadFill: OVERLAY.road.fill, roadCasing: OVERLAY.road.casingColour, rail: OVERLAY.rail.colour,
               power: OVERLAY.powerLine.colour, ...colours };
   const W = g.canvas.width, H = g.canvas.height, s = W / OVERLAY.baseWidth;

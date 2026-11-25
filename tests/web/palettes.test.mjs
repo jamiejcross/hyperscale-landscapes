@@ -30,7 +30,7 @@ test('brushwork count scales with drape area', () => {
 });
 
 test('layer swatches follow the look', () => {
-  assert.equal(layerSwatch('residues', 'guthrie', '#000000'), '#a65a44');
+  assert.equal(layerSwatch('residues', 'guthrie', '#000000'), '#9a6050');
   assert.equal(layerSwatch('terrain', 'field', '#000000'), '#d6d09a');
   assert.equal(layerSwatch('residues', 'mossmorran', '#123456'), '#123456');
 });
@@ -48,5 +48,9 @@ test('CIEDE2000 matches Sharma, Wu and Dalal (2005) reference pairs', () => {
 
 test('colour check produces a row for every pair', () => {
   const rows = check('guthrie');
-  assert.equal(rows.length, 15 + 18);   // 6 evidence colours: 15 pairs, plus 6 x 3 land
+  assert.equal(rows.length, 10 + 15);   // 5 evidence colours: 10 pairs, plus 5 x 3 land
+});
+
+test('evidence colours pass the colour-blind check in both looks', () => {
+  for (const look of ['field', 'guthrie']) assert.deepEqual(check(look).filter(r => !r.pass).map(r => `${r.a}-${r.b}`), [], look);
 });

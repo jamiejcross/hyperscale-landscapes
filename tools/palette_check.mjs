@@ -9,7 +9,7 @@
 // land colours, under normal vision and each simulation. Pure functions are
 // exported for tests.
 import { fileURLToPath } from 'node:url';
-import { PALETTES } from '../web/js/scene/palettes.js';
+import { PALETTES, EVIDENCE } from '../web/js/scene/palettes.js';
 
 export const MACHADO = {
   normal: null,
@@ -83,7 +83,8 @@ export function coloursFor(look) {
   return {
     evidence: {
       residues: P.layers.residues, schools: P.layers.receptors,
-      coal: P.geology?.seams || '#15110e', 'red line': '#ff4d1f', 'pit labels': '#15110e', borehole: '#b3261e',
+      // coal ground, seams and pit squares/labels are one class
+      coal: P.geology?.seams || EVIDENCE.coal, 'red line': EVIDENCE.redLine, borehole: EVIDENCE.borehole,
     },
     land: { farmland: P.landcover['landuse:farmland'], grass: P.landcover['landuse:grass'], 'base land': P.landBase },
   };

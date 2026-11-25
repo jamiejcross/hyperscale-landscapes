@@ -15,6 +15,11 @@ const LANDCOVER_CLASSES = [
 ];
 export { LANDCOVER_CLASSES };
 
+// Evidence marks shared by every look (colour-blind checked with tools/palette_check.mjs;
+// adjusted 25 Nov 2026 with JC's approval). Coal ground and pit squares/labels are one
+// class ("coal") and share the near-black.
+export const EVIDENCE = { redLine: '#ff4d1f', borehole: '#8b0d06', coal: '#15110e' };
+
 export const PALETTES = {
   field: {
     name: 'Field',
@@ -29,7 +34,7 @@ export const PALETTES = {
     },
     landBase: '#d6d09a',
     // evidence layers (screen and legend); power keeps its own colour
-    layers: { water: '#83bec5', buildings: '#f1ece2', roads: '#f3eee4', rail: '#3a332b', residues: '#c98aa0', receptors: '#6aa9c9' },
+    layers: { water: '#83bec5', buildings: '#f1ece2', roads: '#f3eee4', rail: '#3a332b', residues: '#c98a93', receptors: '#6aa9c9' },
     roof: '#d6cdbd',
     water: '#83bec5',
     walls: { light: '#f4f2ee', dark: '#c9c5bd', base: '#9b968c' },
@@ -58,7 +63,7 @@ export const PALETTES = {
       'landuse:railway': '#a0977f', 'natural:bare_rock': '#9a9282', 'natural:scree': '#9a9282',
     },
     landBase: '#bba886',
-    layers: { water: '#8a98a0', buildings: '#d9d1bd', roads: '#ddd3bd', rail: '#3a2e22', residues: '#a65a44', receptors: '#7f93a3' },
+    layers: { water: '#8a98a0', buildings: '#d9d1bd', roads: '#ddd3bd', rail: '#3a2e22', residues: '#9a6050', receptors: '#7f93a3' },
     roof: '#d9d1bd',                // the brief gives one building colour
     water: '#8a98a0',
     walls: { light: '#e3dccb', dark: '#b5aa92', base: '#6e5f47' },
