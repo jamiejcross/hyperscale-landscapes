@@ -22,6 +22,7 @@ import { paintOverlays, paintBoundary } from './overlays.js';
 import { PALETTES, EVIDENCE, brushStrokes, paintBrushwork, seedFrom } from './palettes.js';
 import { createProps } from './props.js';
 import { createGeology } from './geology.js';
+import { createPits } from './pits.js';
 export { layerSwatch } from './palettes.js';
 
 export const LANDCOVER_COLOURS = {
@@ -96,9 +97,11 @@ export function createScene(container) {
   // stepped, and ink would trace every step. Water stays in, so shorelines
   // are inked by the change of object.
   const INKLESS = ['roads', 'power', 'rail', 'railDisused', 'residues'];
+  const drawSize = new THREE.Vector2();
   function draw() {
+    if (pits) pits.layout(camera, renderer.getSize(drawSize), inner);
     renderer.render(scene, camera);
-    if (stylisedLook(view.look) && view.ink) ink.render(scene, camera, { hide: [ground, ...INKLESS.map(id => meshes[id]).filter(Boolean), ...(props?.parts.lines || []), ...(props?.parts.trees || [])] });
+    if (stylisedLook(view.look) && view.ink) ink.render(scene, camera, { hide: [ground, ...INKLESS.map(id => meshes[id]).filter(Boolean), ...(props?.parts.lines || []), ...(props?.parts.trees || []), ...(pits ? [pits.group] : [])] });
   }
 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.28 }));
@@ -109,6 +112,8 @@ export function createScene(container) {
   let props = null;            // 3D props (setProps)
   const propShown = { trees: true, turbines: true, pylons: true };
   let geology = null, geologyOn = false;   // geology walls (setGeology)
+  let pits = null, pitsOn = true, pitsMeta = {};   // pits on the surface (setPits)
+  let mossCanvas = null;                     // Mossmorran's drape: raw drape + red line + pits
   let span = 150, H = 20;
 
   function resize() {
@@ -244,6 +249,7 @@ export function createScene(container) {
       paintOverlays(g, vectors, { Wmm: modelSize.Wmm, Hmm: modelSize.Hmm, residueColour: P.layers.residues, colours: P.overlays,
         show: { roads: shown.roads !== false, rail: shown.rail !== false, power: shown.power !== false, residues: shown.residues !== false } });
     }
+    if (pits && pitsOn && !view.print) pits.paint(g, modelSize);   // pit symbols (BGS BritPits)
     paintBoundary(g, vectors?.boundary, modelSize);          // the site red line, on top
     d.tex.needsUpdate = true;
   }
@@ -311,7 +317,7 @@ export function createScene(container) {
     for (const k of Object.keys(shown)) delete shown[k];
     props?.dispose(); props = null;
     geology?.dispose(); geology = null;
-    geology?.dispose(); geology = null;
+    pits?.dispose(); pits = null;
     vectors = vec; modelSize = { Wmm: grid.Wmm, Hmm: grid.Hmm };
     seed = seedFrom(siteSeed ?? `${grid.Wmm.toFixed(3)}x${grid.Hmm.toFixed(3)}`);
     setDrapeTextures(landcover, kind);
@@ -365,15 +371,21 @@ export function createScene(container) {
     drapeTex?.dispose();
     for (const k of Object.keys(drapes)) { drapes[k].tex.dispose(); delete drapes[k]; }
     drapeRaw = canvas; drapeKind = kind;
-    // Mossmorran shows the site red line on its drape too, when there is one.
-    let display = canvas;
-    if (canvas && vectors?.boundary?.length) {
-      display = document.createElement('canvas'); display.width = canvas.width; display.height = canvas.height;
-      const g = display.getContext('2d'); g.drawImage(canvas, 0, 0);
-      paintBoundary(g, vectors.boundary, modelSize);
-    }
-    drapeTex = display ? canvasTexture(display, renderer) : null;
+    // Mossmorran shows the site red line (and pit symbols) on its drape too.
+    mossCanvas = null;
+    if (canvas) { mossCanvas = document.createElement('canvas'); mossCanvas.width = canvas.width; mossCanvas.height = canvas.height; }
+    drapeTex = mossCanvas ? canvasTexture(mossCanvas, renderer) : null;
+    paintMossDrape();
   }
+  function paintMossDrape() {
+    if (!mossCanvas) return;
+    const g = mossCanvas.getContext('2d');
+    g.drawImage(drapeRaw, 0, 0);
+    if (pits && pitsOn) pits.paint(g, modelSize);
+    if (vectors?.boundary?.length) paintBoundary(g, vectors.boundary, modelSize);
+    drapeTex.needsUpdate = true;
+  }
+  function repaintDrapes() { paintMossDrape(); for (const look of Object.keys(drapes)) paintDrape(look); }
   // kind: 'landcover' for the land-cover map, else anything (see setModel).
   function setDrape(canvas, kind = null) {
     setDrapeTextures(canvas, kind);
@@ -479,6 +491,21 @@ export function createScene(container) {
     refreshVisibility();
     return !!geology;
   }
+  // ---- pits on the surface (BGS BritPits; screen only) ----
+  function setPits(sub, { grid, heights, on = pitsOn } = {}) {
+    pits?.dispose(); pits = null;
+    const terr = meshes.terrain;
+    if (sub && grid && heights && terr) {
+      pitsMeta = { attribution: sub.attribution, nonCommercial: !!sub.nonCommercial };
+      pits = createPits({ sub, grid, heights, terrain: terr.geometry.attributes.position.array, coal: EVIDENCE.coal });
+      if (pits) inner.add(pits.group);
+    }
+    pitsOn = on; pits?.setVisible(on);
+    repaintDrapes();
+    return pits ? { ...pits.counts, labels: pits.labels } : null;
+  }
+  function showPits(on) { pitsOn = !!on; pits?.setVisible(pitsOn); repaintDrapes(); }
+  function showQuarries(on) { pits?.setQuarries(on); pits?.setVisible(pitsOn); repaintDrapes(); }
   function showGeology(on) { geologyOn = !!on; refreshVisibility(); }
   function setPropsVisible(kind, on) { propShown[kind] = on; props?.setVisible(kind, on); refreshVisibility(); }
   function setTreeFactor(k) { props?.setTreeFactor(k); }
@@ -656,7 +683,7 @@ export function createScene(container) {
   return { renderer, scene, camera, controls, view, meshes, focalMm, setModel, setDrape, setLook, setVisible, setView, setSpin,
     cameraAngles, setCameraAngles, setInkWidth, setBrushwork,
     setSun, setFov, setHeightScale, setBackground, setPrintColours, setScreenColours, setShadow, grab,
-    pause, resume, renderAt, orbitStart, orbitTo, orbitEnd, setGeology, showGeology, get geology() { return geology && { panel: geology.panel, on: geologyOn, shown: geology.mesh.visible, attribution: geology.attribution, nonCommercial: geology.nonCommercial }; }, setProps, setPropsVisible, setTreeFactor, get props() { return props; } };
+    pause, resume, renderAt, orbitStart, orbitTo, orbitEnd, setGeology, showGeology, setPits, showPits, showQuarries, get geology() { return (geology || pits) && { walls: !!geology, panel: geology?.panel, on: geologyOn, shown: !!geology?.mesh.visible || (!!pits && pitsOn), attribution: geology?.attribution ?? pitsMeta.attribution, nonCommercial: geology ? geology.nonCommercial : pitsMeta.nonCommercial }; }, setProps, setPropsVisible, setTreeFactor, get props() { return props; }, get pits() { return pits; } };
 }
 
 // Separate wall triangles (|normal z| small) from the top cap and the

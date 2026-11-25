@@ -12,7 +12,7 @@ import { createScene, landcoverCanvas, layerSwatch } from './scene/scene.js';
 import { contourCanvas } from './scene/contours.js';
 import { SURFACES, imageryCanvas } from './data/imagery.js';
 import { mountStudio, geologyNote } from './scene/studio.js';
-import { PALETTES } from './scene/palettes.js';
+import { PALETTES, EVIDENCE } from './scene/palettes.js';
 import { buildViewer } from './export/viewer.js';
 import { computeSection, sectionSVG, svgToPNG } from './export/section.js';
 import { fontFaceCSS } from './fonts.js';
@@ -246,6 +246,16 @@ function showPreview() {
   ul.querySelectorAll('input[data-prop]').forEach(i => { i.onchange = () => { scene.setPropsVisible(i.dataset.prop, i.checked); if (i.dataset.prop === 'pylons') scene.setPropsVisible('lines', i.checked); }; });
   // Geology walls from the bundle (on by default where there are samples).
   scene.setGeology(state.bundle?.subsurface, { grid: model.grid, zExag: opts.zExag, on: true });
+  const pitCounts = scene.setPits(state.bundle?.subsurface, { grid: model.grid, heights: model.heights, on: true });
+  if (pitCounts && (pitCounts.coal + pitCounts.unknown + pitCounts.quarry)) {
+    const li = document.createElement('li');
+    li.innerHTML = `<label class="check"><input type="checkbox" checked data-pits><span class="swatch" style="background:${EVIDENCE.coal}"></span>${t('pits')}</label>`
+      + (pitCounts.quarry ? `<label class="check sub"><input type="checkbox" data-quarries>${t('pits.quarries')} (${pitCounts.quarry})</label>` : '')
+      + `<details><summary>${t('preview.why')}</summary><p>${t('pits.why')}</p></details>`;
+    ul.append(li);
+    li.querySelector('[data-pits]').onchange = e => { scene.showPits(e.target.checked); refreshCaption(); };
+    const qb = li.querySelector('[data-quarries]'); if (qb) qb.onchange = e => scene.showQuarries(e.target.checked);
+  }
   studio.refreshGeology();
   const tf = ul.querySelector('[data-tree-factor]');
   if (tf) tf.oninput = () => { scene.setTreeFactor(+tf.value); tf.parentElement.querySelector('output').textContent = tf.value; };

@@ -185,6 +185,6 @@ export function mountStudio(el, scene, host) {
   }
   function setBrushwork(on) { q('brush').checked = !!on; scene.setBrushwork(!!on); }
   // Geology walls: the toggle shows only when the site has wall samples.
-  function refreshGeology() { q('geoRow').hidden = !scene.geology; update(); }
+  function refreshGeology() { q('geoRow').hidden = !scene.geology?.walls; update(); }
   return { refreshGeology, update, grab, compose, caption, runAnim, animOpts, setLook, setBrushwork, reset: update };
 }
