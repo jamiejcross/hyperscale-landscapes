@@ -48,6 +48,11 @@
       "min_lon": -3.87058,
       "max_lon": -3.81913
     },
-    "model_bbox_note": "3.2 × 1.6 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.6 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary.",
+    "turbines": {
+      "hub_height": 73,
+      "rotor_diameter": 100,
+      "source": "energymap.co.uk, Tod Hill Wind Farm (REPD 3415; Falkirk P/11/0326/FUL): GE 2.85-100, hub 73 m, rotor 100 m. Third-party database, not the planning file: to verify."
+    }
   }
 }

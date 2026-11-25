@@ -26,8 +26,14 @@ SUPPORT_DEFAULTS = [
     ("tower", 100, 24.2, "132 kV lattice tower: Scottish double-circuit 24.2 m (Rannoch-Abernethy, SS-PL1; "
                          "132 kV designs 20.2-26.9 m; Telcontar)"),
     ("tower", 0, 20.3, "66 kV and lower lattice tower: Milliken L134 20.3 m (Telcontar)"),
-    ("pole", 100, 15.0, "132 kV wood pole (trident): no published typical height found; 15 m assumed, to verify"),
-    ("pole", 0, 10.0, "11-33 kV wood pole: no published typical height found; 10 m assumed, to verify"),
+    # Wood poles: Electricity North West ES400W2 (Wood Poles, Issue 10, Aug 2024) lists the
+    # standard lengths (9-24 m, for 11/6.6/33 kV and 132 kV trident lines alike) and planting
+    # depths (1.8 m for 9-12 m poles, 2.4 m for 13-18 m), but no typical length; the length is
+    # our choice within its class, so these stay "assumed".
+    ("pole", 100, 12.6, "132 kV trident wood pole: assumed a 15 m pole planted 2.4 m (ENWL ES400W2: "
+                        "trident poles 9-24 m; 2.4 m planting for 13-18 m) = 12.6 m above ground"),
+    ("pole", 0, 9.2, "11-33 kV wood pole: assumed an 11 m pole planted 1.8 m (ENWL ES400W2: poles 9-24 m; "
+                     "1.8 m planting for 9-12 m) = 9.2 m above ground"),
 ]
 UNKNOWN_VOLTAGE_TOWER_M = (24.2, "voltage not tagged: 132 kV tower height assumed (24.2 m)")
 

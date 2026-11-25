@@ -55,6 +55,11 @@
       "min_lon": -3.30543,
       "max_lon": -3.24569
     },
-    "model_bbox_wide_note": "Study area of JC's Mossmorran/Auchtertool terrain build (Nov 2026), taking in the Mossmorran plant."
+    "model_bbox_wide_note": "Study area of JC's Mossmorran/Auchtertool terrain build (Nov 2026), taking in the Mossmorran plant.",
+    "turbines": {
+      "hub_height": 58.9,
+      "rotor_diameter": 82,
+      "source": "Fife Council planning register, amendment to permission 11/04794/EIA (Clentrie/Gevens; REPD 4078): tip height 99.9 m, rotor diameter 82 m; hub height = tip - rotor/2. The original design was an Enercon E70 (hub 64 m, rotor 71 m; energymap.co.uk); which was built is not confirmed."
+    }
   }
 }

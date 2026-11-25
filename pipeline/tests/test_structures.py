@@ -42,7 +42,7 @@ def test_support_heights_osm_first_then_voltage_defaults_marked_assumed():
     s = {x["osm"]: x for x in r["supports"]}
     assert (s["n1"]["height"], s["n1"]["height_source"]) == (52.0, "osm")
     assert (s["n2"]["height"], s["n2"]["height_source"]) == (46.5, "assumed") and "L12" in s["n2"]["height_rule"]
-    assert (s["n3"]["height"], s["n3"]["height_source"]) == (10.0, "assumed") and "to verify" in s["n3"]["height_rule"]
+    assert (s["n3"]["height"], s["n3"]["height_source"]) == (9.2, "assumed") and "ES400W2" in s["n3"]["height_rule"]
     assert r["summary"]["support_height_sources"] == {"osm": 1, "assumed": 2}
 
 

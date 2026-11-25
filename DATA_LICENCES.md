@@ -25,6 +25,19 @@ Sources marked *to verify* must be checked before the first public release.
 | National Forest Inventory Scotland **2025** (Forestry Commission; ArcGIS FeatureServer `National_Forest_Inventory_Scotland_2025`) | woodland type (interpreted forest type, IFT_IOA) | OGL | "© Forestry Commission copyright. Contains Ordnance Survey data © Crown copyright and database right 2026." | checked |
 | Native Woodland Survey of Scotland (Scottish Forestry; FeatureServers `Native_Woodland_Survey_of_Scotland` and `NWSS_Species_Structures`) | native woodland type and species proportions | OGL v3.0 | Contains public sector information licensed under the Open Government Licence v3.0 (Scottish Forestry). Older NWSS layers also carry an Ordnance Survey notice: **to verify** for the services used | licence checked; OS notice to verify |
 
+## Reference figures for 3D symbols (checked 25 Nov 2026)
+
+Figures quoted, with their source, where OpenStreetMap gives no size; each is labelled "assumed" or "curated" in the manifest and caption.
+
+| Source | Used for | Status |
+|---|---|---|
+| Telcontar, *British pylon series* (telcontar.net/Power/pylons/series) | default lattice tower heights by voltage | factual figures cited; checked |
+| National Grid, "What is a pylon?" | 400 kV pylons "typically up to 50 metres" | cited |
+| Electricity North West, ES400W2 *Wood Poles* (Issue 10, Aug 2024) | wood-pole lengths (9–24 m) and planting depths; our default length is a choice within its classes | cited; default lengths are assumptions |
+| Renewable Energy Planning Database (DESNZ, July 2026 extract; OGL) | identifying wind projects and planning references | used for identification only |
+| Fife Council planning register (11/04794/EIA amendment) | Gevens turbine tip height and rotor | cited in the site record |
+| energymap.co.uk (third-party) | Tod Hill turbine hub and rotor | **to verify** against Falkirk P/11/0326/FUL |
+
 ## Imagery (checked 24 Nov 2026; EOX 2025 is the only satellite drape; OSM land cover and contours are the other surfaces)
 
 The tool's exports (PNG, GIF, offline HTML) are forwarded freely, so imagery
