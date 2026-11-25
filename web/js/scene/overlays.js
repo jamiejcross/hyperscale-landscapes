@@ -40,7 +40,10 @@ export function overlayWidth(kind, drapeWidth = OVERLAY.baseWidth) {
 //            flat [x0, y0, x1, y1, …] array in print mm.
 // show: { roads, rail, power, residues } booleans (the layer checkboxes).
 // residueColour: the residues layer colour.
-export function paintOverlays(g, vectors, { Wmm, Hmm, show = {}, residueColour = '#c98aa0' }) {
+// colours: { roadFill, roadCasing, rail, power } for the current look (defaults: field).
+export function paintOverlays(g, vectors, { Wmm, Hmm, show = {}, residueColour = '#c98aa0', colours = {} }) {
+  const C = { roadFill: OVERLAY.road.fill, roadCasing: OVERLAY.road.casingColour, rail: OVERLAY.rail.colour,
+              power: OVERLAY.powerLine.colour, ...colours };
   const W = g.canvas.width, H = g.canvas.height, s = W / OVERLAY.baseWidth;
   const X = x => x / Wmm * W, Y = y => (1 - y / Hmm) * H;
   const trace = p => { g.moveTo(X(p[0]), Y(p[1])); for (let i = 2; i < p.length; i += 2) g.lineTo(X(p[i]), Y(p[i + 1])); };
@@ -62,7 +65,7 @@ export function paintOverlays(g, vectors, { Wmm, Hmm, show = {}, residueColour =
   if (show.roads !== false && vectors.roads?.length) {
     // All casings first, then all fills, so junctions join cleanly.
     for (const pass of ['casing', 'fill']) {
-      g.strokeStyle = pass === 'casing' ? OVERLAY.road.casingColour : OVERLAY.road.fill;
+      g.strokeStyle = pass === 'casing' ? C.roadCasing : C.roadFill;
       for (const r of vectors.roads) {
         const w = overlayWidth(r.k, W);
         g.lineWidth = pass === 'casing' ? w : w - 2 * OVERLAY.road.casing * s;
@@ -74,7 +77,7 @@ export function paintOverlays(g, vectors, { Wmm, Hmm, show = {}, residueColour =
   if (show.rail !== false) {
     for (const [key, dashed] of [['rail', false], ['railDisused', true]]) {
       const ls = vectors[key] || [];
-      g.strokeStyle = OVERLAY.rail.colour; g.lineWidth = overlayWidth(key, W); g.lineCap = 'butt';
+      g.strokeStyle = C.rail; g.lineWidth = overlayWidth(key, W); g.lineCap = 'butt';
       for (const r of ls) {
         g.setLineDash(dashed ? OVERLAY.rail.dash.map(v => v * s) : []);
         g.beginPath(); trace(r.p); g.stroke();
@@ -86,7 +89,7 @@ export function paintOverlays(g, vectors, { Wmm, Hmm, show = {}, residueColour =
   }
 
   if (show.power !== false && vectors.powerLines?.length) {
-    g.strokeStyle = OVERLAY.powerLine.colour; g.lineWidth = overlayWidth('powerLine', W);
+    g.strokeStyle = C.power; g.lineWidth = overlayWidth('powerLine', W);
     for (const r of vectors.powerLines) { g.beginPath(); trace(r.p); g.stroke(); }
   }
   g.restore();

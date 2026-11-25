@@ -2,12 +2,16 @@
 // defined: the app preview, the standalone viewer and (Phase 4) every
 // rendered artefact use it, so styling is identical everywhere.
 //
-// Two looks share the same geometry, switched by setLook() without a rebuild:
+// Three looks share the same geometry, switched by setLook() without a rebuild:
 //   mossmorran (default) follows JC's Mossmorran viewer: room environment,
 //     hemisphere fill, a warm soft-shadow sun from the south-west, soil strata
 //     on the sides, clearcoat water, and a shadow-catcher ground.
 //   field: a flat-shaded diorama on white (presentation only: print files,
 //     sections and every factual layer are unchanged).
+//   guthrie: the field look with a palette after Sir James Guthrie, a sky
+//     gradient and optional brushwork on the land (colours in palettes.js).
+// "Stylised" below means field or guthrie: they share every code path and
+// differ only in their palette.
 // Each mesh keeps one material per look, made the first time that look is
 // shown and disposed with the model.
 import * as THREE from 'three';
@@ -15,6 +19,8 @@ import { OrbitControls } from 'three/addons/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/RoomEnvironment.js';
 import { createInk, INK } from './ink.js';
 import { paintOverlays, paintBoundary } from './overlays.js';
+import { PALETTES, brushStrokes, paintBrushwork, seedFrom } from './palettes.js';
+export { layerSwatch } from './palettes.js';
 
 export const LANDCOVER_COLOURS = {
   'landuse:farmland': '#C9C08A', 'landuse:meadow': '#B5C98A', 'landuse:grass': '#B5C98A',
@@ -26,40 +32,21 @@ export const LANDCOVER_COLOURS = {
   'natural:bare_rock': '#B3ADA4', 'natural:scree': '#B3ADA4',
 };
 const LAND_BASE = '#BDB08E';
-export const LOOKS = { mossmorran: 'Mossmorran', field: 'Field' };
+export const LOOKS = { mossmorran: 'Mossmorran', field: 'Field', guthrie: 'Guthrie' };
+const stylisedLook = look => look !== 'mossmorran' && !!PALETTES[look];
 
-// Field style land-cover palette (same classes as above): saturated
-// yellow-greens and olives with clear light/dark contrast, after slab's
-// field look. Presentation only.
-export const FIELD_LANDCOVER_COLOURS = {
-  'landuse:farmland': '#e2d9a8', 'landuse:meadow': '#cbcd82', 'landuse:grass': '#cbcd82',
-  'landuse:forest': '#6f7d52', 'natural:wood': '#6f7d52', 'natural:scrub': '#aeb088',
-  'natural:heath': '#b5a989', 'natural:moor': '#b5a989', 'natural:grassland': '#cbcd82',
-  'natural:wetland': '#a9bfa9', 'landuse:residential': '#e8dfcf', 'landuse:farmyard': '#d9cba9',
-  'landuse:cemetery': '#b9bf86', 'landuse:allotments': '#b9bf86', 'landuse:recreation_ground': '#cbcd82',
-  'landuse:commercial': '#d8d1c7', 'landuse:retail': '#d8d1c7', 'landuse:railway': '#d8d1c7',
-  'natural:bare_rock': '#a39c88', 'natural:scree': '#a39c88',
-};
-const FIELD_LAND_BASE = '#d6d09a';
-// The evidence layers in field (screen and legend only; print colours are
-// unchanged). Power keeps its own colour.
-export const FIELD_LAYER_COLOURS = {
-  terrain: FIELD_LAND_BASE, water: '#83bec5', buildings: '#f1ece2', roads: '#f3eee4', rail: '#3a332b',
-  residues: '#c98aa0', receptors: '#6aa9c9',
-};
-// The swatch colour for a layer in a look (falls back to its screen colour).
-export function layerSwatch(id, look, screenColour) {
-  return (look === 'field' && FIELD_LAYER_COLOURS[id]) || screenColour;
-}
+// Kept for compatibility: the field palette now lives in palettes.js.
+export const FIELD_LANDCOVER_COLOURS = PALETTES.field.landcover;
+export const FIELD_LAYER_COLOURS = { terrain: PALETTES.field.landBase, ...PALETTES.field.layers };
 // Screen-only meshes from buildModel, and the layer whose colour they take.
 const SCREEN_OF = { powerPoints: 'power', waterAreas: 'water', waterLines: 'water' };
 // Object IDs for the ink pass (1-15): a change of ID between neighbouring pixels is an edge.
 // Narrow waterways share the terrain's ID, so their stepped edges get no ink.
 const INK_IDS = { terrain: 1, 'terrain-steep': 1, 'terrain-sides': 2, 'terrain-base': 3, water: 4, waterAreas: 4, waterLines: 1, buildings: 5,
   receptors: 6, powerPoints: 7, roads: 8, power: 9, rail: 10, railDisused: 11, residues: 12 };
+// Shared by the stylised looks (colours are per palette).
 const FIELD = {
-  wallLight: '#f4f2ee', wallDark: '#c9c5bd', base: '#9b968c', channel: '#a9a27f', roof: '#d6cdbd',
-  water: '#83bec5', groundShadow: 0.08,
+  groundShadow: 0.08,
   tones: [0.70, 0.87, 1.0],      // three toon steps (shadow side, mid, lit)
   fov: 20, minEl: 12, maxEl: 70,  // camera
 };
@@ -109,7 +96,7 @@ export function createScene(container) {
   const INKLESS = ['roads', 'power', 'rail', 'railDisused', 'residues'];
   function draw() {
     renderer.render(scene, camera);
-    if (view.look === 'field' && view.ink) ink.render(scene, camera, { hide: [ground, ...INKLESS.map(id => meshes[id]).filter(Boolean)] });
+    if (stylisedLook(view.look) && view.ink) ink.render(scene, camera, { hide: [ground, ...INKLESS.map(id => meshes[id]).filter(Boolean)] });
   }
 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.28 }));
@@ -130,7 +117,9 @@ export function createScene(container) {
   // Measured with the [0.70, 0.87, 1.0] tones: at 0.79 a lit, level surface
   // renders at its own colour (within 2/255).
   const FIELD_SUN = 0.79, FIELD_FILL = 0.79;
-  const view = { az: 225, el: 32, strength: 3.0, fill: 1.0, heightScale: 1, fov: 28, background: 'sky', print: false, look: 'mossmorran', ink: true, inkWidth: 1.8 };
+  const view = { az: 225, el: 32, strength: 3.0, fill: 1.0, heightScale: 1, fov: 28, background: 'sky', print: false, look: 'mossmorran', ink: true, inkWidth: 1.8, brushwork: true };
+  const stylised = () => stylisedLook(view.look);
+  const pal = (look = view.look) => PALETTES[look] || PALETTES.field;
 
   // Sun: azimuth clockwise from north, height above the horizon; it warms
   // towards orange as it drops (as in the Mossmorran viewer).
@@ -139,10 +128,10 @@ export function createScene(container) {
     const az = THREE.MathUtils.degToRad(azDeg), el = THREE.MathUtils.degToRad(elDeg), r = span * 2.5;
     sun.position.set(Math.sin(az) * Math.cos(el) * r, Math.sin(el) * r, -Math.cos(az) * Math.cos(el) * r);
     // Field lights are scaled so a lit, level surface shows its own colour.
-    sun.intensity = strength * (view.look === 'field' ? FIELD_SUN : 1);
-    hemi.intensity = fill * (view.look === 'field' ? FIELD_FILL : 1);
+    sun.intensity = strength * (stylised() ? FIELD_SUN : 1);
+    hemi.intensity = fill * (stylised() ? FIELD_FILL : 1);
     const warm = THREE.MathUtils.clamp((elDeg - 3) / 30, 0, 1);
-    if (view.look === 'field') sun.color.set(0xffffff);      // field: neutral light, the colours are in the materials
+    if (stylised()) sun.color.set(0xffffff);      // stylised: neutral light, the colours are in the materials
     else sun.color.setRGB(1, 0.78 + 0.18 * warm, 0.58 + 0.33 * warm);
     const sc = sun.shadow.camera;
     sc.left = sc.bottom = -span * 0.75; sc.right = sc.top = span * 0.75; sc.near = 1; sc.far = span * 6;
@@ -168,24 +157,27 @@ export function createScene(container) {
       if (kind === 'water') return new THREE.MeshPhysicalMaterial({ color: 0x24506a, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.6 });
       return new THREE.MeshStandardMaterial({ color: colour, roughness: 0.8 });
     },
-    // Field: three-step toon shading on everything lit; the slab walls are
-    // flat colours, light or dark by which way they face the sun.
-    field(mesh) {
-      const { kind, colour } = mesh.userData;
-      const toon = o => new THREE.MeshToonMaterial({ gradientMap: toonRamp(), ...o });
-      if (kind === 'terrain') { const t = fieldDrape(); return toon({ map: t, color: t ? 0xffffff : FIELD_LAND_BASE }); }
-      if (kind === 'terrain-base') return new THREE.MeshBasicMaterial({ color: FIELD.base });
-      if (kind === 'terrain-sides') return new THREE.MeshBasicMaterial({ vertexColors: true });
-      if (kind === 'terrain-steep') return toon({ color: FIELD.channel });     // channel banks inside the land
-      if (kind === 'water') return new THREE.MeshBasicMaterial({ color: FIELD.water });   // flat, opaque; ink gives the shoreline
-      if (mesh.userData.id === 'buildings') return roofsAndWalls(toon({ flatShading: true }));
-      return toon({ color: FIELD_LAYER_COLOURS[SCREEN_OF[mesh.userData.id] || mesh.userData.id] || colour, flatShading: mesh.userData.id === 'receptors' });
-    },
+    // Field (and Guthrie): three-step toon shading on everything lit; the slab
+    // walls are flat colours, light or dark by which way they face the sun.
+    field: mesh => stylisedMaterial(mesh, 'field'),
+    guthrie: mesh => stylisedMaterial(mesh, 'guthrie'),
   };
+  function stylisedMaterial(mesh, look) {
+    const { kind, colour } = mesh.userData, P = PALETTES[look];
+    const toon = o => new THREE.MeshToonMaterial({ gradientMap: toonRamp(), ...o });
+    if (kind === 'terrain') { const t = lookDrape(look); return toon({ map: t, color: t ? 0xffffff : P.landBase }); }
+    if (kind === 'terrain-base') return new THREE.MeshBasicMaterial({ color: P.walls.base });
+    if (kind === 'terrain-sides') return new THREE.MeshBasicMaterial({ vertexColors: true });
+    if (kind === 'terrain-steep') return toon({ color: P.channel });     // channel banks inside the land
+    if (kind === 'water') return new THREE.MeshBasicMaterial({ color: P.water });   // flat, opaque; ink gives the shoreline
+    if (mesh.userData.id === 'buildings') return roofsAndWalls(toon({ flatShading: true }), P, look);
+    const id = SCREEN_OF[mesh.userData.id] || mesh.userData.id;
+    return toon({ color: P.layers[id] || colour, flatShading: mesh.userData.id === 'receptors' });
+  }
   // Buildings in field: walls and flat roofs in two colours, chosen per face
   // from its direction (roofs face up), so no geometry changes.
-  function roofsAndWalls(mat) {
-    const wall = new THREE.Color(FIELD_LAYER_COLOURS.buildings), roof = new THREE.Color(FIELD.roof);
+  function roofsAndWalls(mat, P, look) {
+    const wall = new THREE.Color(P.layers.buildings), roof = new THREE.Color(P.roof);
     mat.onBeforeCompile = sh => {
       sh.uniforms.wallColour = { value: wall }; sh.uniforms.roofColour = { value: roof };
       sh.fragmentShader = sh.fragmentShader
@@ -195,7 +187,7 @@ export function createScene(container) {
           float upness = dot(faceN, normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz));
           diffuseColor.rgb = mix(wallColour, roofColour, step(0.7, abs(upness)));`);
     };
-    mat.customProgramCacheKey = () => 'field-roofs-walls';
+    mat.customProgramCacheKey = () => `roofs-walls-${look}`;
     return mat;
   }
   // One shared ramp texture for every toon material.
@@ -207,41 +199,49 @@ export function createScene(container) {
     }
     return ramp;
   }
-  // The field drape, up to 4096 px across: the base drape (land cover redrawn
-  // in the field palette; satellite or contours as they are) with routes and
+  // The stylised drapes (one per look), up to 4096 px across: the base drape
+  // (land cover redrawn in the look's palette; satellite or contours as they
+  // are), Guthrie's brushwork on land cover if switched on, then routes and
   // residue areas painted on top. Painting happens when the model came with
   // vectors (the web app and its offline viewer) and print colours are off;
   // then the raised route strips are hidden instead (see refreshVisibility).
-  let drapeKind = null, drapeRaw = null, fieldDrapeTex = null, fieldBase = null, fieldCanvas = null;
-  let vectors = null, modelSize = null, residueColour = '#c98aa0';
+  let drapeKind = null, drapeRaw = null, seed = 0;
+  const drapes = {};                                 // look -> { base, canvas, tex }
+  let vectors = null, modelSize = null;
   const shown = {};                                  // layer checkboxes: id -> on
-  const painted = () => view.look === 'field' && !view.print && !!vectors;
-  function fieldDrape() {
+  const painted = () => stylised() && !view.print && !!vectors;
+  function lookDrape(look) {
     if (!drapeRaw) return null;
-    if (!fieldBase) {
+    if (!drapes[look]) {
       const img = drapeRaw, W = Math.min(4096, renderer.capabilities.maxTextureSize);
       const H = Math.round(W * img.height / img.width);
-      fieldBase = document.createElement('canvas'); fieldBase.width = W; fieldBase.height = H;
-      const g = fieldBase.getContext('2d', { willReadFrequently: drapeKind === 'landcover' });
+      const base = document.createElement('canvas'); base.width = W; base.height = H;
+      const g = base.getContext('2d', { willReadFrequently: drapeKind === 'landcover' });
       g.imageSmoothingQuality = 'high'; g.drawImage(img, 0, 0, W, H);
-      if (drapeKind === 'landcover') recolour(fieldBase, paletteMap());
-      fieldCanvas = document.createElement('canvas'); fieldCanvas.width = W; fieldCanvas.height = H;
-      fieldDrapeTex = canvasTexture(fieldCanvas, renderer);
-      paintField();
+      if (drapeKind === 'landcover') recolour(base, paletteMap(PALETTES[look]));
+      const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+      drapes[look] = { base, canvas, tex: canvasTexture(canvas, renderer) };
+      paintDrape(look);
     }
-    return fieldDrapeTex;
+    return drapes[look].tex;
   }
-  function paintField() {
-    if (!fieldCanvas) return;
-    const g = fieldCanvas.getContext('2d');
-    g.drawImage(fieldBase, 0, 0);
-    if (painted()) {
-      paintOverlays(g, vectors, { Wmm: modelSize.Wmm, Hmm: modelSize.Hmm, residueColour,
+  function paintDrape(look = view.look) {
+    const d = drapes[look]; if (!d) return;
+    const g = d.canvas.getContext('2d'), P = PALETTES[look];
+    g.drawImage(d.base, 0, 0);
+    // Brushwork: a texture, not data (Guthrie only; land cover only; seeded per site).
+    if (P.brushwork && view.brushwork && drapeKind === 'landcover') {
+      d.strokes ||= brushStrokes(d.canvas.width, d.canvas.height, seed);
+      paintBrushwork(g, d.strokes);
+    }
+    if (painted() && look === view.look) {
+      paintOverlays(g, vectors, { Wmm: modelSize.Wmm, Hmm: modelSize.Hmm, residueColour: P.layers.residues, colours: P.overlays,
         show: { roads: shown.roads !== false, rail: shown.rail !== false, power: shown.power !== false, residues: shown.residues !== false } });
     }
     paintBoundary(g, vectors?.boundary, modelSize);          // the site red line, on top
-    fieldDrapeTex.needsUpdate = true;
+    d.tex.needsUpdate = true;
   }
+  const paintField = () => { if (stylised()) paintDrape(view.look); };
   // Route strips hidden while they are painted; power keeps its substations
   // and pegs as a screen-only mesh (powerPoints) so they still cast shadows.
   const PAINTED_MESHES = new Set(['roads', 'rail', 'railDisused', 'power', 'residues', 'water']);
@@ -257,7 +257,8 @@ export function createScene(container) {
     const m = meshes['terrain-sides']; if (!m) return;
     const g = m.geometry, n = g.attributes.normal, N = n.count;
     const col = g.attributes.color || g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(N * 3), 3)).attributes.color;
-    const light = new THREE.Color(FIELD.wallLight), dark = new THREE.Color(FIELD.wallDark), c = new THREE.Color();
+    const W = pal(stylised() ? view.look : 'field').walls;
+    const light = new THREE.Color(W.light), dark = new THREE.Color(W.dark), c = new THREE.Color();
     const sx = sun.position.x, sz = sun.position.z, sl = Math.hypot(sx, sz) || 1;
     for (let i = 0; i < N; i++) {
       // model (x, y, z-up) -> world (x, z, -y)
@@ -283,7 +284,7 @@ export function createScene(container) {
     mesh.geometry.dispose();
     const mats = [...Object.values(mesh.userData.looks), mesh.userData.printMaterial].filter(Boolean);
     for (const m of mats) {
-      if (m.map && m.map !== drapeTex && m.map !== fieldDrapeTex) m.map.dispose();
+      if (m.map && m.map !== drapeTex && !Object.values(drapes).some(d => d.tex === m.map)) m.map.dispose();
       m.dispose();
     }
   }
@@ -293,11 +294,12 @@ export function createScene(container) {
   // style redraws that in its own palette), else anything.
   // vectors / screen: the field style's painted routes and screen-only meshes
   // (from buildModel); absent for models from the Python tool.
-  function setModel({ layers, colours, landcover, grid, drapeKind: kind = null, vectors: vec = null, screen = {} }) {
+  // seed: a stable id for the site (Guthrie's brushwork is seeded from it).
+  function setModel({ layers, colours, landcover, grid, drapeKind: kind = null, vectors: vec = null, screen = {}, seed: siteSeed = null }) {
     for (const k of Object.keys(meshes)) { inner.remove(meshes[k]); disposeMesh(meshes[k]); delete meshes[k]; }
     for (const k of Object.keys(shown)) delete shown[k];
     vectors = vec; modelSize = { Wmm: grid.Wmm, Hmm: grid.Hmm };
-    residueColour = FIELD_LAYER_COLOURS.residues;
+    seed = seedFrom(siteSeed ?? `${grid.Wmm.toFixed(3)}x${grid.Hmm.toFixed(3)}`);
     setDrapeTextures(landcover, kind);
     span = Math.max(grid.Wmm, grid.Hmm);
     let zmax = 0;
@@ -346,7 +348,8 @@ export function createScene(container) {
 
   // Swap the drape on the land top (land cover or satellite) without rebuilding.
   function setDrapeTextures(canvas, kind) {
-    drapeTex?.dispose(); fieldDrapeTex?.dispose(); fieldDrapeTex = null; fieldBase = fieldCanvas = null;
+    drapeTex?.dispose();
+    for (const k of Object.keys(drapes)) { drapes[k].tex.dispose(); delete drapes[k]; }
     drapeRaw = canvas; drapeKind = kind;
     // Mossmorran shows the site red line on its drape too, when there is one.
     let display = canvas;
@@ -363,10 +366,10 @@ export function createScene(container) {
     for (const id of ['terrain', 'terrain-base']) {
       const m = meshes[id]; if (!m) continue;
       for (const [look, mat] of Object.entries(m.userData.looks)) {
-        if (look === 'field' && id === 'terrain-base') continue;      // flat colour
-        const t = look === 'field' ? fieldDrape() : drapeTex;
+        if (stylisedLook(look) && id === 'terrain-base') continue;      // flat colour
+        const t = stylisedLook(look) ? lookDrape(look) : drapeTex;
         mat.map = t;
-        mat.color.set(t ? 0xffffff : look === 'field' ? FIELD_LAND_BASE : LAND_BASE);
+        mat.color.set(t ? 0xffffff : stylisedLook(look) ? PALETTES[look].landBase : LAND_BASE);
         mat.needsUpdate = true;
       }
     }
@@ -378,33 +381,40 @@ export function createScene(container) {
   let mossBackground = view.background, mossFov = view.fov;
   function setLook(look) {
     if (!LOOKS[look] || look === view.look) return;
-    const field = look === 'field';
-    if (field) { mossBackground = view.background; mossFov = camera.fov; }
+    const field = stylisedLook(look), wasStylised = stylisedLook(view.look);
+    if (field && !wasStylised) { mossBackground = view.background; mossFov = camera.fov; }
     view.look = look;
+    if (field) INK.colour = PALETTES[look].ink;
     for (const m of Object.values(meshes)) applyMaterial(m);
     refreshVisibility();
     if (field) paintField();
-    scene.environment = field ? null : roomEnv;
-    renderer.toneMapping = field ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
-    if (field) { hemi.color.set(0xffffff); hemi.groundColor.set(0xc9c5bd); }
-    else { hemi.color.set(0xcfe3ff); hemi.groundColor.set(0x5a4a35); }
-    // A new shadow type needs a fresh shadow map and recompiled shaders.
-    renderer.shadowMap.type = field ? THREE.VSMShadowMap : THREE.PCFSoftShadowMap;
-    sun.shadow.radius = field ? 6 : 1; sun.shadow.blurSamples = field ? 12 : 8;
-    sun.shadow.bias = field ? -0.0002 : -0.0004;
-    sun.shadow.map?.dispose(); sun.shadow.map = null;
-    scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
-    setBackground(field ? 'white' : mossBackground);
+    if (field !== wasStylised) {
+      scene.environment = field ? null : roomEnv;
+      renderer.toneMapping = field ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
+      if (field) { hemi.color.set(0xffffff); hemi.groundColor.set(0xc9c5bd); }
+      else { hemi.color.set(0xcfe3ff); hemi.groundColor.set(0x5a4a35); }
+      // A new shadow type needs a fresh shadow map and recompiled shaders.
+      renderer.shadowMap.type = field ? THREE.VSMShadowMap : THREE.PCFSoftShadowMap;
+      sun.shadow.radius = field ? 6 : 1; sun.shadow.blurSamples = field ? 12 : 8;
+      sun.shadow.bias = field ? -0.0002 : -0.0004;
+      sun.shadow.map?.dispose(); sun.shadow.map = null;
+      scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
+    }
+    setBackground(field ? PALETTES[look].background : mossBackground);
     setSun();
-    // Camera: a long lens, elevation held between 12° and 70°; back to the
-    // previous lens and free elevation on the way out.
-    const deg = THREE.MathUtils.degToRad;
-    controls.minPolarAngle = field ? deg(90 - FIELD.maxEl) : 0;
-    controls.maxPolarAngle = field ? deg(90 - FIELD.minEl) : Math.PI * 0.495;
-    setFov(field ? FIELD.fov : mossFov);
-    if (field) fit();
+    if (field !== wasStylised) {
+      // Camera: a long lens, elevation held between 12° and 70°; back to the
+      // previous lens and free elevation on the way out.
+      const deg = THREE.MathUtils.degToRad;
+      controls.minPolarAngle = field ? deg(90 - FIELD.maxEl) : 0;
+      controls.maxPolarAngle = field ? deg(90 - FIELD.minEl) : Math.PI * 0.495;
+      setFov(field ? FIELD.fov : mossFov);
+      if (field) fit();
+    }
     controls.update();
   }
+  // Guthrie's brushwork texture on or off (it adds no information).
+  function setBrushwork(on) { view.brushwork = !!on; paintField(); }
   // Move the camera along its line of sight until the model's bounding box
   // just fits the view (with a small margin).
   function fit(margin = 0.92) {
@@ -441,7 +451,7 @@ export function createScene(container) {
     const views = { oblique: [0.55, 0.62, 0.85], reverse: [-0.55, 0.62, -0.85], low: [0.25, 0.18, 1.0], top: [0, 1, 0.0001] };
     let v = new THREE.Vector3(...(views[name] || views.oblique)).normalize().multiplyScalar(d);
     const target = new THREE.Vector3(0, H * 0.3, 0);
-    if (view.look === 'field') {
+    if (stylised()) {
       // Hold the elevation between 12° and 70°, then fit the model to the view.
       const sph = new THREE.Spherical().setFromVector3(v), deg = THREE.MathUtils.degToRad;
       sph.phi = THREE.MathUtils.clamp(sph.phi, deg(90 - FIELD.maxEl), deg(90 - FIELD.minEl));
@@ -475,7 +485,7 @@ export function createScene(container) {
     const az = THREE.MathUtils.degToRad(azDeg), el = THREE.MathUtils.degToRad(elDeg);
     const r = camera.position.distanceTo(controls.target);
     const dir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el));
-    camera.position.copy(view.look === 'field' ? fitPosition(dir, controls.target) : controls.target.clone().addScaledVector(dir, r));
+    camera.position.copy(stylised() ? fitPosition(dir, controls.target) : controls.target.clone().addScaledVector(dir, r));
     controls.update();
   }
 
@@ -497,6 +507,7 @@ export function createScene(container) {
     sky: () => gradient([[0, '#7fa6c9'], [0.55, '#c9d9e4'], [1, '#e9e4da']]),
     studio: () => gradient([[0, '#d9d6cf'], [1, '#a9a59c']]),
     white: () => new THREE.Color(0xffffff),
+    guthrie: () => gradient(PALETTES.guthrie.sky),
     dark: () => gradient([[0, '#2b2e33'], [1, '#141518']]),
     clear: () => null,
   };
@@ -504,7 +515,7 @@ export function createScene(container) {
     view.background = name;
     if (scene.background?.isTexture) scene.background.dispose();
     scene.background = (BACKGROUNDS[name] || BACKGROUNDS.sky)();
-    ground.material.opacity = view.look === 'field' ? FIELD.groundShadow : name === 'dark' ? 0.45 : 0.28;
+    ground.material.opacity = stylised() ? FIELD.groundShadow : name === 'dark' ? 0.45 : 0.28;
   }
 
   // Print colours: show each layer in the filament colour of its print object.
@@ -530,7 +541,7 @@ export function createScene(container) {
       applyMaterial(m);
     }
     // Print colours show the printed strips, so the painted routes step aside.
-    if (changed) { refreshVisibility(); if (view.look === 'field') paintField(); }
+    if (changed) { refreshVisibility(); paintField(); }
   }
   function setShadow(on) { ground.visible = on; }
 
@@ -593,7 +604,7 @@ export function createScene(container) {
   function orbitEnd() { if (orbitBase) camera.position.copy(orbitBase.pos); camera.lookAt(controls.target); orbitBase = null; }
 
   return { renderer, scene, camera, controls, view, meshes, focalMm, setModel, setDrape, setLook, setVisible, setView, setSpin,
-    cameraAngles, setCameraAngles, setInkWidth,
+    cameraAngles, setCameraAngles, setInkWidth, setBrushwork,
     setSun, setFov, setHeightScale, setBackground, setPrintColours, setScreenColours, setShadow, grab,
     pause, resume, renderAt, orbitStart, orbitTo, orbitEnd };
 }
@@ -656,8 +667,8 @@ function strataTexture(renderer) {
 // Redraw a land-cover canvas (in place) in another palette: each pixel takes the target
 // colour of the nearest source colour (so anti-aliased edges and JPEG noise
 // in an offline viewer's drape map cleanly).
-function paletteMap() {
-  const pairs = [[LAND_BASE, FIELD_LAND_BASE], ...Object.entries(LANDCOVER_COLOURS).map(([k, c]) => [c, FIELD_LANDCOVER_COLOURS[k]])];
+function paletteMap(to, from = { landBase: LAND_BASE, landcover: LANDCOVER_COLOURS }) {
+  const pairs = [[from.landBase, to.landBase], ...Object.entries(from.landcover).map(([k, c]) => [c, to.landcover[k]])];
   const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
   return pairs.map(([a, b]) => [rgb(a), rgb(b)]);
 }
