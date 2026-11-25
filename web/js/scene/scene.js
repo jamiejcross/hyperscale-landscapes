@@ -18,6 +18,11 @@ import { PALETTES, EVIDENCE, brushStrokes, paintBrushwork, seedFrom } from './pa
 import { createProps } from './props.js';
 import { createGeology } from './geology.js';
 import { createPits } from './pits.js';
+import { smoothTerrain, gridMesh, liftWalls, borderEdges } from './screenterrain.js';
+import { paintCarto, recolourData, heightMetres, seaCanvas, hazeRange, glyphPoints } from './carto.js';
+import { reliefCanvas } from './contours.js';
+import { createGlyphs } from './glyphs.js';
+import { decodeTrees } from '../data/props.js';
 export { layerSwatch } from './palettes.js';
 
 export const LANDCOVER_COLOURS = {
@@ -30,8 +35,17 @@ export const LANDCOVER_COLOURS = {
   'natural:bare_rock': '#B3ADA4', 'natural:scree': '#B3ADA4',
 };
 const LAND_BASE = '#BDB08E';                // land-cover canvas ground (redrawn in each look's palette)
-export const LOOKS = { guthrie: 'Guthrie', field: 'Field' };
+export const LOOKS = { guthrie: 'Guthrie', field: 'Field', anthropogenic: 'Anthropogenic' };
 export const DEFAULT_LOOK = 'guthrie';
+// What each look does beyond its palette. Anthropogenic: a smoothed screen
+// terrain, one painted cartographic drape on an unlit surface, no screen-space
+// ink (only the slab border and what is drawn into the drape and glyphs),
+// 2.5D glyphs for pylons and turbines, and haze. Any look can opt in.
+export const LOOK_DEFS = {
+  guthrie: {}, field: {},
+  anthropogenic: { screenTerrain: true, carto: true, inkPass: false, glyphs: true, fog: true },
+};
+const lookDef = look => LOOK_DEFS[look] || {};
 const stylisedLook = look => !!PALETTES[look];
 
 // Kept for compatibility: the field palette now lives in palettes.js.
@@ -95,8 +109,11 @@ export function createScene(container) {
   const drawSize = new THREE.Vector2();
   function draw() {
     if (pits) pits.layout(camera, renderer.getSize(drawSize), inner);
+    if (scene.fog) {               // haze follows the camera (live view, grabs and every turntable frame)
+      [scene.fog.near, scene.fog.far] = hazeRange(camera.position.distanceTo(controls.target), PALETTES[view.look].carto);
+    }
     renderer.render(scene, camera);
-    if (stylisedLook(view.look) && view.ink) ink.render(scene, camera, { hide: [ground, ...INKLESS.map(id => meshes[id]).filter(Boolean), ...(props?.parts.lines || []), ...(props?.parts.trees || []), ...(pits ? [pits.group] : [])] });
+    if (stylisedLook(view.look) && view.ink && lookDef(view.look).inkPass !== false) ink.render(scene, camera, { hide: [ground, ...INKLESS.map(id => meshes[id]).filter(Boolean), ...(props?.parts.lines || []), ...(props?.parts.trees || []), ...(pits ? [pits.group] : [])] });
   }
 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.28 }));
@@ -108,6 +125,13 @@ export function createScene(container) {
   const propShown = { trees: true, turbines: true, pylons: true };
   let geology = null, geologyOn = false;   // geology walls (setGeology)
   let pits = null, pitsOn = true, pitsMeta = {};   // pits on the surface (setPits)
+  let propsSection = null;     // the bundle's props, for crowns and glyphs
+  // Carto looks (Anthropogenic): built on first use per model, then cached.
+  let screenT = null;          // { T, mesh, border, wallOrig, wallLift, stats }
+  let carto = null;            // { canvas, tex, stats }
+  let cartoCache = {};         // base (recoloured), relief, sea, sampler
+  let glyphs = null, glyphInfo = null;
+  let heightsGrid = null, reliefMeta = null, layerColours = {};
   let span = 150, H = 20;
 
   function resize() {
@@ -121,7 +145,8 @@ export function createScene(container) {
   // Measured with the [0.70, 0.87, 1.0] tones: at 0.79 a lit, level surface
   // renders at its own colour (within 2/255).
   const FIELD_SUN = 0.79, FIELD_FILL = 0.79;
-  const view = { az: 225, el: 32, strength: 3.0, fill: 1.0, heightScale: 1, fov: 20, background: PALETTES[DEFAULT_LOOK].background, print: false, look: DEFAULT_LOOK, ink: true, inkWidth: 1.8, brushwork: true };
+  const view = { az: 225, el: 32, strength: 3.0, fill: 1.0, heightScale: 1, fov: 20, background: PALETTES[DEFAULT_LOOK].background, print: false, look: DEFAULT_LOOK, ink: true, inkWidth: 1.8, brushwork: true,
+    relief: true, crowns: true, smoothRadius: 1 };
   const stylised = () => stylisedLook(view.look);
   const pal = (look = view.look) => PALETTES[look] || PALETTES.field;
 
@@ -154,10 +179,13 @@ export function createScene(container) {
     // walls are flat colours, light or dark by which way they face the sun.
     field: mesh => stylisedMaterial(mesh, 'field'),
     guthrie: mesh => stylisedMaterial(mesh, 'guthrie'),
+    anthropogenic: mesh => stylisedMaterial(mesh, 'anthropogenic'),
   };
   function stylisedMaterial(mesh, look) {
     const { kind, colour } = mesh.userData, P = PALETTES[look];
     const toon = o => new THREE.MeshToonMaterial({ gradientMap: toonRamp(), ...o });
+    // (a carto look paints its own drape on the screen terrain, so the print terrain needs none)
+    if (kind === 'terrain' && lookDef(look).carto && vectors) return toon({ color: P.landBase });
     if (kind === 'terrain') { const t = lookDrape(look); return toon({ map: t, color: t ? 0xffffff : P.landBase }); }
     if (kind === 'terrain-base') return new THREE.MeshBasicMaterial({ color: P.walls.base });
     if (kind === 'terrain-sides') return new THREE.MeshBasicMaterial({ vertexColors: true });
@@ -235,11 +263,12 @@ export function createScene(container) {
     paintBoundary(g, vectors?.boundary, modelSize);          // the site red line, on top
     d.tex.needsUpdate = true;
   }
-  const paintField = () => { if (stylised()) paintDrape(view.look); };
+  const paintField = () => { if (cartoActive()) paintCartoDrape(); else if (stylised()) paintDrape(view.look); };
   // Route strips hidden while they are painted; power keeps its substations
   // and pegs as a screen-only mesh (powerPoints) so they still cast shadows.
   const PAINTED_MESHES = new Set(['roads', 'rail', 'railDisused', 'power', 'residues', 'water']);
   function refreshVisibility() {
+    if (refreshCarto()) return;
     const p = painted();
     for (const [k, m] of Object.entries(meshes)) {
       if (SCREEN_OF[k]) m.visible = p && shown[SCREEN_OF[k]] !== false     // screen-only stand-ins
@@ -251,6 +280,168 @@ export function createScene(container) {
     if (geology) geology.mesh.visible = geo && shown['terrain-sides'] !== false;
     if (geo && meshes['terrain-sides']) meshes['terrain-sides'].visible = false;
   }
+  // ---- Carto looks (Anthropogenic) ----
+  // Active only with the painted vectors (the web app and its offline viewer)
+  // and with print colours off; otherwise the look falls back to its palette
+  // on the ordinary meshes.
+  const cartoActive = () => !!lookDef(view.look).carto && !view.print && !!vectors && !!meshes.terrain;
+  const CARTO_HIDDEN = new Set(['terrain', 'terrain-steep', 'terrain-base', 'water', 'waterAreas', 'waterLines', 'roads', 'power',
+    'rail', 'railDisused', 'residues', 'buildings', 'receptors', 'powerPoints', 'powerPegs']);
+  let drapeVersion = 0;
+  // Visibility for a carto look; returns false (and undoes it) for any other.
+  function refreshCarto() {
+    if (!cartoActive()) {
+      if (screenT) { screenT.mesh.visible = screenT.border.visible = false; setWallsLifted(false); }
+      if (glyphs) glyphs.group.visible = false;
+      if (props) props.group.visible = true;
+      scene.fog = null;
+      return false;
+    }
+    ensureScreenTerrain();
+    for (const [k, m] of Object.entries(meshes)) m.visible = !CARTO_HIDDEN.has(k) && shown[k] !== false;
+    const geo = !!geology && geologyOn, sides = shown['terrain-sides'] !== false;
+    if (meshes['terrain-sides']) meshes['terrain-sides'].visible = sides && !geo;
+    if (geology) geology.mesh.visible = geo && sides;
+    setWallsLifted(true);                           // walls (and geology walls) meet the smoothed land
+    screenT.mesh.visible = shown.terrain !== false;
+    screenT.border.visible = sides;
+    if (props) props.group.visible = false;         // glyphs and painted crowns replace the 3D props
+    ensureGlyphs(); if (glyphs) glyphs.group.visible = true;
+    if (lookDef(view.look).fog && !scene.fog) scene.fog = new THREE.Fog(PALETTES[view.look].carto.haze, 1, 2);
+    paintCartoDrape();
+    return true;
+  }
+  function setWallsLifted(on) {
+    const m = meshes['terrain-sides'];
+    if (!m || !screenT?.wallOrig || screenT.lifted === on) return;
+    const a = m.geometry.attributes.position;
+    a.array.set(on ? screenT.wallLift : screenT.wallOrig); a.needsUpdate = true;
+    m.geometry.computeBoundingSphere();
+    screenT.lifted = on;
+  }
+  // Stage 1: the smoothed screen terrain over the print terrain's top surface.
+  function ensureScreenTerrain() {
+    if (screenT) return screenT;
+    const t0 = performance.now();
+    const terr = meshes.terrain.geometry, src = terr.attributes.position.array, idx = terr.index.array;
+    const used = new Uint8Array(src.length / 3); let n = 0;
+    for (let i = 0; i < idx.length; i++) if (!used[idx[i]]) { used[idx[i]] = 1; n++; }
+    const top = new Float32Array(n * 3);
+    for (let v = 0, o = 0; v < used.length; v++) if (used[v]) { top[o++] = src[3 * v]; top[o++] = src[3 * v + 1]; top[o++] = src[3 * v + 2]; }
+    const T = smoothTerrain(top, { radius: view.smoothRadius });
+    const m = gridMesh(T, modelSize.Wmm, modelSize.Hmm);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(m.positions, 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(m.uvs, 2));
+    g.setIndex(new THREE.BufferAttribute(m.indices, 1));
+    g.computeVertexNormals();
+    const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    mesh.name = 'screen-terrain'; mesh.userData = { inkId: 1 }; mesh.visible = false;
+    let wallOrig = null, wallLift = null, seg = new Float32Array(0), kept = null;
+    const sides = meshes['terrain-sides'];
+    if (sides) {
+      wallOrig = Float32Array.from(sides.geometry.attributes.position.array);
+      const L = liftWalls(wallOrig, T.sample, T);
+      wallLift = L.positions; kept = [L.keep.reduce((a, b) => a + b, 0), L.keep.length];
+      seg = borderEdges(wallLift, { keep: L.keep });           // Stage 3: the slab border
+    }
+    const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(seg, 3));
+    const border = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: PALETTES[view.look].ink, fog: false }));
+    border.name = 'slab-border'; border.visible = false;
+    inner.add(mesh, border);
+    screenT = { T, mesh, border, wallOrig, wallLift, lifted: false,
+      stats: { ...T.stats, wallTriangles: kept, borderSegments: seg.length / 6, ms: Math.round(performance.now() - t0) } };
+    return screenT;
+  }
+  // Stage 4: glyphs on the smoothed ground.
+  function ensureGlyphs() {
+    if (glyphInfo || !lookDef(view.look).glyphs || !screenT) return;
+    const C = PALETTES[view.look].carto;
+    glyphInfo = glyphPoints({ props: propsSection, vectors, mmPerM: modelSize.mmPerM, Wmm: modelSize.Wmm, Hmm: modelSize.Hmm, C });
+    if (!glyphInfo.points.length) return;
+    glyphs = createGlyphs({ points: glyphInfo.points, zAt: screenT.T.sample, ink: PALETTES[view.look].ink, C, anisotropy: renderer.capabilities.getMaxAnisotropy() });
+    inner.add(glyphs.group);
+    for (const k of ['pylons', 'turbines']) glyphs.setVisible(k, propShown[k] !== false);
+  }
+  function disposeGlyphs() { if (glyphs) { inner.remove(glyphs.group); glyphs.dispose(); } glyphs = null; glyphInfo = null; }
+  // Stage 2: the painted drape, repainted only when what it shows changes.
+  function paintCartoDrape() {
+    if (!cartoActive() || !screenT) return null;
+    const P = PALETTES[view.look], C = P.carto, t0 = performance.now();
+    const { Wmm, Hmm, mmPerM } = modelSize;
+    const long = Math.min(C.drapePx, renderer.capabilities.maxTextureSize);
+    const W = Wmm >= Hmm ? long : Math.round(long * Wmm / Hmm), H = Wmm >= Hmm ? Math.round(long * Hmm / Wmm) : long;
+    const show = { brushwork: view.brushwork, relief: view.relief, crowns: view.crowns && propShown.trees !== false };
+    for (const k of ['water', 'roads', 'rail', 'power', 'residues', 'buildings', 'receptors']) show[k] = shown[k] !== false;
+    const key = JSON.stringify([view.look, W, H, drapeVersion, show, pits && pitsOn ? pits.shown : null]);
+    if (carto?.key === key) { if (!carto.tex) uploadCarto(); return carto.stats; }
+    if (!carto || carto.canvas.width !== W || carto.canvas.height !== H) {
+      carto?.tex?.dispose();
+      const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+      carto = { canvas, tex: null };
+    }
+    let reliefMs = 0;
+    if (drapeRaw && !cartoCache.base) cartoCache.base = drapeKind === 'landcover' ? recolourCopy(drapeRaw, paletteMap(P)) : drapeRaw;
+    if (heightsGrid && !cartoCache.sampler) {
+      const r0 = performance.now(), wM = Wmm / mmPerM, hM = Hmm / mmPerM;
+      cartoCache.sampler = heightMetres(heightsGrid.grid, heightsGrid.heights, reliefMeta);
+      cartoCache.relief = reliefCanvas(cartoCache.sampler, wM, hM, Math.round(C.reliefPx * W / C.drapePx), Hmm / Wmm).canvas;
+      cartoCache.sea = seaCanvas(cartoCache.sampler, wM, hM, C.water);
+      reliefMs = performance.now() - r0;
+    }
+    if (propsSection && cartoCache.trees === undefined) cartoCache.trees = decodeTrees(propsSection);
+    const stats = paintCarto(carto.canvas, { base: cartoCache.base, baseKind: drapeKind, landBase: P.landBase, relief: cartoCache.relief, sea: cartoCache.sea,
+      vectors, Wmm, Hmm, mmPerM, C, ink: P.ink, trees: cartoCache.trees || null, seed, show });
+    const g = carto.canvas.getContext('2d');
+    if (pits && pitsOn) pits.paint(g, modelSize);             // pit symbols (BGS BritPits), on top
+    paintBoundary(g, vectors?.boundary, modelSize);          // the site red line, on top
+    carto.key = key;
+    carto.stats = { ...stats, reliefMs: Math.round(reliefMs), ms: Math.round(stats.ms), totalMs: Math.round(performance.now() - t0) };
+    uploadCarto();
+    return carto.stats;
+  }
+  function uploadCarto() {
+    if (!carto) return;
+    if (carto.tex) carto.tex.needsUpdate = true; else carto.tex = canvasTexture(carto.canvas, renderer);
+    if (screenT.mesh.material.map !== carto.tex) { screenT.mesh.material.map = carto.tex; screenT.mesh.material.needsUpdate = true; }
+  }
+  function disposeCarto() {
+    if (screenT) {
+      setWallsLifted(false);
+      inner.remove(screenT.mesh, screenT.border);
+      screenT.mesh.geometry.dispose(); screenT.mesh.material.dispose(); screenT.border.geometry.dispose(); screenT.border.material.dispose();
+      screenT = null;
+    }
+    carto?.tex?.dispose(); carto = null; cartoCache = {};
+    disposeGlyphs(); scene.fog = null;
+  }
+  // Caption small print for the look, generated from what is drawn.
+  function lookNotes() {
+    if (!cartoActive()) return [];
+    const out = [], c = carto?.stats?.crowns, gi = glyphInfo, T = screenT?.T;
+    if (c && (c.canopy || c.grid || c.row)) {
+      if (c.canopy) out.push('tree crowns drawn as symbols at canopy-model tree positions');
+      if (c.grid || c.row) out.push('woodland drawn as crown symbols, not individual trees');
+    }
+    if (gi?.counts.pylon || gi?.counts.pole) {
+      out.push(`${gi.counts.pole && gi.counts.pylon ? 'pylon and pole' : gi.counts.pylon ? 'pylon' : 'pole'} symbols ×${PALETTES[view.look].carto.glyphScale} height`);
+      if (gi.assumed.pylonHeight) out.push(`${gi.assumed.pylonHeight} pylon height${gi.assumed.pylonHeight > 1 ? 's' : ''} assumed (${PALETTES[view.look].carto.pylonM} m)`);
+    }
+    if (gi?.assumed.turbineHeight) out.push(`turbine height assumed (${PALETTES[view.look].carto.turbineM} m) for ${gi.assumed.turbineHeight}`);
+    if (T) {
+      const m = (2 * T.stats.radius + 3) * T.cell / modelSize.mmPerM;     // closing (3 cells) widened by the mean
+      out.push(`terrain smoothed for display (~${Math.max(5, Math.round(m / 5) * 5)} m); printed model unchanged`);
+    }
+    return out;
+  }
+  // Anthropogenic's own toggles (textures and symbols, not data).
+  function setCarto({ relief, crowns } = {}) {
+    if (relief != null) view.relief = !!relief;
+    if (crowns != null) view.crowns = !!crowns;
+    paintField();
+  }
+  const cartoInfo = () => ({ screen: screenT?.stats || null, drape: carto?.stats || null, glyphs: glyphInfo ? { ...glyphInfo.counts, assumed: glyphInfo.assumed } : null, notes: lookNotes() });
+
   // Light or dark slab walls by facing direction relative to the sun.
   function shadeWalls() {
     const m = meshes['terrain-sides']; if (!m) return;
@@ -294,13 +485,17 @@ export function createScene(container) {
   // vectors / screen: the field style's painted routes and screen-only meshes
   // (from buildModel); absent for models from the Python tool.
   // seed: a stable id for the site (Guthrie's brushwork is seeded from it).
-  function setModel({ layers, colours, landcover, grid, drapeKind: kind = null, vectors: vec = null, screen = {}, seed: siteSeed = null }) {
+  // heights / relief (optional): buildModel's height grid and { base, zExag,
+  // minM }, for the Anthropogenic relief and sea; without them it has none.
+  function setModel({ layers, colours, landcover, grid, drapeKind: kind = null, vectors: vec = null, screen = {}, seed: siteSeed = null, heights = null, relief = null }) {
+    disposeCarto(true);
+    heightsGrid = heights && relief ? { grid, heights } : null; reliefMeta = relief; layerColours = colours || {};
     for (const k of Object.keys(meshes)) { inner.remove(meshes[k]); disposeMesh(meshes[k]); delete meshes[k]; }
     for (const k of Object.keys(shown)) delete shown[k];
     props?.dispose(); props = null;
     geology?.dispose(); geology = null;
     pits?.dispose(); pits = null;
-    vectors = vec; modelSize = { Wmm: grid.Wmm, Hmm: grid.Hmm };
+    vectors = vec; modelSize = { Wmm: grid.Wmm, Hmm: grid.Hmm, mmPerM: grid.mmPerM };
     seed = seedFrom(siteSeed ?? `${grid.Wmm.toFixed(3)}x${grid.Hmm.toFixed(3)}`);
     setDrapeTextures(landcover, kind);
     span = Math.max(grid.Wmm, grid.Hmm);
@@ -352,8 +547,9 @@ export function createScene(container) {
   function setDrapeTextures(canvas, kind) {
     for (const k of Object.keys(drapes)) { drapes[k].tex.dispose(); delete drapes[k]; }
     drapeRaw = canvas; drapeKind = kind;
+    delete cartoCache.base; drapeVersion++;
   }
-  function repaintDrapes() { for (const look of Object.keys(drapes)) paintDrape(look); }
+  function repaintDrapes() { for (const look of Object.keys(drapes)) paintDrape(look); if (cartoActive()) paintCartoDrape(); }
   // kind: 'landcover' for the land-cover map, else anything (see setModel).
   function setDrape(canvas, kind = null) {
     setDrapeTextures(canvas, kind);
@@ -361,12 +557,14 @@ export function createScene(container) {
       const m = meshes[id]; if (!m) continue;
       for (const [look, mat] of Object.entries(m.userData.looks)) {
         if (id === 'terrain-base') continue;      // flat colour
+        if (lookDef(look).carto && vectors) continue;   // painted on the screen terrain instead
         const t = lookDrape(look);
         mat.map = t;
         mat.color.set(t ? 0xffffff : PALETTES[look].landBase);
         mat.needsUpdate = true;
       }
     }
+    if (cartoActive()) paintCartoDrape();
   }
 
   // ---- Looks ----
@@ -375,6 +573,7 @@ export function createScene(container) {
     if (!LOOKS[look] || look === view.look) return;
     view.look = look;
     INK.colour = PALETTES[look].ink;
+    if (carto && !lookDef(look).carto) { carto.tex?.dispose(); carto.tex = null; screenT && (screenT.mesh.material.map = null); }   // free the GPU copy
     for (const m of Object.values(meshes)) applyMaterial(m);
     props?.setLook(look); geology?.setLook(look);
     refreshVisibility();
@@ -413,7 +612,8 @@ export function createScene(container) {
   // props: the bundle's props section; heights and grid from buildModel.
   function setProps(section, { grid, heights, zExag = 2, seed: s = null } = {}) {
     props?.dispose(); props = null;
-    if (!section || !grid || !heights) return null;
+    propsSection = section || null; disposeGlyphs(); delete cartoCache.trees; if (carto) carto.key = null;
+    if (!section || !grid || !heights) { refreshVisibility(); return null; }
     props = createProps({ props: section, grid, heights, zExag, seed: seedFrom(s ?? 'props'), ramp: toonRamp });
     inner.add(props.group);
     props.setLook(view.look);
@@ -451,7 +651,10 @@ export function createScene(container) {
   // One class of pit on or off: 'coal', 'unknown' or 'quarry'.
   function showPitClass(cls, on) { pits?.setShown(cls, on); pits?.setVisible(pitsOn); repaintDrapes(); }
   function showGeology(on) { geologyOn = !!on; refreshVisibility(); }
-  function setPropsVisible(kind, on) { propShown[kind] = on; props?.setVisible(kind, on); refreshVisibility(); }
+  function setPropsVisible(kind, on) {
+    propShown[kind] = on; props?.setVisible(kind, on); glyphs?.setVisible(kind, on); refreshVisibility();
+    if (kind === 'trees' && cartoActive()) paintCartoDrape();      // crowns are painted
+  }
   function setTreeFactor(k) { props?.setTreeFactor(k); }
 
   function setVisible(id, on) {
@@ -459,6 +662,7 @@ export function createScene(container) {
     if (id === 'terrain-sides') shown['terrain-steep'] = on;      // "Soil sides" hid these before too
     refreshVisibility();
     if (['roads', 'rail', 'power', 'residues'].includes(id) && painted()) paintField();
+    else if (['water', 'buildings', 'receptors'].includes(id) && cartoActive()) paintField();
   }
 
   function setView(name, animate = true) {
@@ -627,7 +831,7 @@ export function createScene(container) {
   return { renderer, scene, camera, controls, view, meshes, focalMm, setModel, setDrape, setLook, setVisible, setView, setSpin,
     cameraAngles, setCameraAngles, setInkWidth, setBrushwork,
     setSun, setFov, setHeightScale, setBackground, setPrintColours, setScreenColours, setShadow, grab,
-    pause, resume, renderAt, orbitStart, orbitTo, orbitEnd, setGeology, showGeology, setPits, showPits, showPitClass, get geology() { return (geology || pits) && { walls: !!geology, panel: geology?.panel, on: geologyOn, shown: !!geology?.mesh.visible || (!!pits && pitsOn && pits.anyShown), attribution: geology?.attribution ?? pitsMeta.attribution, sub: geology?.sub ?? pitsMeta.sub, instance: geology, nonCommercial: geology ? geology.nonCommercial : pitsMeta.nonCommercial }; }, setProps, setPropsVisible, setTreeFactor, get props() { return props; }, get pits() { return pits; } };
+    pause, resume, renderAt, orbitStart, orbitTo, orbitEnd, setCarto, lookNotes, cartoInfo, setGeology, showGeology, setPits, showPits, showPitClass, get geology() { return (geology || pits) && { walls: !!geology, panel: geology?.panel, on: geologyOn, shown: !!geology?.mesh.visible || (!!pits && pitsOn && pits.anyShown), attribution: geology?.attribution ?? pitsMeta.attribution, sub: geology?.sub ?? pitsMeta.sub, instance: geology, nonCommercial: geology ? geology.nonCommercial : pitsMeta.nonCommercial }; }, setProps, setPropsVisible, setTreeFactor, get props() { return props; }, get pits() { return pits; } };
 }
 
 // Separate wall triangles (|normal z| small) from the top cap and the
@@ -688,6 +892,15 @@ function recolour(c, map) {
     d[i] = out[0]; d[i + 1] = out[1]; d[i + 2] = out[2];
   }
   g.putImageData(id, 0, 0);
+  return c;
+}
+
+// A recoloured copy for the carto drape: nearest palette colour, and base
+// land for anything further than 30 (RGB distance) from every colour.
+function recolourCopy(src, map) {
+  const c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
+  const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(src, 0, 0);
+  const id = g.getImageData(0, 0, c.width, c.height); recolourData(id.data, map, 900); g.putImageData(id, 0, 0);
   return c;
 }
 

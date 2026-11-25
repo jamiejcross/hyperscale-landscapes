@@ -18,7 +18,7 @@ export function mountExtras(ul, scene, { props, subsurface, grid, heights, zExag
     if (!n) continue;
     const li = document.createElement('li');
     const slider = kind === 'trees'
-      ? `<label class="range">${text('props.trees.height', { x: `<output>${zExag}</output>` })}<input type="range" min="1" max="4" step="0.5" value="${zExag}" data-tree-factor></label>` : '';
+      ? `<label class="range" data-hide-looks="anthropogenic">${text('props.trees.height', { x: `<output>${zExag}</output>` })}<input type="range" min="1" max="4" step="0.5" value="${zExag}" data-tree-factor></label>` : '';
     li.innerHTML = `<label class="check"><input type="checkbox" checked data-prop="${kind}">${text(`props.${kind}`)}</label>${slider}
       <details><summary>${text('preview.why')}</summary><p>${text(`props.${kind}.why`)}</p></details>`;
     ul.append(li);

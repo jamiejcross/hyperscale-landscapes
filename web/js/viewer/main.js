@@ -3,7 +3,7 @@
 // #terrain-data script tag, decodes the gzipped geometry, and uses the same
 // scene, studio and caption code as the web app.
 import { createScene, layerSwatch } from 'hl/scene';
-import { mountStudio, geologyNote } from 'hl/studio';
+import { mountStudio, geologyNote, lookNote } from 'hl/studio';
 import { mountExtras } from 'hl/extras';
 import { parseView, urlWriter } from 'hl/urlstate';
 import { PALETTES } from 'hl/palettes';
@@ -27,7 +27,8 @@ const heights = D.layout.heights ? arr('heights') : null, propsData = json('prop
 // ---- scene
 const scene = createScene($('view'));
 const drape = D.drape ? await new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = D.drape; }) : null;
-scene.setModel({ layers, colours: D.colours, grid: D.grid, landcover: drape && toCanvas(drape), drapeKind: D.drapeKind, vectors, screen, seed: D.seed ?? D.slug });
+scene.setModel({ layers, colours: D.colours, grid: D.grid, landcover: drape && toCanvas(drape), drapeKind: D.drapeKind, vectors, screen, seed: D.seed ?? D.slug,
+  heights, relief: D.relief || null });
 function toCanvas(img) { const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0); return c; }
 
 // ---- panel: title, layers, studio, caption
@@ -57,7 +58,7 @@ const studio = mountStudio($('studio'), scene, {
   printColours: () => D.printColours, alt: () => D.alt,
   fontCSS: () => [...document.querySelectorAll('style')].map(s => s.textContent).filter(t => t.includes('@font-face')).join(''),
   onChange: () => {
-    const notes = [PALETTES[scene.view.look]?.captionNote, geologyNote(scene)].filter(Boolean).join(' · ');
+    const notes = [lookNote(scene), geologyNote(scene)].filter(Boolean).join(' · ');
     $('caption').textContent = `${exag()}. ${D.caption.sources}. ${D.caption.footer}${notes ? ` · ${notes}` : ''}.`; writeUrl();
     document.querySelectorAll('.swatch[data-swatch]').forEach(s => { s.style.background = layerSwatch(s.dataset.swatch, scene.view.look, s.dataset.screen); });
   },
@@ -70,6 +71,7 @@ if (heights && (propsData || subsurface)) {
 {
   const v = parseView(location.search);
   if (typeof D.view?.brushwork === 'boolean') studio.setBrushwork(D.view.brushwork);
+  if (D.view && (D.view.relief === false || D.view.crowns === false)) scene.setCarto({ relief: D.view.relief, crowns: D.view.crowns });
   if (v.style || D.view?.look) studio.setLook(v.style || D.view.look);
   if (v.az != null || v.el != null) { const a = scene.cameraAngles(); scene.setCameraAngles(v.az ?? a.az, v.el ?? a.el); }
   scene.controls.addEventListener('change', writeUrl);

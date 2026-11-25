@@ -13,7 +13,7 @@ import { mountExtras, EXTRAS_KEYS } from './scene/extras.js';
 import { legendModel, subsurfaceCounts } from './scene/subsurface-info.js';
 import { contourCanvas } from './scene/contours.js';
 import { SURFACES, imageryCanvas } from './data/imagery.js';
-import { mountStudio, geologyNote } from './scene/studio.js';
+import { mountStudio, geologyNote, lookNote } from './scene/studio.js';
 import { PALETTES, EVIDENCE } from './scene/palettes.js';
 import { buildViewer } from './export/viewer.js';
 import { computeSection, sectionSVG, svgToPNG } from './export/section.js';
@@ -225,7 +225,8 @@ function showPreview() {
   const colours = Object.fromEntries(Object.values(state.layers).map(l => [l.id, l.colour_screen]));
   colours.railDisused = state.layers.rail.colour_screen_disused;
   state.drape = landcoverCanvas(model.grid, osm.features);
-  scene.setModel({ layers: model.layers, colours, grid: model.grid, landcover: state.drape, drapeKind: 'landcover', vectors: model.vectors, screen: model.screen, seed: siteSeed() });
+  scene.setModel({ layers: model.layers, colours, grid: model.grid, landcover: state.drape, drapeKind: 'landcover', vectors: model.vectors, screen: model.screen, seed: siteSeed(),
+    heights: model.heights, relief: reliefOf(model, opts) });
   const ul = $('layer-list'); ul.textContent = '';
   const shown = ['terrain', 'water', 'buildings', 'roads', 'rail', 'power', 'residues', 'receptors'];
   for (const id of shown) {
@@ -255,6 +256,9 @@ function showPreview() {
   $('preview').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 
+// What the Anthropogenic relief needs to turn the height grid back into metres.
+const reliefOf = (model, opts) => ({ base: opts.base, zExag: opts.zExag, minM: model.report.elevation.minM });
+
 // The disclosed exaggeration is always what is on screen: the model's own
 // factor times the studio's "extra height" (which also scales buildings).
 function exaggerationText() {
@@ -276,7 +280,7 @@ function refreshCaption() {
   if (!state.model) return;
   const counts = state.model.model.report.counts;
   $('caption').textContent = captionText(state.model.opts, state.model.form) + ` Counts: ${counts.buildings} buildings, ${counts.receptors} schools, care or community buildings, ${counts.roads} roads.`
-    + (PALETTES[scene?.view.look]?.captionNote ? ` ${PALETTES[scene.view.look].captionNote}.` : '')
+    + (scene && lookNote(scene) ? ` ${lookNote(scene)}.` : '')
     + (scene && geologyNote(scene) ? ` ${geologyNote(scene)}. ${geologyCounts()}` : '');
 }
 
@@ -386,7 +390,8 @@ $('dl-viewer').onclick = async () => {
     const caption = captionLines({ name: state.name, exaggeration: t('caption.exag', { x: opts.zExag }), sources: sourcesText(), legend: boundaryLegend() });
     const blob = await buildViewer({
       model, legend, colours, printColours: printColourMap(), caption, zExag: opts.zExag, slug: slug(),
-      seed: siteSeed(), view: { look: scene.view.look, brushwork: scene.view.brushwork },
+      seed: siteSeed(), view: { look: scene.view.look, brushwork: scene.view.brushwork, relief: scene.view.relief, crowns: scene.view.crowns },
+      relief: reliefOf(model, opts),
       props: state.bundle?.props || null, subsurface: state.bundle?.subsurface || null,
       text: Object.fromEntries(EXTRAS_KEYS.map(k => [k, t(k)])),
       sub: `${state.bbox.minLat.toFixed(3)}–${state.bbox.maxLat.toFixed(3)}°N, ${Math.abs(state.bbox.maxLon).toFixed(3)}–${Math.abs(state.bbox.minLon).toFixed(3)}°W · ${w.toFixed(1)} × ${h.toFixed(1)} km · from the ${opts.printSize} mm print model`,

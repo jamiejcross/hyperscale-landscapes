@@ -574,6 +574,29 @@ export function buildModel({ bbox, elev, osm, opts }) {
     }
   }
   for (const p of pegs) square(cv('pegcut'), grid, p.at, p.side * 1.5);
+  // More screen-only vectors, for the Anthropogenic look's painted surface
+  // (woods, tree rows, lakes, waterways, footprints, substations and the
+  // points its pylon and turbine symbols stand on). Print layers never use them.
+  Object.assign(vectors, { woods: [], treeRows: [], lakes: [], waterways: [], footprints: [], powerAreas: [], powerPoints: [] });
+  const ringsMm = g => polygonsOf(g).map(rings => rings.map(toMm));
+  for (const f of osm.features) {
+    const g = f.geometry;
+    if (f.layer === 'landcover' && (f.kind === 'natural:wood' || f.kind === 'landuse:forest') && g.type !== 'LineString' && g.type !== 'Point') {
+      for (const rings of ringsMm(g)) vectors.woods.push({ rings, leaf: f.tags?.leaf_type || null });
+    } else if (f.layer === 'trees' && g.type === 'LineString') vectors.treeRows.push({ p: toMm(g.coordinates) });
+    else if (f.layer === 'power' && f.status === 'existing') {
+      if (g.type === 'Polygon' || g.type === 'MultiPolygon') { if (POWER_AREAS.has(f.kind)) for (const rings of ringsMm(g)) vectors.powerAreas.push({ rings }); }
+      else if (g.type === 'Point') {
+        const [x, y] = toMm([g.coordinates]), h = parseFloat(f.tags?.height);
+        if (POWER_AREAS.has(f.kind) && !f.kind.startsWith('generator')) vectors.powerAreas.push({ sq: [x, y, Math.max(25 * mmPerM, 2)] });
+        const k = f.kind === 'tower' ? 'tower' : f.kind === 'pole' ? 'pole' : f.kind.startsWith('generator:wind') || f.tags?.['generator:source'] === 'wind' ? 'wind' : null;
+        if (k) vectors.powerPoints.push({ k, x, y, h: Number.isFinite(h) ? h : null });
+      }
+    }
+  }
+  for (const w of osm.water) for (const rings of ringsMm(w.geometry)) vectors.lakes.push({ rings });
+  for (const w of osm.waterways) for (const l of linesOf(w.geometry)) vectors.waterways.push({ k: w.kind, p: toMm(l) });
+  for (const f of footprints) vectors.footprints.push({ rings: f.rings.map(r => r.flatMap(([x, y]) => [+x.toFixed(2), +y.toFixed(2)])), r: f.receptor ? 1 : 0 });
 
   // ---- Resolve overlap priority per cell ----
   const masks = {};

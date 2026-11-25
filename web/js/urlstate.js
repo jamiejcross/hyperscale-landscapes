@@ -1,5 +1,5 @@
 // Shareable view state in the page URL:
-//   ?site=<id>&style=guthrie|field&az=<deg>&el=<deg>
+//   ?site=<id>&style=guthrie|field|anthropogenic&az=<deg>&el=<deg>
 // (style=mossmorran, from links made before that look was retired, opens as guthrie)
 // az and el are the CAMERA's angles as seen from the model's centre: az is
 // the compass bearing the camera stands at (clockwise from north, so 135 is
@@ -8,7 +8,7 @@
 // Pure functions, plus a throttled writer; no other imports, so Node can
 // test this file directly.
 
-export const STYLES = ['guthrie', 'field'];
+export const STYLES = ['guthrie', 'field', 'anthropogenic'];
 const RETIRED = { mossmorran: 'guthrie' };
 export const EL_MIN = 12, EL_MAX = 70;
 const SITE_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;

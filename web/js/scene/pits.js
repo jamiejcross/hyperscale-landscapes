@@ -18,7 +18,7 @@ export function createPits({ sub, grid, heights, terrain, coal = '#15110e' }) {
   if (!all.length) return null;
   const mmPerM = grid.mmPerM, zAt = heightSampler(grid, heights);
   const group = new THREE.Group(); group.name = 'pits';
-  const threadMat = new THREE.LineBasicMaterial({ color: coal, transparent: true, opacity: 0.85, depthTest: true });
+  const threadMat = new THREE.LineBasicMaterial({ color: coal, transparent: true, opacity: 0.85, depthTest: true, fog: false });
   const show = { ...DEFAULT_PIT_SHOW }; let labels = [], lastKey = '';
   const topPts = [];
   for (let i = 0; i < terrain.length; i += 3 * 7) topPts.push(new THREE.Vector3(terrain[i], terrain[i + 1], terrain[i + 2]));
@@ -29,7 +29,7 @@ export function createPits({ sub, grid, heights, terrain, coal = '#15110e' }) {
     for (const g of groupPits(all, { show })) {
       const pts = g.pits.map(p => { const x = p.x * mmPerM, y = p.y * mmPerM; return [x, y, zAt(x, y)]; });
       const cx = g.cx * mmPerM, cy = g.cy * mmPerM;
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture(g), depthTest: false, depthWrite: false, sizeAttenuation: false }));
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture(g), depthTest: false, depthWrite: false, sizeAttenuation: false, fog: false }));
       sp.center.set(0.5, 0); sp.renderOrder = 10; sp.userData.aspect = sp.material.map.image.width / sp.material.map.image.height;
       sp.position.set(cx, cy, Math.max(...pts.map(p => p[2])) + 10);
       const pos = new Float32Array(pts.length * 6);

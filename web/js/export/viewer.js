@@ -26,6 +26,10 @@ export const MODULES = {
   'hl/extras': 'js/scene/extras.js',
   'hl/export/walls': 'js/export/walls.js',
   'hl/data/props': 'js/data/props.js',
+  'hl/screenterrain': 'js/scene/screenterrain.js',
+  'hl/carto': 'js/scene/carto.js',
+  'hl/contours': 'js/scene/contours.js',
+  'hl/glyphs': 'js/scene/glyphs.js',
   gifenc: 'vendor/gifenc.js',
 };
 const KEY_OF = Object.fromEntries(Object.entries(MODULES).map(([k, p]) => [p, k]));
@@ -52,11 +56,13 @@ export function rewrite(text, from) {
 }
 
 export async function buildViewer({ model, legend, colours, printColours, caption, sub, drape, drapeKind = null, zExag, slug, alt, seed = null, view = null,
-  props = null, subsurface = null, text = {} }) {
+  props = null, subsurface = null, text = {}, relief = null }) {
   // Pack every non-empty layer into one gzipped buffer.
   const parts = [], layout = {}, ids = [];
   let offset = 0;
   const add = (key, arr, type) => {
+    // typed arrays must start on a multiple of their element size: pad to 4 bytes
+    if (offset % 4) { const pad = 4 - (offset % 4); parts.push(new Uint8Array(pad)); offset += pad; }
     const bytes = new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
     layout[key] = [offset, bytes.byteLength, type];
     parts.push(bytes); offset += bytes.byteLength;
@@ -78,7 +84,8 @@ export async function buildViewer({ model, legend, colours, printColours, captio
   if (model.vectors) add('vectors', new TextEncoder().encode(JSON.stringify(model.vectors)), 'json');
   // Site extras (screen only): the height grid for placing props and pits,
   // and the bundle's props and subsurface sections as they are.
-  if (model.heights && (props || subsurface)) add('heights', model.heights, 'float32');
+  // (always packed: the Anthropogenic look's relief, sea and screen terrain need it too)
+  if (model.heights) add('heights', model.heights, 'float32');
   if (props) add('props', new TextEncoder().encode(JSON.stringify(props)), 'json');
   if (subsurface) add('subsurface', new TextEncoder().encode(JSON.stringify(subsurface)), 'json');
   const raw = new Uint8Array(offset);
@@ -89,7 +96,7 @@ export async function buildViewer({ model, legend, colours, printColours, captio
     schema: 'hyperscale-landscapes/viewer@1',
     layers: ids, screen: screenIds, layout, geom,
     grid: Object.fromEntries(['Wmm', 'Hmm', 'mmPerM', 'nx', 'ny', 'dx', 'dy'].map(k => [k, model.grid[k]])), text,
-    colours, printColours, legend, caption, sub, zExag, slug, alt, seed, view,
+    colours, printColours, legend, caption, sub, zExag, slug, alt, seed, view, relief,
     drape: drape ? drape.toDataURL('image/jpeg', 0.85) : null, drapeKind,
   };
 

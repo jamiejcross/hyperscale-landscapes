@@ -10,6 +10,7 @@
 // exported for tests.
 import { fileURLToPath } from 'node:url';
 import { PALETTES, EVIDENCE } from '../web/js/scene/palettes.js';
+import { HILLSHADE } from '../web/js/scene/contours.js';
 
 export const MACHADO = {
   normal: null,
@@ -77,16 +78,28 @@ export function dE(hexA, hexB, kind = 'normal') {
   return deltaE2000(rgbToLab(simulate(hexToRgb(hexA), kind)), rgbToLab(simulate(hexToRgb(hexB), kind)));
 }
 
-// Evidence colours and the three most common land colours for a palette.
+// A land colour under the baked relief of a carto look at its darkest
+// hillshade (canvas 'multiply' at the relief's alpha, in sRGB as drawn).
+// Contour lines are thin and left out.
+export function underRelief(hex, alpha, grey = HILLSHADE.min) {
+  const f = (1 - alpha) + alpha * grey / 255;
+  return '#' + hexToRgb(hex).map(c => Math.round(c * f).toString(16).padStart(2, '0')).join('');
+}
+
+// Evidence colours and the three most common land colours for a palette
+// (for a carto look: its painted evidence colours, and the land also under
+// the darkest relief).
 export function coloursFor(look) {
-  const P = PALETTES[look];
+  const P = PALETTES[look], C = P.carto;
+  const land = { farmland: P.landcover['landuse:farmland'], grass: P.landcover['landuse:grass'], 'base land': P.landBase };
+  if (C) for (const [k, v] of Object.entries({ ...land })) land[`${k} (darkest relief)`] = underRelief(v, C.reliefAlpha);
   return {
     evidence: {
-      residues: P.layers.residues, schools: P.layers.receptors,
+      residues: C ? C.residue : P.layers.residues, schools: C ? C.receptor : P.layers.receptors,
       // coal ground, seams and pit squares/labels are one class
       coal: P.geology?.seams || EVIDENCE.coal, 'red line': EVIDENCE.redLine, borehole: EVIDENCE.borehole,
     },
-    land: { farmland: P.landcover['landuse:farmland'], grass: P.landcover['landuse:grass'], 'base land': P.landBase },
+    land,
   };
 }
 
@@ -108,7 +121,7 @@ export function check(look) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  for (const look of ['field', 'guthrie']) {
+  for (const look of ['field', 'guthrie', 'anthropogenic']) {
     const rows = check(look);
     console.log(`\n## ${look}: ${rows.filter(r => !r.pass).length} of ${rows.length} pairs below threshold`);
     console.log('| pair | normal | protan | deutan | tritan | min | need | |');

@@ -94,6 +94,40 @@ export const PALETTES = {
   },
 };
 
+// Anthropogenic: the Guthrie palette with a cartographic treatment (brief:
+// claude-code-prompt-anthropogenic-style.md). The land is soft and lineless;
+// what people built is drawn crisply. `carto` holds the painted surface's
+// values (scene/carto.js); everything else is Guthrie's.
+PALETTES.anthropogenic = {
+  ...PALETTES.guthrie,
+  name: 'Anthropogenic',
+  brushwork: true,
+  carto: {
+    drapePx: 6144,                     // long side, capped by the GPU's texture size
+    reliefPx: 3072, reliefAlpha: 0.62, // contour helper's canvas, multiplied in
+    brushScale: 1.5,                   // Guthrie's strokes x 1.5 (6-27 px long, 2-7.5 px wide)
+    woodShadow: 'rgba(38,30,16,0.42)', woodShadowM: 7, woodBlurM: 5,
+    woodBase: '#6a6845',
+    crownSpacingM: 8.5, crownJitter: 0.25,
+    conifer: { needleleaved: 0.85, broadleaved: 0.08, other: 0.4 },
+    broad: ['#5f6141', '#666842', '#57593b'], broadLit: 'rgba(196,190,140,0.35)', broadR: [3.6, 5.2],
+    coniferFill: '#33362a', coniferLit: '#4f5338', coniferH: [6, 8.5], coniferW: 0.42,
+    crownShadow: 'rgba(30,24,12,0.32)',
+    rowR: 2.6, rowStepM: 6,
+    water: '#8a98a0', riverM: 6, streamM: 3.2,
+    roadFill: '#e4dbc6', roadCasing: [9, 6], roadWidth: [6.5, 3.8],
+    rail: [12, 9], railWidth: 2.6, powerAlpha: 0.8, powerWidth: [2.2, 1.4],
+    // brief: #a65a44; it failed the colour-blind check (against the red line, and grass
+    // under the darkest relief), so a darker rust that passes every pair (approved by JC, 25 Nov 2026)
+    residueFill: 'rgba(143,90,82,0.25)', residue: '#8f5a52', residueHatch: [2, 10], residueEdge: 2.5,
+    footShadow: 'rgba(30,22,12,0.45)', footShadowM: 1.8, building: '#ddd5c2', receptor: '#8ea0ae', footEdge: 1.6,
+    substation: '#c9c1ae',             // not in the brief: a footprint fill a shade darker than buildings
+    haze: '#d3cdbf', fogNear: 0.55, fogFar: 1.75,
+    glyphShadow: '#1e160c', pylonFill: 'rgba(255,250,236,0.85)', turbineFill: '#efe9da',
+    pylonM: 42, turbineM: 125, glyphScale: 1.3,
+  },
+};
+
 // Brushwork for the Guthrie drape: deterministic short curved strokes, as data
 // (so a seed always gives the same strokes and GIF frames do not shimmer).
 export const BRUSHWORK = {
@@ -120,14 +154,15 @@ export function prng(seed) {
 }
 
 // The stroke list for a W x H drape: [{x, y, len, width, angle, bend, tone}].
-export function brushStrokes(W, H, seed) {
+// `scale` multiplies stroke length and width (1 for Guthrie).
+export function brushStrokes(W, H, seed, scale = 1) {
   const r = prng(seed), n = Math.round(BRUSHWORK.perArea * W * H), out = [];
   const B = BRUSHWORK;
   for (let i = 0; i < n; i++) {
     out.push({
       x: r() * W, y: r() * H,
-      len: B.length[0] + r() * (B.length[1] - B.length[0]),
-      width: B.width[0] + r() * (B.width[1] - B.width[0]),
+      len: (B.length[0] + r() * (B.length[1] - B.length[0])) * scale,
+      width: (B.width[0] + r() * (B.width[1] - B.width[0])) * scale,
       angle: (r() * 2 - 1) * B.angle,
       bend: (r() * 2 - 1) * 0.35,
       tone: B.tones[Math.floor(r() * B.tones.length)],

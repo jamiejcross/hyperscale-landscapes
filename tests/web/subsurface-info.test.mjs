@@ -98,3 +98,8 @@ test('offline viewer: every relative import of a packed module is packed too', (
   }
   assert.throws(() => rewrite("import { x } from './nowhere.js';", 'js/scene/scene.js'), /not packed/);
 });
+
+test('offline viewer: every packed array starts on a 4-byte boundary', () => {
+  const src = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/js/export/viewer.js'), 'utf8');
+  assert.match(src, /if \(offset % 4\)/);     // the packer pads before each entry
+});

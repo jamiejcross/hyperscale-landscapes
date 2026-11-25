@@ -51,6 +51,7 @@ test('colour check produces a row for every pair', () => {
   assert.equal(rows.length, 10 + 15);   // 5 evidence colours: 10 pairs, plus 5 x 3 land
 });
 
-test('evidence colours pass the colour-blind check in both looks', () => {
-  for (const look of ['field', 'guthrie']) assert.deepEqual(check(look).filter(r => !r.pass).map(r => `${r.a}-${r.b}`), [], look);
+test('evidence colours pass the colour-blind check in every look (Anthropogenic: also against its darkest relief)', () => {
+  assert.ok(check('anthropogenic').some(r => /darkest relief/.test(r.b)));
+  for (const look of ['field', 'guthrie', 'anthropogenic']) assert.deepEqual(check(look).filter(r => !r.pass).map(r => `${r.a}-${r.b}`), [], look);
 });

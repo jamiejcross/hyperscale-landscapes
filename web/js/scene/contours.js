@@ -13,9 +13,19 @@ export function contourInterval(relief) {
   return relief > 150 ? 10 : 5;
 }
 
+// Hillshade grey range (of 255): flat ground 236, held between these.
+export const HILLSHADE = { min: 200, max: 250, flat: 236 };
+
 export function contourCanvas(grid, elev, widthPx = 2048) {
-  const W = widthPx, Hc = Math.round(widthPx * grid.Hmm / grid.Wmm);
-  const wM = grid.Wmm / grid.mmPerM, hM = grid.Hmm / grid.mmPerM, px = wM / W;   // metres per pixel
+  return reliefCanvas((x, y) => elev.sample(...grid.proj.toLonLat(x, y)), grid.Wmm / grid.mmPerM, grid.Hmm / grid.mmPerM, widthPx, grid.Hmm / grid.Wmm);
+}
+
+// The same drawing from any height sampler: sampleM(xM, yM) gives metres at
+// a point (x east, y north, from the SW corner) of a wM x hM metre area.
+// `aspect` (height / width) sets the canvas height.
+export function reliefCanvas(sampleM, wM, hM, widthPx = 2048, aspect = hM / wM) {
+  const W = widthPx, Hc = Math.round(widthPx * aspect);
+  const px = wM / W;   // metres per pixel
 
   // Sample heights at pixel centres, row 0 at the north edge.
   let e = new Float32Array(W * Hc);
@@ -23,8 +33,7 @@ export function contourCanvas(grid, elev, widthPx = 2048) {
   for (let j = 0; j < Hc; j++) {
     const y = (Hc - j - 0.5) / Hc * hM;
     for (let i = 0; i < W; i++) {
-      const [lon, lat] = grid.proj.toLonLat((i + 0.5) / W * wM, y);
-      let v = elev.sample(lon, lat);
+      let v = sampleM((i + 0.5) / W * wM, y);
       if (!(v > 0)) v = 0;                                   // sea and no-data at sea level
       e[j * W + i] = v;
       if (v > 0) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
@@ -43,8 +52,8 @@ export function contourCanvas(grid, elev, widthPx = 2048) {
     // Hillshade: surface normal from the slope (pixel size in metres).
     const n = norm([-gx * ex / px, -gy * ex / px, 1]);
     const lambert = Math.max(0, n[0] * L[0] + n[1] * L[1] + n[2] * L[2]);
-    let g = 236 + 22 * (lambert - L[2]) / (1 - L[2] + 1e-6);   // flat ground stays at 236
-    g = Math.min(250, Math.max(200, g));
+    let g = HILLSHADE.flat + 22 * (lambert - L[2]) / (1 - L[2] + 1e-6);   // flat ground stays at 236
+    g = Math.min(HILLSHADE.max, Math.max(HILLSHADE.min, g));
     // Contour line: distance (in pixels) from this pixel to the nearest level.
     const slope = Math.hypot(gx, gy);
     if (v > 0 && slope > 1e-4) {

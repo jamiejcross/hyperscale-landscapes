@@ -2,7 +2,7 @@
 // sun, height, background, screengrab), shared by the app's preview and the
 // downloadable offline viewer.  Saved images always carry the caption strip.
 import { withCaption } from './caption.js';
-import { LOOKS } from './scene.js';
+import { LOOKS, LOOK_DEFS } from './scene.js';
 import { PALETTES } from './palettes.js';
 import { SIZES, makeGIF, makeVideo, videoType } from './turntable.js';
 import { captionNote, subsurfaceManifest } from './subsurface-info.js';
@@ -17,6 +17,11 @@ export function geologyNote(scene) {
   if (!g?.shown) return '';
   return g.sub ? captionNote(g.sub) : `${g.attribution}${g.nonCommercial ? ' (non-commercial use only)' : ''}`;
 }
+// The look's caption small print: the palette's note, then what the look
+// itself drew (Anthropogenic: crowns, glyph heights, terrain smoothing).
+export function lookNote(scene) {
+  return [PALETTES[scene.view.look]?.captionNote, ...(scene.lookNotes?.() || [])].filter(Boolean).join('; ');
+}
 const escHTML = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 export function mountStudio(el, scene, host) {
@@ -28,8 +33,10 @@ export function mountStudio(el, scene, host) {
       <select name="look" aria-label="Style">
         ${Object.entries(LOOKS).map(([k, label]) => `<option value="${k}"${k === scene.view.look ? ' selected' : ''}>${label}</option>`).join('')}
       </select>
-      <label class="range" name="inkRow">Outline <input type="range" name="ink" min="1" max="3" step="0.1" value="1.8"><output name="inkV"></output></label>
+      <label class="range" name="inkRow"${LOOK_DEFS[scene.view.look]?.inkPass === false ? ' hidden' : ''}>Outline <input type="range" name="ink" min="1" max="3" step="0.1" value="1.8"><output name="inkV"></output></label>
       <label class="check" name="brushRow"${PALETTES[scene.view.look]?.brushwork ? '' : ' hidden'}><input type="checkbox" name="brush"${scene.view.brushwork ? ' checked' : ''}> Brushwork (a texture, not data)</label>
+      <label class="check" name="reliefRow"${LOOK_DEFS[scene.view.look]?.carto ? '' : ' hidden'}><input type="checkbox" name="relief"${scene.view.relief !== false ? ' checked' : ''}> Relief shading (from the model's heights)</label>
+      <label class="check" name="crownRow"${LOOK_DEFS[scene.view.look]?.carto ? '' : ' hidden'}><input type="checkbox" name="crowns"${scene.view.crowns !== false ? ' checked' : ''}> Crown symbols (woodland drawn as symbols)</label>
       <p class="hint">Changes how the model is drawn on screen and in saved images. Print files are not affected.</p>
     </fieldset>
     <fieldset><legend>Camera</legend>
@@ -122,11 +129,17 @@ export function mountStudio(el, scene, host) {
   q('ink').addEventListener('input', () => { scene.setInkWidth(+q('ink').value); inkLabel(); });
   inkLabel();
   q('brush').addEventListener('change', e => scene.setBrushwork(e.target.checked));
+  q('relief').addEventListener('change', e => { scene.setCarto?.({ relief: e.target.checked }); host.onChange?.(scene.view); });
+  q('crowns').addEventListener('change', e => { scene.setCarto?.({ crowns: e.target.checked }); host.onChange?.(scene.view); });
   q('look').addEventListener('change', e => {
     const to = e.target.value;
     scene.setLook(to);
     renderLegend();
-    q('brushRow').hidden = !PALETTES[to]?.brushwork;    // Guthrie only
+    q('brushRow').hidden = !PALETTES[to]?.brushwork;    // Guthrie and Anthropogenic
+    q('reliefRow').hidden = q('crownRow').hidden = !LOOK_DEFS[to]?.carto;
+    q('inkRow').hidden = LOOK_DEFS[to]?.inkPass === false;
+    // controls elsewhere that a look makes meaningless (e.g. the 3D tree height in Anthropogenic)
+    document.querySelectorAll('[data-hide-looks]').forEach(n => { n.hidden = n.dataset.hideLooks.split(' ').includes(to); });
     q('bg').value = scene.view.background;     // each look brings its own background
     update();
   });
@@ -134,7 +147,7 @@ export function mountStudio(el, scene, host) {
 
   // The caption for saved images and animations, with the look's note (Guthrie) in the small print.
   function caption() {
-    const c = host.caption(), notes = [PALETTES[scene.view.look]?.captionNote, geologyNote(scene)].filter(Boolean);
+    const c = host.caption(), notes = [lookNote(scene), geologyNote(scene)].filter(Boolean);
     return notes.length ? { ...c, footer: [c.footer, ...notes].join(' · ') } : c;
   }
   // The captioned image, without downloading it (also used by artefact exports).
@@ -209,7 +222,7 @@ export function mountStudio(el, scene, host) {
       return `<div class="geo-row">${icon}<span>${escHTML(it.text)}</span></div>`;
     }).join('');
   }
-  function wallsCaption() { const c = host.caption(), note = PALETTES[scene.view.look]?.captionNote; return note ? { ...c, footer: `${c.footer} · ${note}` } : c; }
+  function wallsCaption() { const c = host.caption(), note = lookNote(scene); return note ? { ...c, footer: `${c.footer} · ${note}` } : c; }
   // (the BGS sources go in the export's own caption, so the plain caption is used)
   async function walls(kind) {
     const G = scene.geology?.instance; if (!G) return null;
