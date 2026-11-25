@@ -21,5 +21,7 @@
   nwr["amenity"~"^(school|kindergarten|college|university|hospital|clinic|doctors|prison|community_centre|place_of_worship|library|social_facility|nursing_home|childcare)$"]({{bbox}});
   nwr["social_facility"]({{bbox}});
   nwr["healthcare"]({{bbox}});
+  node["natural"="tree"]({{bbox}});
+  way["natural"="tree_row"]({{bbox}});
 );
 out tags geom({{bbox}});

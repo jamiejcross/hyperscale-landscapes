@@ -79,12 +79,16 @@ export function classify(t) {
   if (RECEPTOR.has(t.amenity) || 'social_facility' in t || 'healthcare' in t) return ['receptors', t.amenity || t.social_facility || t.healthcare];
   if (t.landuse) return ['landcover', `landuse:${t.landuse}`];
   if (COVER_NATURAL.has(t.natural)) return ['landcover', `natural:${t.natural}`];
+  if (t.natural === 'tree' || t.natural === 'tree_row') return ['trees', t.natural];
   return null;
 }
 
 const KEEP = set('voltage', 'operator', 'start_date', 'height', 'building:levels', 'railway', 'usage',
   'historic', 'man_made', 'landuse', 'natural', 'amenity', 'social_facility', 'healthcare',
-  'generator:source', 'plant:source', 'plant:storage', 'highway', 'waterway', 'width', 'building', 'lanes');
+  'generator:source', 'plant:source', 'plant:storage', 'highway', 'waterway', 'width', 'building', 'lanes',
+  // supports and turbines (3D symbols), and individual trees
+  'height:hub', 'hub_height', 'rotor:diameter', 'generator:output:electricity', 'generator:method', 'manufacturer', 'model',
+  'structure', 'design', 'line_attachment', 'direction', 'genus', 'species', 'leaf_type', 'leaf_cycle', 'taxon', 'denotation');
 
 function cleanTags(t, layer) {
   const out = {};

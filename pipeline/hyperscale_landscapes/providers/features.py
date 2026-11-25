@@ -30,7 +30,17 @@ KEEP_TAGS = {"voltage", "operator", "start_date", "end_date", "frequency",
              "height", "railway", "usage", "historic", "man_made", "landuse",
              "natural", "amenity", "social_facility", "healthcare", "substance",
              "resource", "industrial", "construction", "proposed", "disused",
-             "abandoned"}
+             "abandoned",
+             # supports and turbines (3D symbols): dimensions and design
+             "height:hub", "hub_height", "rotor:diameter", "manufacturer", "model", "structure", "design",
+             "line_attachment", "direction",
+             # individual trees and tree rows
+             "genus", "species", "leaf_type", "leaf_cycle", "taxon", "denotation"}
+# The tags the 3D props rely on; the web app's KEEP must include them too
+# (tests/test_query_parity.py).
+PROP_TAGS = {"height", "height:hub", "rotor:diameter", "generator:source", "generator:output:electricity",
+             "manufacturer", "model", "voltage", "structure", "design", "line_attachment",
+             "genus", "species", "leaf_type"}
 
 RAIL_KINDS = {"rail", "light_rail", "narrow_gauge", "subway", "tram",
               "abandoned", "disused", "razed", "dismantled", "preserved",
@@ -75,6 +85,8 @@ def _query(bbox: BBox) -> str:
   nwr["amenity"~"{rx(RECEPTOR_AMENITY)}"]({b});
   nwr["social_facility"]({b});
   nwr["healthcare"]({b});
+  node["natural"="tree"]({b});
+  way["natural"="tree_row"]({b});
 );
 out tags geom({b});
 """
@@ -137,6 +149,8 @@ def classify(tags: dict) -> tuple[str, str] | None:
         return "landcover", f"landuse:{tags['landuse']}"
     if tags.get("natural") in LANDCOVER_NATURAL:
         return "landcover", f"natural:{tags['natural']}"
+    if tags.get("natural") in ("tree", "tree_row"):
+        return "trees", tags["natural"]
     return None
 
 
