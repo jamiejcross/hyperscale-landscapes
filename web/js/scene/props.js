@@ -59,7 +59,7 @@ export function createProps({ props, grid, heights, zExag = 2, seed = 1, ramp })
   const mmPerM = grid.mmPerM, zAt = heightSampler(grid, heights);
   const parts = { trees: [], turbines: [], pylons: [], lines: [] };
   const mats = {};                    // look -> { inst, turbine, pylon }
-  let look = 'mossmorran', treeFactor = zExag, rotorPhase = 0;
+  let look = 'guthrie', treeFactor = zExag, rotorPhase = 0;
   const T = decodeTrees(props);
 
   // ---- trees ----
@@ -182,8 +182,7 @@ export function createProps({ props, grid, heights, zExag = 2, seed = 1, ramp })
   function materialsFor(lk) {
     if (!mats[lk]) {
       const P = PALETTES[lk] || PALETTES.field;
-      const stylised = lk !== 'mossmorran';
-      const make = c => stylised ? new THREE.MeshToonMaterial({ color: c, gradientMap: ramp?.() }) : new THREE.MeshStandardMaterial({ color: c, roughness: 0.85 });
+      const make = c => new THREE.MeshToonMaterial({ color: c, gradientMap: ramp?.() });
       mats[lk] = { inst: make(0xffffff), turbine: make(P.props.turbine), pylon: make(P.props.pylon), ink: P.ink || '#221d18' };
     }
     return mats[lk];
@@ -194,7 +193,7 @@ export function createProps({ props, grid, heights, zExag = 2, seed = 1, ramp })
     for (const m of parts.trees) m.material = M.inst;
     for (const m of parts.turbines) m.material = M.turbine;
     for (const m of parts.pylons) m.material = M.pylon;
-    if (lines) lines.material.color.set(lk === 'mossmorran' ? '#2a2a28' : M.ink);
+    if (lines) lines.material.color.set(M.ink);
     colourTrees();
   }
   function setTreeFactor(k) { treeFactor = k; placeTrees(); }

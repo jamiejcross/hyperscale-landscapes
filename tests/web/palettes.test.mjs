@@ -32,7 +32,7 @@ test('brushwork count scales with drape area', () => {
 test('layer swatches follow the look', () => {
   assert.equal(layerSwatch('residues', 'guthrie', '#000000'), '#9a6050');
   assert.equal(layerSwatch('terrain', 'field', '#000000'), '#d6d09a');
-  assert.equal(layerSwatch('residues', 'mossmorran', '#123456'), '#123456');
+  assert.equal(layerSwatch('residues', 'unknown-look', '#123456'), '#123456');
 });
 
 test('CIEDE2000 matches Sharma, Wu and Dalal (2005) reference pairs', () => {

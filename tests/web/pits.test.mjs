@@ -31,15 +31,22 @@ test('collieries by name count as coal, labelled as such', () => {
   assert.equal(groupPits([{ ...c, class: 'coal', coal_by_name: true }])[0].note, 'colliery · no mine plan matched');   // flagged by the pipeline
 });
 
-test('one group per name; quarries only when asked for', () => {
+test('one group per name; each class drawn only when switched on', () => {
   const g = groupPits(PITS);
   assert.deepEqual(g.map(x => x.name), ['Little Raith', 'Camilla']);
   assert.equal(g[0].cls, 'coal'); assert.equal(g[0].pits.length, 2);
   assert.equal(g[0].cx, 200); assert.equal(g[0].cy, 300);
   assert.equal(g[0].note, 'coal mine · abandoned 1932');
-  const q = groupPits(PITS, { showQuarries: true });
+  const q = groupPits(PITS, { show: { coal: true, unknown: true, quarry: true } });
   assert.equal(q.length, 4);
   assert.equal(q.find(x => x.name === 'Little Raith Quarries').note, 'quarry · name also on a coal mine plan');
+  assert.deepEqual(groupPits(PITS, { show: { quarry: true } }).map(x => x.name), ['Little Raith Quarries', 'Cults Quarry']);
+  assert.deepEqual(groupPits(PITS, { show: { unknown: true } }).map(x => x.name), ['Camilla']);
+  // a name with pits of two classes takes its class from the drawn pits only
+  const mixed = [{ name: 'Mixed', class: 'coal', x: 0, y: 0, plans: [] }, { name: 'Mixed', class: 'unknown', x: 2, y: 0, plans: [] }];
+  assert.equal(groupPits(mixed)[0].cls, 'coal');
+  const u = groupPits(mixed, { show: { unknown: true } })[0];
+  assert.equal(u.cls, 'unknown'); assert.equal(u.pits.length, 1); assert.equal(u.cx, 2);
 });
 
 test('label layout: above the silhouette, no overlaps, inside the frame', () => {

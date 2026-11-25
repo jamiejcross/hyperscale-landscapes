@@ -2,21 +2,16 @@
 // defined: the app preview, the standalone viewer and (Phase 4) every
 // rendered artefact use it, so styling is identical everywhere.
 //
-// Three looks share the same geometry, switched by setLook() without a rebuild:
-//   mossmorran (default) follows JC's Mossmorran viewer: room environment,
-//     hemisphere fill, a warm soft-shadow sun from the south-west, soil strata
-//     on the sides, clearcoat water, and a shadow-catcher ground.
-//   field: a flat-shaded diorama on white (presentation only: print files,
-//     sections and every factual layer are unchanged).
-//   guthrie: the field look with a palette after Sir James Guthrie, a sky
-//     gradient and optional brushwork on the land (colours in palettes.js).
-// "Stylised" below means field or guthrie: they share every code path and
-// differ only in their palette.
+// Two looks share the same geometry, switched by setLook() without a rebuild:
+//   guthrie (default): a flat-shaded diorama with a palette after Sir James
+//     Guthrie, a sky gradient and optional brushwork on the land.
+//   field: the same on white, in its own palette (colours in palettes.js).
+// Both are presentation only: print files, sections and every factual layer
+// are unchanged. (The earlier Mossmorran look was retired in Nov 2026.)
 // Each mesh keeps one material per look, made the first time that look is
 // shown and disposed with the model.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
-import { RoomEnvironment } from 'three/addons/RoomEnvironment.js';
 import { createInk, INK } from './ink.js';
 import { paintOverlays, paintBoundary } from './overlays.js';
 import { PALETTES, EVIDENCE, brushStrokes, paintBrushwork, seedFrom } from './palettes.js';
@@ -34,9 +29,10 @@ export const LANDCOVER_COLOURS = {
   'landuse:commercial': '#C8BFC0', 'landuse:retail': '#C8BFC0', 'landuse:railway': '#BDB5AA',
   'natural:bare_rock': '#B3ADA4', 'natural:scree': '#B3ADA4',
 };
-const LAND_BASE = '#BDB08E';
-export const LOOKS = { mossmorran: 'Mossmorran', field: 'Field', guthrie: 'Guthrie' };
-const stylisedLook = look => look !== 'mossmorran' && !!PALETTES[look];
+const LAND_BASE = '#BDB08E';                // land-cover canvas ground (redrawn in each look's palette)
+export const LOOKS = { guthrie: 'Guthrie', field: 'Field' };
+export const DEFAULT_LOOK = 'guthrie';
+const stylisedLook = look => !!PALETTES[look];
 
 // Kept for compatibility: the field palette now lives in palettes.js.
 export const FIELD_LANDCOVER_COLOURS = PALETTES.field.landcover;
@@ -58,29 +54,28 @@ export function createScene(container) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMapping = THREE.NoToneMapping;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.VSMShadowMap;
   container.appendChild(renderer.domElement);
   renderer.domElement.setAttribute('role', 'img');
 
   const scene = new THREE.Scene();
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const roomEnv = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  scene.environment = roomEnv;
-  scene.environmentIntensity = 0.35;
-  scene.background = gradient([[0, '#7fa6c9'], [0.55, '#c9d9e4'], [1, '#e9e4da']]);
 
-  const camera = new THREE.PerspectiveCamera(28, 1, 0.5, 5000);
+  // Camera: a long lens, elevation held between 12° and 70° (FIELD below).
+  const camera = new THREE.PerspectiveCamera(20, 1, 0.5, 5000);
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true; controls.dampingFactor = 0.08;
-  controls.maxPolarAngle = Math.PI * 0.495;
+  controls.minPolarAngle = THREE.MathUtils.degToRad(90 - 70);
+  controls.maxPolarAngle = THREE.MathUtils.degToRad(90 - 12);
   controls.autoRotateSpeed = 0.8;
 
-  const hemi = new THREE.HemisphereLight(0xcfe3ff, 0x5a4a35, 1.0);
-  const sun = new THREE.DirectionalLight(0xfff1dc, 3.0);
+  // Neutral light: the colours are in the materials.
+  const hemi = new THREE.HemisphereLight(0xffffff, 0xc9c5bd, 1.0);
+  const sun = new THREE.DirectionalLight(0xffffff, 3.0);
   sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.04;
+  sun.shadow.bias = -0.0002; sun.shadow.normalBias = 0.04;
+  sun.shadow.radius = 6; sun.shadow.blurSamples = 12;
   scene.add(hemi, sun, sun.target);
 
   const model = new THREE.Group();
@@ -113,7 +108,6 @@ export function createScene(container) {
   const propShown = { trees: true, turbines: true, pylons: true };
   let geology = null, geologyOn = false;   // geology walls (setGeology)
   let pits = null, pitsOn = true, pitsMeta = {};   // pits on the surface (setPits)
-  let mossCanvas = null;                     // Mossmorran's drape: raw drape + red line + pits
   let span = 150, H = 20;
 
   function resize() {
@@ -127,22 +121,18 @@ export function createScene(container) {
   // Measured with the [0.70, 0.87, 1.0] tones: at 0.79 a lit, level surface
   // renders at its own colour (within 2/255).
   const FIELD_SUN = 0.79, FIELD_FILL = 0.79;
-  const view = { az: 225, el: 32, strength: 3.0, fill: 1.0, heightScale: 1, fov: 28, background: 'sky', print: false, look: 'mossmorran', ink: true, inkWidth: 1.8, brushwork: true };
+  const view = { az: 225, el: 32, strength: 3.0, fill: 1.0, heightScale: 1, fov: 20, background: PALETTES[DEFAULT_LOOK].background, print: false, look: DEFAULT_LOOK, ink: true, inkWidth: 1.8, brushwork: true };
   const stylised = () => stylisedLook(view.look);
   const pal = (look = view.look) => PALETTES[look] || PALETTES.field;
 
-  // Sun: azimuth clockwise from north, height above the horizon; it warms
-  // towards orange as it drops (as in the Mossmorran viewer).
+  // Sun: azimuth clockwise from north, height above the horizon.
   function setSun(azDeg = view.az, elDeg = view.el, strength = view.strength, fill = view.fill) {
     Object.assign(view, { az: azDeg, el: elDeg, strength, fill });
     const az = THREE.MathUtils.degToRad(azDeg), el = THREE.MathUtils.degToRad(elDeg), r = span * 2.5;
     sun.position.set(Math.sin(az) * Math.cos(el) * r, Math.sin(el) * r, -Math.cos(az) * Math.cos(el) * r);
     // Field lights are scaled so a lit, level surface shows its own colour.
-    sun.intensity = strength * (stylised() ? FIELD_SUN : 1);
-    hemi.intensity = fill * (stylised() ? FIELD_FILL : 1);
-    const warm = THREE.MathUtils.clamp((elDeg - 3) / 30, 0, 1);
-    if (stylised()) sun.color.set(0xffffff);      // stylised: neutral light, the colours are in the materials
-    else sun.color.setRGB(1, 0.78 + 0.18 * warm, 0.58 + 0.33 * warm);
+    sun.intensity = strength * FIELD_SUN;
+    hemi.intensity = fill * FIELD_FILL;
     const sc = sun.shadow.camera;
     sc.left = sc.bottom = -span * 0.75; sc.right = sc.top = span * 0.75; sc.near = 1; sc.far = span * 6;
     sc.updateProjectionMatrix();
@@ -159,16 +149,8 @@ export function createScene(container) {
   }
 
   // ---- Materials, one set per look ----
-  let drapeTex = null;           // the land-cover or satellite drape, shared by both looks
   const MAKE = {
-    mossmorran(mesh) {
-      const { kind, colour } = mesh.userData;
-      if (kind === 'terrain' || kind === 'terrain-base') return new THREE.MeshStandardMaterial({ map: drapeTex, color: drapeTex ? 0xffffff : LAND_BASE, roughness: 0.92 });
-      if (kind === 'terrain-sides' || kind === 'terrain-steep') return new THREE.MeshStandardMaterial({ map: strataTexture(renderer), roughness: 0.96 });
-      if (kind === 'water') return new THREE.MeshPhysicalMaterial({ color: 0x24506a, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.6 });
-      return new THREE.MeshStandardMaterial({ color: colour, roughness: 0.8 });
-    },
-    // Field (and Guthrie): three-step toon shading on everything lit; the slab
+    // Field and Guthrie: three-step toon shading on everything lit; the slab
     // walls are flat colours, light or dark by which way they face the sun.
     field: mesh => stylisedMaterial(mesh, 'field'),
     guthrie: mesh => stylisedMaterial(mesh, 'guthrie'),
@@ -301,7 +283,7 @@ export function createScene(container) {
     mesh.geometry.dispose();
     const mats = [...Object.values(mesh.userData.looks), mesh.userData.printMaterial].filter(Boolean);
     for (const m of mats) {
-      if (m.map && m.map !== drapeTex && !Object.values(drapes).some(d => d.tex === m.map)) m.map.dispose();
+      if (m.map && !Object.values(drapes).some(d => d.tex === m.map)) m.map.dispose();
       m.dispose();
     }
   }
@@ -337,7 +319,7 @@ export function createScene(container) {
       const g = geometry(m);
       if (id === 'terrain') {
         // Top and bottom take the drape; the sides are split off into their
-        // own geometry (soil strata in the Mossmorran look).
+        // own geometry (flat walls, or the geology walls).
         const { capsIdx, baseIdx, walls, steep } = splitWalls(m, grid);
         g.setIndex(new THREE.BufferAttribute(capsIdx, 1));
         g.setAttribute('uv', planarUV(m.positions, grid));
@@ -368,76 +350,37 @@ export function createScene(container) {
 
   // Swap the drape on the land top (land cover or satellite) without rebuilding.
   function setDrapeTextures(canvas, kind) {
-    drapeTex?.dispose();
     for (const k of Object.keys(drapes)) { drapes[k].tex.dispose(); delete drapes[k]; }
     drapeRaw = canvas; drapeKind = kind;
-    // Mossmorran shows the site red line (and pit symbols) on its drape too.
-    mossCanvas = null;
-    if (canvas) { mossCanvas = document.createElement('canvas'); mossCanvas.width = canvas.width; mossCanvas.height = canvas.height; }
-    drapeTex = mossCanvas ? canvasTexture(mossCanvas, renderer) : null;
-    paintMossDrape();
   }
-  function paintMossDrape() {
-    if (!mossCanvas) return;
-    const g = mossCanvas.getContext('2d');
-    g.drawImage(drapeRaw, 0, 0);
-    if (pits && pitsOn) pits.paint(g, modelSize);
-    if (vectors?.boundary?.length) paintBoundary(g, vectors.boundary, modelSize);
-    drapeTex.needsUpdate = true;
-  }
-  function repaintDrapes() { paintMossDrape(); for (const look of Object.keys(drapes)) paintDrape(look); }
+  function repaintDrapes() { for (const look of Object.keys(drapes)) paintDrape(look); }
   // kind: 'landcover' for the land-cover map, else anything (see setModel).
   function setDrape(canvas, kind = null) {
     setDrapeTextures(canvas, kind);
     for (const id of ['terrain', 'terrain-base']) {
       const m = meshes[id]; if (!m) continue;
       for (const [look, mat] of Object.entries(m.userData.looks)) {
-        if (stylisedLook(look) && id === 'terrain-base') continue;      // flat colour
-        const t = stylisedLook(look) ? lookDrape(look) : drapeTex;
+        if (id === 'terrain-base') continue;      // flat colour
+        const t = lookDrape(look);
         mat.map = t;
-        mat.color.set(t ? 0xffffff : stylisedLook(look) ? PALETTES[look].landBase : LAND_BASE);
+        mat.color.set(t ? 0xffffff : PALETTES[look].landBase);
         mat.needsUpdate = true;
       }
     }
   }
 
   // ---- Looks ----
-  // Switch the whole look (materials, lights, environment, tone mapping,
-  // shadow type, background) without rebuilding any geometry.
-  let mossBackground = view.background, mossFov = view.fov;
+  // Switch the look (materials, ink colour, background) without rebuilding any geometry.
   function setLook(look) {
     if (!LOOKS[look] || look === view.look) return;
-    const field = stylisedLook(look), wasStylised = stylisedLook(view.look);
-    if (field && !wasStylised) { mossBackground = view.background; mossFov = camera.fov; }
     view.look = look;
-    if (field) INK.colour = PALETTES[look].ink;
+    INK.colour = PALETTES[look].ink;
     for (const m of Object.values(meshes)) applyMaterial(m);
     props?.setLook(look); geology?.setLook(look);
     refreshVisibility();
-    if (field) paintField();
-    if (field !== wasStylised) {
-      scene.environment = field ? null : roomEnv;
-      renderer.toneMapping = field ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
-      if (field) { hemi.color.set(0xffffff); hemi.groundColor.set(0xc9c5bd); }
-      else { hemi.color.set(0xcfe3ff); hemi.groundColor.set(0x5a4a35); }
-      // A new shadow type needs a fresh shadow map and recompiled shaders.
-      renderer.shadowMap.type = field ? THREE.VSMShadowMap : THREE.PCFSoftShadowMap;
-      sun.shadow.radius = field ? 6 : 1; sun.shadow.blurSamples = field ? 12 : 8;
-      sun.shadow.bias = field ? -0.0002 : -0.0004;
-      sun.shadow.map?.dispose(); sun.shadow.map = null;
-      scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
-    }
-    setBackground(field ? PALETTES[look].background : mossBackground);
+    paintField();
+    setBackground(PALETTES[look].background);
     setSun();
-    if (field !== wasStylised) {
-      // Camera: a long lens, elevation held between 12° and 70°; back to the
-      // previous lens and free elevation on the way out.
-      const deg = THREE.MathUtils.degToRad;
-      controls.minPolarAngle = field ? deg(90 - FIELD.maxEl) : 0;
-      controls.maxPolarAngle = field ? deg(90 - FIELD.minEl) : Math.PI * 0.495;
-      setFov(field ? FIELD.fov : mossFov);
-      if (field) fit();
-    }
     controls.update();
   }
   // Guthrie's brushwork texture on or off (it adds no information).
@@ -505,7 +448,8 @@ export function createScene(container) {
     return pits ? { ...pits.counts, labels: pits.labels } : null;
   }
   function showPits(on) { pitsOn = !!on; pits?.setVisible(pitsOn); repaintDrapes(); }
-  function showQuarries(on) { pits?.setQuarries(on); pits?.setVisible(pitsOn); repaintDrapes(); }
+  // One class of pit on or off: 'coal', 'unknown' or 'quarry'.
+  function showPitClass(cls, on) { pits?.setShown(cls, on); pits?.setVisible(pitsOn); repaintDrapes(); }
   function showGeology(on) { geologyOn = !!on; refreshVisibility(); }
   function setPropsVisible(kind, on) { propShown[kind] = on; props?.setVisible(kind, on); refreshVisibility(); }
   function setTreeFactor(k) { props?.setTreeFactor(k); }
@@ -554,9 +498,8 @@ export function createScene(container) {
   }
   function setCameraAngles(azDeg, elDeg) {
     const az = THREE.MathUtils.degToRad(azDeg), el = THREE.MathUtils.degToRad(elDeg);
-    const r = camera.position.distanceTo(controls.target);
     const dir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el));
-    camera.position.copy(stylised() ? fitPosition(dir, controls.target) : controls.target.clone().addScaledVector(dir, r));
+    camera.position.copy(fitPosition(dir, controls.target));
     controls.update();
   }
 
@@ -615,6 +558,7 @@ export function createScene(container) {
     if (changed) { refreshVisibility(); paintField(); }
   }
   function setShadow(on) { ground.visible = on; }
+  INK.colour = PALETTES[view.look].ink; setBackground(view.background);   // the default look
 
   // Render at `mult` x the on-screen size and return the pixels on a canvas.
   // Captures ignore any on-screen view offset (the offline viewer shifts the
@@ -683,7 +627,7 @@ export function createScene(container) {
   return { renderer, scene, camera, controls, view, meshes, focalMm, setModel, setDrape, setLook, setVisible, setView, setSpin,
     cameraAngles, setCameraAngles, setInkWidth, setBrushwork,
     setSun, setFov, setHeightScale, setBackground, setPrintColours, setScreenColours, setShadow, grab,
-    pause, resume, renderAt, orbitStart, orbitTo, orbitEnd, setGeology, showGeology, setPits, showPits, showQuarries, get geology() { return (geology || pits) && { walls: !!geology, panel: geology?.panel, on: geologyOn, shown: !!geology?.mesh.visible || (!!pits && pitsOn), attribution: geology?.attribution ?? pitsMeta.attribution, nonCommercial: geology ? geology.nonCommercial : pitsMeta.nonCommercial }; }, setProps, setPropsVisible, setTreeFactor, get props() { return props; }, get pits() { return pits; } };
+    pause, resume, renderAt, orbitStart, orbitTo, orbitEnd, setGeology, showGeology, setPits, showPits, showPitClass, get geology() { return (geology || pits) && { walls: !!geology, panel: geology?.panel, on: geologyOn, shown: !!geology?.mesh.visible || (!!pits && pitsOn && pits.anyShown), attribution: geology?.attribution ?? pitsMeta.attribution, nonCommercial: geology ? geology.nonCommercial : pitsMeta.nonCommercial }; }, setProps, setPropsVisible, setTreeFactor, get props() { return props; }, get pits() { return pits; } };
 }
 
 // Separate wall triangles (|normal z| small) from the top cap and the
@@ -717,28 +661,6 @@ function splitWalls({ positions: P, indices: I }, grid) {
     return g;
   };
   return { capsIdx: new Uint32Array(caps), baseIdx: new Uint32Array(base), walls: geo(wallPos, wallUV), steep: steepPos.length ? geo(steepPos, steepUV) : null };
-}
-
-// Soil strata for the sides (from the Mossmorran viewer): irregular bands
-// by height, a little grain, and a dark turf line at the surface.
-function strataTexture(renderer) {
-  const W = 1024, Hh = 512, c = document.createElement('canvas'); c.width = W; c.height = Hh;
-  const g = c.getContext('2d');
-  const layers = [[0.00, '#3b2f26'], [0.10, '#5a4a3a'], [0.24, '#8a7356'], [0.33, '#6f5a43'],
-    [0.45, '#a58a63'], [0.55, '#7d6449'], [0.68, '#5d4a37'], [0.82, '#4a3b2b'], [0.93, '#3a2e1f']];
-  for (let x = 0; x < W; x += 2) for (let i = 0; i < layers.length; i++) {
-    const wob = k => Math.sin(x * 0.013 + k * 3.1) * 0.012 + Math.sin(x * 0.051 + k * 1.7) * 0.006;
-    const y0 = layers[i][0] + (i ? wob(i) : 0), y1 = i + 1 < layers.length ? layers[i + 1][0] + wob(i + 1) : 1;
-    g.fillStyle = layers[i][1]; g.fillRect(x, Hh - y1 * Hh, 2, (y1 - y0) * Hh + 1);
-  }
-  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  for (let k = 0; k < 9000; k++) {
-    const s = rnd() * 2.2 + 0.4; g.fillStyle = rnd() < 0.5 ? 'rgba(255,240,215,0.10)' : 'rgba(0,0,0,0.14)';
-    g.fillRect(rnd() * W, rnd() * Hh, s, s * 0.7);
-  }
-  const tg = g.createLinearGradient(0, 0, 0, Hh * 0.06); tg.addColorStop(0, '#2f3a1c'); tg.addColorStop(1, 'rgba(47,42,28,0)');
-  g.fillStyle = tg; g.fillRect(0, 0, W, Hh * 0.06);
-  const t = canvasTexture(c, renderer); t.wrapS = THREE.RepeatWrapping; return t;
 }
 
 // Redraw a land-cover canvas (in place) in another palette: each pixel takes the target

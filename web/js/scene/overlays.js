@@ -1,5 +1,5 @@
-// Field style: routes and residue areas painted into the land surface (the
-// drape), instead of the raised print strips the Mossmorran look shows.
+// Field and Guthrie: routes and residue areas painted into the land surface
+// (the drape), instead of the raised print strips (shown with print colours).
 // Presentation only: the vectors are the same features model.js rasterises
 // for the print layers, in print millimetres, and nothing here changes them.
 //

@@ -252,13 +252,11 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
   function material(look) {
     if (!materials[look]) {
       const map = texture(palettes[look]?.geology ? look : 'field');
-      materials[look] = look === 'mossmorran'
-        ? new THREE.MeshStandardMaterial({ map, roughness: 0.92 })
-        : new THREE.MeshBasicMaterial({ map, vertexColors: true });
+      materials[look] = new THREE.MeshBasicMaterial({ map, vertexColors: true });
     }
     return materials[look];
   }
-  // Light or dark by which way each wall faces the sun (stylised looks).
+  // Light or dark by which way each wall faces the sun .
   function shade(sun) {
     const n = geo.attributes.normal, col = geo.attributes.color, sl = Math.hypot(sun.x, sun.z) || 1;
     for (let i = 0; i < n.count; i++) {

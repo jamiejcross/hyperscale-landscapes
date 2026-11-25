@@ -1,5 +1,6 @@
 // Shareable view state in the page URL:
-//   ?site=<id>&style=mossmorran|field|guthrie&az=<deg>&el=<deg>
+//   ?site=<id>&style=guthrie|field&az=<deg>&el=<deg>
+// (style=mossmorran, from links made before that look was retired, opens as guthrie)
 // az and el are the CAMERA's angles as seen from the model's centre: az is
 // the compass bearing the camera stands at (clockwise from north, so 135 is
 // looking from the south-east), el its height above the horizon, held to
@@ -7,7 +8,8 @@
 // Pure functions, plus a throttled writer; no other imports, so Node can
 // test this file directly.
 
-export const STYLES = ['mossmorran', 'field', 'guthrie'];
+export const STYLES = ['guthrie', 'field'];
+const RETIRED = { mossmorran: 'guthrie' };
 export const EL_MIN = 12, EL_MAX = 70;
 const SITE_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
@@ -19,7 +21,7 @@ export function parseView(search) {
   const p = new URLSearchParams(search), out = {};
   const site = p.get('site');
   if (site && SITE_ID.test(site)) out.site = site;
-  const style = p.get('style');
+  const style = RETIRED[p.get('style')] || p.get('style');
   if (STYLES.includes(style)) out.style = style;
   const az = num(p.get('az'));
   if (Number.isFinite(az)) out.az = round1(((az % 360) + 360) % 360);

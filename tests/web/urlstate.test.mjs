@@ -25,8 +25,9 @@ test('parseView drops anything invalid', () => {
 });
 
 test('viewSearch writes, rounds, clamps and keeps other parameters', () => {
-  assert.equal(viewSearch('?lang=en', { site: 'plean', style: 'mossmorran', az: 134.6, el: 85 }),
-    '?lang=en&site=plean&style=mossmorran&az=135&el=70');
+  assert.equal(viewSearch('?lang=en', { site: 'plean', style: 'field', az: 134.6, el: 85 }),
+    '?lang=en&site=plean&style=field&az=135&el=70');
+  assert.equal(parseView('?style=mossmorran').style, 'guthrie');   // retired look
   assert.equal(viewSearch('?site=plean&az=10', { site: null }), '?az=10');
   assert.equal(viewSearch('', {}), '');
 });

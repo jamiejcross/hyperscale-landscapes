@@ -1,4 +1,4 @@
-// The studio panel: the controls of JC's Mossmorran viewer (camera, lens,
+// The studio panel (after JC's Mossmorran viewer): look, camera, lens,
 // sun, height, background, screengrab), shared by the app's preview and the
 // downloadable offline viewer.  Saved images always carry the caption strip.
 import { withCaption } from './caption.js';
@@ -24,8 +24,8 @@ export function mountStudio(el, scene, host) {
       <select name="look" aria-label="Style">
         ${Object.entries(LOOKS).map(([k, label]) => `<option value="${k}"${k === scene.view.look ? ' selected' : ''}>${label}</option>`).join('')}
       </select>
-      <label class="range" name="inkRow" hidden>Outline <input type="range" name="ink" min="1" max="3" step="0.1" value="1.8"><output name="inkV"></output></label>
-      <label class="check" name="brushRow" hidden><input type="checkbox" name="brush"${scene.view.brushwork ? ' checked' : ''}> Brushwork (a texture, not data)</label>
+      <label class="range" name="inkRow">Outline <input type="range" name="ink" min="1" max="3" step="0.1" value="1.8"><output name="inkV"></output></label>
+      <label class="check" name="brushRow"${PALETTES[scene.view.look]?.brushwork ? '' : ' hidden'}><input type="checkbox" name="brush"${scene.view.brushwork ? ' checked' : ''}> Brushwork (a texture, not data)</label>
       <p class="hint">Changes how the model is drawn on screen and in saved images. Print files are not affected.</p>
     </fieldset>
     <fieldset><legend>Camera</legend>
@@ -35,7 +35,7 @@ export function mountStudio(el, scene, host) {
         <button type="button" data-view="low">Low angle</button>
         <button type="button" data-view="top">From above</button>
       </div>
-      <label class="range">Lens <input type="range" name="fov" min="10" max="60" value="28"><output name="fovV"></output></label>
+      <label class="range">Lens <input type="range" name="fov" min="10" max="60" value="${Math.round(scene.view.fov)}"><output name="fovV"></output></label>
       <label class="check"><input type="checkbox" name="spin"> Turn slowly</label>
     </fieldset>
     <fieldset><legend>Sun</legend>
@@ -48,7 +48,7 @@ export function mountStudio(el, scene, host) {
       <label class="range">Extra height <input type="range" name="zex" min="50" max="300" step="25" value="100"><output name="zexV"></output></label>
       <label class="check"><input type="checkbox" name="sides" checked> Soil sides</label>
       <label class="check" name="geoRow" hidden><input type="checkbox" name="geology" checked> Geology walls (BGS; screen only)</label>
-      <label class="check"><input type="checkbox" name="shadow" checked> Ground shadow</label>
+      <label class="check"><input type="checkbox" name="shadow"> Ground shadow</label>
       <label class="check"><input type="checkbox" name="print"> Print colours</label>
     </fieldset>
     <fieldset><legend>Background</legend>
@@ -100,24 +100,19 @@ export function mountStudio(el, scene, host) {
   ['az', 'el', 'sun', 'fill', 'zex'].forEach(n => q(n).addEventListener('input', update));
   ['sides', 'geology', 'shadow', 'print'].forEach(n => q(n).addEventListener('change', update));
   q('fov').addEventListener('input', () => { scene.setFov(+q('fov').value); q('fovV').value = `${scene.focalMm(+q('fov').value)} mm`; });
-  q('fovV').value = `${scene.focalMm(28)} mm`;
+  q('fovV').value = `${scene.focalMm(scene.view.fov)} mm`;
+  q('bg').value = scene.view.background;
   q('spin').addEventListener('change', e => scene.setSpin(e.target.checked));
   q('bg').addEventListener('change', e => scene.setBackground(e.target.value));
   const inkLabel = () => { q('inkV').value = `${(+q('ink').value).toFixed(1)} px`; };
   q('ink').addEventListener('input', () => { scene.setInkWidth(+q('ink').value); inkLabel(); });
   inkLabel();
   q('brush').addEventListener('change', e => scene.setBrushwork(e.target.checked));
-  let mossShadow = true;
   q('look').addEventListener('change', e => {
-    // Ground shadow: off by default in the stylised looks; the Mossmorran setting comes back on the way out.
-    const to = e.target.value, from = scene.view.look;
-    if (to !== 'mossmorran' && from === 'mossmorran') { mossShadow = q('shadow').checked; q('shadow').checked = false; }
-    else if (to === 'mossmorran') q('shadow').checked = mossShadow;
+    const to = e.target.value;
     scene.setLook(to);
-    q('inkRow').hidden = to === 'mossmorran';           // the outline only exists in the stylised looks
     q('brushRow').hidden = !PALETTES[to]?.brushwork;    // Guthrie only
-    q('bg').value = scene.view.background;     // each look brings its own background and lens
-    q('fov').value = Math.round(scene.view.fov); q('fovV').value = `${scene.focalMm(scene.view.fov)} mm`;
+    q('bg').value = scene.view.background;     // each look brings its own background
     update();
   });
   el.addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) scene.setView(b.dataset.view); });

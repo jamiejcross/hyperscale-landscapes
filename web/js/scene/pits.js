@@ -5,7 +5,7 @@
 // screen space so they never cover the land or each other. Screen only.
 import * as THREE from 'three';
 import { heightSampler } from './props-math.js';
-import { PIT_SQUARE_M, displayClass, groupPits, layoutLabels, silhouette } from './pits-math.js';
+import { PIT_SQUARE_M, DEFAULT_PIT_SHOW, displayClass, groupPits, layoutLabels, silhouette } from './pits-math.js';
 
 const FONT = 'DejaVu Sans, Helvetica, Arial, sans-serif';
 const LABEL_PX = 28, LABEL_PX_DENSE = 20;    // label height on screen, CSS px (smaller above 8 labels)
@@ -19,14 +19,14 @@ export function createPits({ sub, grid, heights, terrain, coal = '#15110e' }) {
   const mmPerM = grid.mmPerM, zAt = heightSampler(grid, heights);
   const group = new THREE.Group(); group.name = 'pits';
   const threadMat = new THREE.LineBasicMaterial({ color: coal, transparent: true, opacity: 0.85, depthTest: true });
-  let showQuarries = false, labels = [], lastKey = '';
+  const show = { ...DEFAULT_PIT_SHOW }; let labels = [], lastKey = '';
   const topPts = [];
   for (let i = 0; i < terrain.length; i += 3 * 7) topPts.push(new THREE.Vector3(terrain[i], terrain[i + 1], terrain[i + 2]));
 
   function build() {
     for (const L of labels) { L.sp.material.map.dispose(); L.sp.material.dispose(); L.lines.geometry.dispose(); }
     group.clear(); labels = []; lastKey = '';
-    for (const g of groupPits(all, { showQuarries })) {
+    for (const g of groupPits(all, { show })) {
       const pts = g.pits.map(p => { const x = p.x * mmPerM, y = p.y * mmPerM; return [x, y, zAt(x, y)]; });
       const cx = g.cx * mmPerM, cy = g.cy * mmPerM;
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture(g), depthTest: false, depthWrite: false, sizeAttenuation: false }));
@@ -62,7 +62,7 @@ export function createPits({ sub, grid, heights, terrain, coal = '#15110e' }) {
     g2.save();
     for (const p of all) {
       const cls = displayClass(p);
-      if (cls === 'quarry' && !showQuarries) continue;
+      if (!show[cls]) continue;
       const x = p.x * mmPerM * k, y = (1 - p.y * mmPerM / Hmm) * H;
       if (cls === 'coal') {
         g2.fillStyle = 'rgba(255,250,236,0.95)'; g2.fillRect(x - half - 2 * px, y - half - 2 * px, 2 * half + 4 * px, 2 * half + 4 * px);
@@ -110,7 +110,8 @@ export function createPits({ sub, grid, heights, terrain, coal = '#15110e' }) {
     });
   }
 
-  function setQuarries(on) { showQuarries = !!on; build(); }
+  // Draw one class (coal, unknown, quarry) or not.
+  function setShown(cls, on) { if (cls in show && show[cls] !== !!on) { show[cls] = !!on; build(); } }
   function setVisible(on) { group.visible = !!on; lastKey = ''; }
   function dispose() {
     for (const L of labels) { L.sp.material.map.dispose(); L.sp.material.dispose(); L.lines.geometry.dispose(); }
@@ -121,6 +122,7 @@ export function createPits({ sub, grid, heights, terrain, coal = '#15110e' }) {
     coal: all.filter(p => displayClass(p) === 'coal').length, unknown: all.filter(p => displayClass(p) === 'unknown').length,
     quarry: all.filter(p => displayClass(p) === 'quarry').length,
   };
-  return { group, paint, layout, setQuarries, setVisible, dispose, counts,
-    get labels() { return labels.length; }, get quarries() { return showQuarries; } };
+  return { group, paint, layout, setShown, setVisible, dispose, counts,
+    get labels() { return labels.length; }, get shown() { return { ...show }; },
+    get anyShown() { return Object.entries(show).some(([k, v]) => v && counts[k]); } };
 }

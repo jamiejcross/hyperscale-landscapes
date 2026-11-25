@@ -27,14 +27,19 @@ export function pitNote(cls, year, sharedName = false, byName = false) {
   return 'mine or quarry · type unknown';
 }
 
-// Pits grouped by name (one label per name). A group's class is coal if any
-// of its pits is coal, else unknown if any is unknown, else quarry.
-// showQuarries: whether quarry pits are drawn at all.
-export function groupPits(pits, { showQuarries = false } = {}) {
+// Which classes are drawn by default: coal mines and pits of unknown type on,
+// quarries off. Each has its own toggle in the layer key.
+export const PIT_CLASSES = ['coal', 'unknown', 'quarry'];
+export const DEFAULT_PIT_SHOW = { coal: true, unknown: true, quarry: false };
+
+// Pits grouped by name (one label per name), drawing only the classes in
+// `show`. A group's class is coal if any of its drawn pits is coal, else
+// unknown if any is unknown, else quarry.
+export function groupPits(pits, { show = DEFAULT_PIT_SHOW } = {}) {
   const groups = new Map();
   for (const p of pits || []) {
     const cls = displayClass(p);
-    if (cls === 'quarry' && !showQuarries) continue;
+    if (!show[cls]) continue;
     const g = groups.get(p.name) || { name: p.name, pits: [], classes: new Set(), years: [], shared: false, byName: false };
     g.pits.push(p); g.classes.add(cls); g.shared ||= !!p.coal_by_stripped_name; g.byName ||= !!p.coal_by_name || collieryByName(p);
     const y = cls === 'coal' && abandonedYear(p); if (y) g.years.push(y);

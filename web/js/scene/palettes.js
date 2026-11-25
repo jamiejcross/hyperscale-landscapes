@@ -5,7 +5,6 @@
 //   guthrie - the field look recoloured after a pastoral by Sir James Guthrie
 //             (1859-1930, Glasgow Boys; the painting is public domain), from the
 //             colour study in docs/reference/auchtertool-guthrie-palette.png.
-// The Mossmorran look keeps its own materials in scene.js.
 
 const LANDCOVER_CLASSES = [
   'landuse:farmland', 'landuse:meadow', 'landuse:grass', 'landuse:forest', 'natural:wood', 'natural:scrub',

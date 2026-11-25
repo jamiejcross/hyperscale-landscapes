@@ -3,7 +3,7 @@
 // DevTools protocol).
 //
 //   node tools/shoot.mjs                       # south-gyle and auchtertool-cato, field
-//   node tools/shoot.mjs --style mossmorran
+//   node tools/shoot.mjs --style field
 //   node tools/shoot.mjs --sites plean --label step1
 //
 // For each site it serves web/, opens ?site=<id>&style=<style>&az=313&el=35,
@@ -22,7 +22,7 @@ const WEB = path.join(ROOT, 'web'), OUT = path.join(ROOT, 'output', 'shots');
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
 const SITES = opt('sites', 'south-gyle,auchtertool-cato').split(',');
-const STYLE = opt('style', 'field'), LABEL = opt('label', ''), AZ = opt('az', '313'), EL = opt('el', '35');
+const STYLE = opt('style', 'guthrie'), LABEL = opt('label', ''), AZ = opt('az', '313'), EL = opt('el', '35');
 const SURFACE = opt('surface', 'landcover');
 const HIDE = opt('hide', '').split(',').filter(Boolean);   // layer ids to switch off, e.g. buildings
 const EVAL = opt('eval', '');
@@ -96,7 +96,7 @@ const CAPTURE = (surface, hide, extra, upload) => `(async () => {
   sc.pause();
   const c = sc.grab(2); sc.resume();
   return { png: c.toDataURL('image/png'), w: c.width, h: c.height, look: sc.view.look,
-    angles: sc.cameraAngles(), status: document.getElementById('build-status').textContent };
+    angles: sc.cameraAngles(), status: document.getElementById('build-status').textContent, info: window.__shootInfo };
 })()`;
 
 fs.mkdirSync(OUT, { recursive: true });
@@ -110,6 +110,7 @@ try {
     const file = path.join(OUT, `${site}-${STYLE}${LABEL ? `-${LABEL}` : ''}.png`);
     fs.writeFileSync(file, Buffer.from(r.png.split(',')[1], 'base64'));
     console.log(`${path.relative(ROOT, file)}  ${r.w}×${r.h}  ${r.look}  az ${r.angles.az.toFixed(0)} el ${r.angles.el.toFixed(0)}  (${r.status})`);
+    if (r.info) console.log(`  ${r.info}`);   // set window.__shootInfo in --eval to report something
   }
 } finally {
   ws.close(); chrome.kill(); server.close();

@@ -8,7 +8,7 @@ import { fetchOSM, parseOSM } from './data/overpass.js';
 import { loadElevation, ATTRIBUTION as ELEV_ATTRIBUTION } from './data/elevation.js';
 import { readBoundary } from './data/upload.js';
 import { buildModel, printObjects, pauseHeights } from './geom/model.js';
-import { createScene, landcoverCanvas, layerSwatch } from './scene/scene.js';
+import { createScene, landcoverCanvas, layerSwatch, DEFAULT_LOOK } from './scene/scene.js';
 import { contourCanvas } from './scene/contours.js';
 import { SURFACES, imageryCanvas } from './data/imagery.js';
 import { mountStudio, geologyNote } from './scene/studio.js';
@@ -23,7 +23,7 @@ import { parseView, urlWriter } from './urlstate.js';
 
 const $ = id => document.getElementById(id);
 const OSM_ATTR = '© OpenStreetMap contributors';
-const state = { bbox: null, name: '', site: null, bundle: null, model: null, layers: {}, presets: {}, surface: 'eox-2025' };
+const state = { bbox: null, name: '', site: null, bundle: null, model: null, layers: {}, presets: {}, surface: 'landcover' };
 let scene = null, studio = null;
 
 // Shareable view URL (?site=&style=&az=&el=). A view in the address bar on
@@ -217,6 +217,9 @@ function showPreview() {
     });
     scene.controls.addEventListener('change', writeUrl);
   }
+  // Every new model starts on the land-cover surface in the Guthrie look.
+  state.surface = 'landcover'; $('surface').value = 'landcover'; $('surface-note').textContent = '';
+  studio.setLook(DEFAULT_LOOK);
   const colours = Object.fromEntries(Object.values(state.layers).map(l => [l.id, l.colour_screen]));
   colours.railDisused = state.layers.rail.colour_screen_disused;
   state.drape = landcoverCanvas(model.grid, osm.features);
@@ -247,14 +250,19 @@ function showPreview() {
   // Geology walls from the bundle (on by default where there are samples).
   scene.setGeology(state.bundle?.subsurface, { grid: model.grid, zExag: opts.zExag, on: true });
   const pitCounts = scene.setPits(state.bundle?.subsurface, { grid: model.grid, heights: model.heights, on: true });
-  if (pitCounts && (pitCounts.coal + pitCounts.unknown + pitCounts.quarry)) {
-    const li = document.createElement('li');
-    li.innerHTML = `<label class="check"><input type="checkbox" checked data-pits><span class="swatch" style="background:${EVIDENCE.coal}"></span>${t('pits')}</label>`
-      + (pitCounts.quarry ? `<label class="check sub"><input type="checkbox" data-quarries>${t('pits.quarries')} (${pitCounts.quarry})</label>` : '')
-      + `<details><summary>${t('preview.why')}</summary><p>${t('pits.why')}</p></details>`;
+  // One row per class of pit (BGS BritPits), each with its own toggle; quarries start off.
+  const PIT_SWATCH = {
+    coal: `background:${EVIDENCE.coal}`,
+    unknown: `background:#fffaec;outline:1.5px dashed ${EVIDENCE.coal};outline-offset:-1.5px`,
+    quarry: `background:#fffaec;outline:1.5px solid ${EVIDENCE.coal};outline-offset:-1.5px`,
+  };
+  for (const cls of ['coal', 'unknown', 'quarry']) {
+    if (!pitCounts?.[cls]) continue;
+    const on = scene.pits.shown[cls], li = document.createElement('li');
+    li.innerHTML = `<label class="check"><input type="checkbox"${on ? ' checked' : ''} data-pits="${cls}"><span class="swatch" style="${PIT_SWATCH[cls]}"></span>${t(`pits.${cls}`)} (${pitCounts[cls]})</label>
+      <details><summary>${t('preview.why')}</summary><p>${t(`pits.${cls}.why`)}</p></details>`;
     ul.append(li);
-    li.querySelector('[data-pits]').onchange = e => { scene.showPits(e.target.checked); refreshCaption(); };
-    const qb = li.querySelector('[data-quarries]'); if (qb) qb.onchange = e => scene.showQuarries(e.target.checked);
+    li.querySelector('[data-pits]').onchange = e => { scene.showPitClass(cls, e.target.checked); refreshCaption(); };
   }
   studio.refreshGeology();
   const tf = ul.querySelector('[data-tree-factor]');
@@ -271,7 +279,6 @@ function showPreview() {
   $('caption').textContent = captionText(opts, form) + ` Counts: ${counts.buildings} buildings, ${counts.receptors} schools, care or community buildings, ${counts.roads} roads.`;
   $('pauses').textContent = 'Single-colour printers: pause to change filament at ' +
     pauseHeights(model, opts.base).map(p => `${p.zMm} mm (${p.changeTo})`).join(', ') + '.';
-  if (state.surface !== 'landcover') applySurface(state.surface);
   $('preview').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 
