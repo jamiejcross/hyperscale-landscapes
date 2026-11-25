@@ -150,3 +150,7 @@ footer.site p { margin: 0; max-width: none; }
   .map { min-height: 340px; }
   .downloads button { width: 100%; }
 }
+
+/* tree height slider in the layer list */
+#layer-list .range { display: flex; align-items: center; gap: .5rem; font-size: .85rem; margin: .2rem 0 .2rem 1.6rem; }
+#layer-list .range input { flex: 1; min-width: 6rem; }

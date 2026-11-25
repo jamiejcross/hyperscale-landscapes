@@ -113,7 +113,7 @@ try {
   }
 } finally {
   ws.close(); chrome.kill(); server.close();
-  fs.rmSync(profile, { recursive: true, force: true });
+  try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch {}   // Chrome may still be writing its profile
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }

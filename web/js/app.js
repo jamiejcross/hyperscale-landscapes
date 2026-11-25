@@ -11,7 +11,7 @@ import { buildModel, printObjects, pauseHeights } from './geom/model.js';
 import { createScene, landcoverCanvas, layerSwatch } from './scene/scene.js';
 import { contourCanvas } from './scene/contours.js';
 import { SURFACES, imageryCanvas } from './data/imagery.js';
-import { mountStudio } from './scene/studio.js';
+import { mountStudio, geologyNote } from './scene/studio.js';
 import { PALETTES } from './scene/palettes.js';
 import { buildViewer } from './export/viewer.js';
 import { computeSection, sectionSVG, svgToPNG } from './export/section.js';
@@ -231,6 +231,24 @@ function showPreview() {
     ul.append(li);
   }
   ul.querySelectorAll('input').forEach(i => { i.onchange = () => scene.setVisible(i.dataset.layer, i.checked); });
+  // 3D props from the site bundle (screen only; drawn sites only).
+  const pc = scene.setProps(state.bundle?.props, { grid: model.grid, heights: model.heights, zExag: opts.zExag, seed: siteSeed() });
+  const propRows = [['trees', pc?.trees], ['turbines', pc?.turbines], ['pylons', (pc?.towers || 0) + (pc?.poles || 0) + (pc?.lineSegments || 0)]];
+  for (const [kind, n] of propRows) {
+    if (!n) continue;
+    const li = document.createElement('li');
+    const slider = kind === 'trees'
+      ? `<label class="range">${t('props.trees.height', { x: `<output>${opts.zExag}</output>` })}<input type="range" min="1" max="4" step="0.5" value="${opts.zExag}" data-tree-factor></label>` : '';
+    li.innerHTML = `<label class="check"><input type="checkbox" checked data-prop="${kind}">${t(`props.${kind}`)}</label>${slider}
+      <details><summary>${t('preview.why')}</summary><p>${t(`props.${kind}.why`)}</p></details>`;
+    ul.append(li);
+  }
+  ul.querySelectorAll('input[data-prop]').forEach(i => { i.onchange = () => { scene.setPropsVisible(i.dataset.prop, i.checked); if (i.dataset.prop === 'pylons') scene.setPropsVisible('lines', i.checked); }; });
+  // Geology walls from the bundle (on by default where there are samples).
+  scene.setGeology(state.bundle?.subsurface, { grid: model.grid, zExag: opts.zExag, on: true });
+  studio.refreshGeology();
+  const tf = ul.querySelector('[data-tree-factor]');
+  if (tf) tf.oninput = () => { scene.setTreeFactor(+tf.value); tf.parentElement.querySelector('output').textContent = tf.value; };
   const counts = model.report.counts;
   studio.update();
   if (pendingView) {           // a view from a shared link, applied once
@@ -268,7 +286,8 @@ function refreshCaption() {
   if (!state.model) return;
   const counts = state.model.model.report.counts;
   $('caption').textContent = captionText(state.model.opts, state.model.form) + ` Counts: ${counts.buildings} buildings, ${counts.receptors} schools, care or community buildings, ${counts.roads} roads.`
-    + (PALETTES[scene?.view.look]?.captionNote ? ` ${PALETTES[scene.view.look].captionNote}.` : '');
+    + (PALETTES[scene?.view.look]?.captionNote ? ` ${PALETTES[scene.view.look].captionNote}.` : '')
+    + (scene && geologyNote(scene) ? ` ${geologyNote(scene)}.` : '');
 }
 
 function captionText(opts, form, { print = false } = {}) {

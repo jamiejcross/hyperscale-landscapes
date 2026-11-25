@@ -19,7 +19,9 @@ import { OrbitControls } from 'three/addons/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/RoomEnvironment.js';
 import { createInk, INK } from './ink.js';
 import { paintOverlays, paintBoundary } from './overlays.js';
-import { PALETTES, brushStrokes, paintBrushwork, seedFrom } from './palettes.js';
+import { PALETTES, EVIDENCE, brushStrokes, paintBrushwork, seedFrom } from './palettes.js';
+import { createProps } from './props.js';
+import { createGeology } from './geology.js';
 export { layerSwatch } from './palettes.js';
 
 export const LANDCOVER_COLOURS = {
@@ -39,11 +41,11 @@ const stylisedLook = look => look !== 'mossmorran' && !!PALETTES[look];
 export const FIELD_LANDCOVER_COLOURS = PALETTES.field.landcover;
 export const FIELD_LAYER_COLOURS = { terrain: PALETTES.field.landBase, ...PALETTES.field.layers };
 // Screen-only meshes from buildModel, and the layer whose colour they take.
-const SCREEN_OF = { powerPoints: 'power', waterAreas: 'water', waterLines: 'water' };
+const SCREEN_OF = { powerPoints: 'power', powerPegs: 'power', waterAreas: 'water', waterLines: 'water' };
 // Object IDs for the ink pass (1-15): a change of ID between neighbouring pixels is an edge.
 // Narrow waterways share the terrain's ID, so their stepped edges get no ink.
 const INK_IDS = { terrain: 1, 'terrain-steep': 1, 'terrain-sides': 2, 'terrain-base': 3, water: 4, waterAreas: 4, waterLines: 1, buildings: 5,
-  receptors: 6, powerPoints: 7, roads: 8, power: 9, rail: 10, railDisused: 11, residues: 12 };
+  receptors: 6, powerPoints: 7, powerPegs: 7, roads: 8, power: 9, rail: 10, railDisused: 11, residues: 12 };
 // Shared by the stylised looks (colours are per palette).
 const FIELD = {
   groundShadow: 0.08,
@@ -96,7 +98,7 @@ export function createScene(container) {
   const INKLESS = ['roads', 'power', 'rail', 'railDisused', 'residues'];
   function draw() {
     renderer.render(scene, camera);
-    if (stylisedLook(view.look) && view.ink) ink.render(scene, camera, { hide: [ground, ...INKLESS.map(id => meshes[id]).filter(Boolean)] });
+    if (stylisedLook(view.look) && view.ink) ink.render(scene, camera, { hide: [ground, ...INKLESS.map(id => meshes[id]).filter(Boolean), ...(props?.parts.lines || []), ...(props?.parts.trees || [])] });
   }
 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.28 }));
@@ -104,6 +106,9 @@ export function createScene(container) {
   scene.add(ground);
 
   const meshes = {};
+  let props = null;            // 3D props (setProps)
+  const propShown = { trees: true, turbines: true, pylons: true };
+  let geology = null, geologyOn = false;   // geology walls (setGeology)
   let span = 150, H = 20;
 
   function resize() {
@@ -137,6 +142,7 @@ export function createScene(container) {
     sc.left = sc.bottom = -span * 0.75; sc.right = sc.top = span * 0.75; sc.near = 1; sc.far = span * 6;
     sc.updateProjectionMatrix();
     shadeWalls();
+    geology?.shade(sun.position);
   }
 
   function geometry(m) {
@@ -248,9 +254,14 @@ export function createScene(container) {
   function refreshVisibility() {
     const p = painted();
     for (const [k, m] of Object.entries(meshes)) {
-      if (SCREEN_OF[k]) m.visible = p && shown[SCREEN_OF[k]] !== false;     // screen-only stand-ins
+      if (SCREEN_OF[k]) m.visible = p && shown[SCREEN_OF[k]] !== false     // screen-only stand-ins
+        && !(k === 'powerPegs' && props && (propShown.pylons || propShown.turbines));   // the 3D props replace the pegs
       else m.visible = shown[k] !== false && !(p && PAINTED_MESHES.has(k));
     }
+    // Geology walls stand in for the plain slab walls (not with print colours).
+    const geo = !!geology && geologyOn && !view.print;
+    if (geology) geology.mesh.visible = geo && shown['terrain-sides'] !== false;
+    if (geo && meshes['terrain-sides']) meshes['terrain-sides'].visible = false;
   }
   // Light or dark slab walls by facing direction relative to the sun.
   function shadeWalls() {
@@ -298,6 +309,9 @@ export function createScene(container) {
   function setModel({ layers, colours, landcover, grid, drapeKind: kind = null, vectors: vec = null, screen = {}, seed: siteSeed = null }) {
     for (const k of Object.keys(meshes)) { inner.remove(meshes[k]); disposeMesh(meshes[k]); delete meshes[k]; }
     for (const k of Object.keys(shown)) delete shown[k];
+    props?.dispose(); props = null;
+    geology?.dispose(); geology = null;
+    geology?.dispose(); geology = null;
     vectors = vec; modelSize = { Wmm: grid.Wmm, Hmm: grid.Hmm };
     seed = seedFrom(siteSeed ?? `${grid.Wmm.toFixed(3)}x${grid.Hmm.toFixed(3)}`);
     setDrapeTextures(landcover, kind);
@@ -386,6 +400,7 @@ export function createScene(container) {
     view.look = look;
     if (field) INK.colour = PALETTES[look].ink;
     for (const m of Object.values(meshes)) applyMaterial(m);
+    props?.setLook(look); geology?.setLook(look);
     refreshVisibility();
     if (field) paintField();
     if (field !== wasStylised) {
@@ -438,6 +453,35 @@ export function createScene(container) {
   }
 
 
+
+  // ---- 3D props (trees, turbines, pylons and lines; screen only) ----
+  // props: the bundle's props section; heights and grid from buildModel.
+  function setProps(section, { grid, heights, zExag = 2, seed: s = null } = {}) {
+    props?.dispose(); props = null;
+    if (!section || !grid || !heights) return null;
+    props = createProps({ props: section, grid, heights, zExag, seed: seedFrom(s ?? 'props'), ramp: toonRamp });
+    inner.add(props.group);
+    props.setLook(view.look);
+    for (const k of Object.keys(propShown)) propShown[k] = true;
+    refreshVisibility();
+    return props.counts;
+  }
+  // ---- geology walls (subsurface section; screen only) ----
+  // Returns true when the bundle had wall samples. `on` sets the toggle.
+  function setGeology(sub, { grid, zExag = 2, on = geologyOn } = {}) {
+    geology?.dispose(); geology = null;
+    const walls = meshes['terrain-sides'];
+    if (sub && walls && grid) {
+      geology = createGeology({ sub, walls: walls.geometry, grid, zExag, palettes: PALETTES, evidence: EVIDENCE, ink: PALETTES.field.ink });
+      if (geology) { inner.add(geology.mesh); geology.setLook(view.look); geology.shade(sun.position); }
+    }
+    geologyOn = on;
+    refreshVisibility();
+    return !!geology;
+  }
+  function showGeology(on) { geologyOn = !!on; refreshVisibility(); }
+  function setPropsVisible(kind, on) { propShown[kind] = on; props?.setVisible(kind, on); refreshVisibility(); }
+  function setTreeFactor(k) { props?.setTreeFactor(k); }
 
   function setVisible(id, on) {
     for (const k of [id, `${id}Disused`, `${id}-sides`, `${id}-base`]) shown[k] = on;
@@ -568,7 +612,10 @@ export function createScene(container) {
     return c;
   }
 
-  const loop = () => { controls.update(); draw(); };
+  // Turbine rotors turn slowly in the live view and follow the orbit angle
+  // in GIF/video frames (so loops are seamless); single grabs show them still.
+  const clock = new THREE.Clock();
+  const loop = () => { controls.update(); if (props?.counts.turbines) props.setRotor(props.rotorPhase + Math.min(clock.getDelta(), 0.1) * 0.6); draw(); };
   renderer.setAnimationLoop(loop);
 
   // ---- Capture helpers for animations (turntable GIF / video) ----
@@ -593,20 +640,23 @@ export function createScene(container) {
   let orbitBase = null;
   // `aspect` is the frame's width/height: when it is narrower than the screen,
   // the camera moves back so the model's full width stays in frame.
+  let orbitRotor = 0;
   function orbitStart(aspect = camera.aspect) {
+    orbitRotor = props?.rotorPhase || 0;
     const k = Math.max(1, camera.aspect / aspect);
     orbitBase = { offset: camera.position.clone().sub(controls.target).multiplyScalar(k), pos: camera.position.clone() };
   }
   function orbitTo(angle) {
     const v = orbitBase.offset.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
     camera.position.copy(controls.target).add(v); camera.lookAt(controls.target);
+    if (props) props.setRotor(orbitRotor + angle * 6);      // six whole rotor turns per lap: seamless loops
   }
   function orbitEnd() { if (orbitBase) camera.position.copy(orbitBase.pos); camera.lookAt(controls.target); orbitBase = null; }
 
   return { renderer, scene, camera, controls, view, meshes, focalMm, setModel, setDrape, setLook, setVisible, setView, setSpin,
     cameraAngles, setCameraAngles, setInkWidth, setBrushwork,
     setSun, setFov, setHeightScale, setBackground, setPrintColours, setScreenColours, setShadow, grab,
-    pause, resume, renderAt, orbitStart, orbitTo, orbitEnd };
+    pause, resume, renderAt, orbitStart, orbitTo, orbitEnd, setGeology, showGeology, get geology() { return geology && { panel: geology.panel, on: geologyOn, shown: geology.mesh.visible, attribution: geology.attribution, nonCommercial: geology.nonCommercial }; }, setProps, setPropsVisible, setTreeFactor, get props() { return props; } };
 }
 
 // Separate wall triangles (|normal z| small) from the top cap and the

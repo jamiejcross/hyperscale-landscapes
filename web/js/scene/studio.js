@@ -8,6 +8,13 @@ import { SIZES, makeGIF, makeVideo, videoType } from './turntable.js';
 
 const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'N'];
 
+// Caption note for the geology walls when they are on screen (BGS licence terms).
+export function geologyNote(scene) {
+  const g = scene.geology;
+  if (!g?.shown) return '';
+  return `${g.attribution}${g.nonCommercial ? ' (non-commercial use)' : ''}`;
+}
+
 export function mountStudio(el, scene, host) {
   // host: { caption(): {title, disclosure, sources, footer, top}, filename(): string,
   //         printColours(): {layerId: hex}, onChange?(view), alt?(): string }
@@ -40,6 +47,7 @@ export function mountStudio(el, scene, host) {
     <fieldset><legend>Model</legend>
       <label class="range">Extra height <input type="range" name="zex" min="50" max="300" step="25" value="100"><output name="zexV"></output></label>
       <label class="check"><input type="checkbox" name="sides" checked> Soil sides</label>
+      <label class="check" name="geoRow" hidden><input type="checkbox" name="geology" checked> Geology walls (BGS; screen only)</label>
       <label class="check"><input type="checkbox" name="shadow" checked> Ground shadow</label>
       <label class="check"><input type="checkbox" name="print"> Print colours</label>
     </fieldset>
@@ -84,12 +92,13 @@ export function mountStudio(el, scene, host) {
     scene.setHeightScale(+q('zex').value / 100);
     q('zexV').value = `×${(+q('zex').value / 100).toFixed(2)}`;
     scene.setVisible('terrain-sides', q('sides').checked);
+    scene.showGeology?.(q('geology').checked);
     scene.setShadow(q('shadow').checked);
     scene.setPrintColours(q('print').checked, host.printColours());
     host.onChange?.(scene.view);
   }
   ['az', 'el', 'sun', 'fill', 'zex'].forEach(n => q(n).addEventListener('input', update));
-  ['sides', 'shadow', 'print'].forEach(n => q(n).addEventListener('change', update));
+  ['sides', 'geology', 'shadow', 'print'].forEach(n => q(n).addEventListener('change', update));
   q('fov').addEventListener('input', () => { scene.setFov(+q('fov').value); q('fovV').value = `${scene.focalMm(+q('fov').value)} mm`; });
   q('fovV').value = `${scene.focalMm(28)} mm`;
   q('spin').addEventListener('change', e => scene.setSpin(e.target.checked));
@@ -115,8 +124,8 @@ export function mountStudio(el, scene, host) {
 
   // The caption for saved images and animations, with the look's note (Guthrie) in the small print.
   function caption() {
-    const c = host.caption(), note = PALETTES[scene.view.look]?.captionNote;
-    return note ? { ...c, footer: `${c.footer} · ${note}` } : c;
+    const c = host.caption(), notes = [PALETTES[scene.view.look]?.captionNote, geologyNote(scene)].filter(Boolean);
+    return notes.length ? { ...c, footer: [c.footer, ...notes].join(' · ') } : c;
   }
   // The captioned image, without downloading it (also used by artefact exports).
   function compose(mult = +q('res').value) {
@@ -175,5 +184,7 @@ export function mountStudio(el, scene, host) {
     q('look').value = look; q('look').dispatchEvent(new Event('change'));
   }
   function setBrushwork(on) { q('brush').checked = !!on; scene.setBrushwork(!!on); }
-  return { update, grab, compose, caption, runAnim, animOpts, setLook, setBrushwork, reset: update };
+  // Geology walls: the toggle shows only when the site has wall samples.
+  function refreshGeology() { q('geoRow').hidden = !scene.geology; update(); }
+  return { refreshGeology, update, grab, compose, caption, runAnim, animOpts, setLook, setBrushwork, reset: update };
 }

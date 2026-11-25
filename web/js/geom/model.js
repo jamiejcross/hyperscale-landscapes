@@ -692,7 +692,9 @@ export function buildModel({ bbox, elev, osm, opts }) {
     const wslab = m => m.some(Boolean) ? slabFromMask(grid, m, v => W[v], v => W[v] - MM.waterDepth - 0.3) : null;
     waterSplit.waterAreas = wslab(a); waterSplit.waterLines = wslab(l);
   }
-  const screen = { powerPoints: concat([powerAreas, ...pegMeshes]), ...waterSplit };
+  // Pegs apart from substations, so the 3D pylons and turbines (when the site
+  // bundle has them) can stand in for them on screen.
+  const screen = { powerPoints: powerAreas, powerPegs: concat(pegMeshes), ...waterSplit };
 
   report.counts = { buildings: bl.length, receptors: rl.length, roads: nRoads, pegs: pegMeshes.filter(Boolean).length };
   report.grid = { cols: nx, rows: grid.ny, cellMm: +grid.dx.toFixed(3) };

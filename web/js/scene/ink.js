@@ -23,8 +23,12 @@ const OUTLINE_VERT = /* glsl */`
 #include <skinning_pars_vertex>
 varying vec3 vN;
 void main() {
-  vN = normalize(normalMatrix * normal);
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  vec3 nrm = normal; vec4 pos = vec4(position, 1.0);
+#ifdef USE_INSTANCING
+  nrm = mat3(instanceMatrix) * nrm; pos = instanceMatrix * pos;
+#endif
+  vN = normalize(normalMatrix * nrm);
+  gl_Position = projectionMatrix * modelViewMatrix * pos;
 }`;
 const OUTLINE_FRAG = /* glsl */`
 uniform float inkId;
