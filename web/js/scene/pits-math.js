@@ -10,12 +10,17 @@ export function abandonedYear(pit) {
   return plans.find(p => p.year_abandoned)?.year_abandoned || null;
 }
 
-// Class as drawn: a quarry-named pit that only matched a coal plan once
-// "Quarry/Quarries" was stripped from its name is drawn as a quarry.
-export const displayClass = p => (p.coal_by_stripped_name ? 'quarry' : p.class);
+// Class as drawn:
+//  - a quarry-named pit that only matched a coal plan once "Quarry/Quarries"
+//    was stripped from its name is drawn as a quarry;
+//  - a pit of unknown type whose BritPits name says "Colliery" is drawn as a
+//    coal mine (a colliery is a coal mine), labelled as known by name only.
+export const collieryByName = p => p.class === 'unknown' && /\bcollier(y|ies)\b/i.test(p.name || '');
+export const displayClass = p => (p.coal_by_stripped_name ? 'quarry' : collieryByName(p) ? 'coal' : p.class);
 
 // The label's second line for a class.
-export function pitNote(cls, year, sharedName = false) {
+export function pitNote(cls, year, sharedName = false, byName = false) {
+  if (cls === 'coal' && !year && byName) return 'colliery · no mine plan matched';
   if (cls === 'coal') return year ? `coal mine · abandoned ${year}` : 'coal mine';
   if (cls === 'quarry') return sharedName ? 'quarry · name also on a coal mine plan' : 'quarry';
   return 'mine or quarry · type unknown';
@@ -29,15 +34,15 @@ export function groupPits(pits, { showQuarries = false } = {}) {
   for (const p of pits || []) {
     const cls = displayClass(p);
     if (cls === 'quarry' && !showQuarries) continue;
-    const g = groups.get(p.name) || { name: p.name, pits: [], classes: new Set(), years: [], shared: false };
-    g.pits.push(p); g.classes.add(cls); g.shared ||= !!p.coal_by_stripped_name;
+    const g = groups.get(p.name) || { name: p.name, pits: [], classes: new Set(), years: [], shared: false, byName: false };
+    g.pits.push(p); g.classes.add(cls); g.shared ||= !!p.coal_by_stripped_name; g.byName ||= collieryByName(p);
     const y = cls === 'coal' && abandonedYear(p); if (y) g.years.push(y);
     groups.set(p.name, g);
   }
   return [...groups.values()].map(g => {
     const cls = g.classes.has('coal') ? 'coal' : g.classes.has('unknown') ? 'unknown' : 'quarry';
     const year = g.years.sort()[0] || null;
-    return { name: g.name, cls, pits: g.pits, note: pitNote(cls, year, g.shared),
+    return { name: g.name, cls, pits: g.pits, note: pitNote(cls, year, g.shared, g.byName),
       cx: g.pits.reduce((s, p) => s + p.x, 0) / g.pits.length, cy: g.pits.reduce((s, p) => s + p.y, 0) / g.pits.length };
   });
 }

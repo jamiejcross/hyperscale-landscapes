@@ -1,7 +1,7 @@
 // Node tests for pits on the surface (run: node --test tests/web/*.test.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { abandonedYear, displayClass, pitNote, groupPits, layoutLabels, silhouette } from '../../web/js/scene/pits-math.js';
+import { abandonedYear, collieryByName, displayClass, pitNote, groupPits, layoutLabels, silhouette } from '../../web/js/scene/pits-math.js';
 
 const plan = (year, seams) => ({ year_abandoned: year, seams });
 const PITS = [
@@ -19,6 +19,15 @@ test('classes, years and notes', () => {
   assert.equal(pitNote('coal', null), 'coal mine');
   assert.equal(pitNote('unknown'), 'mine or quarry · type unknown');
   assert.equal(pitNote('quarry', null, true), 'quarry · name also on a coal mine plan');
+});
+
+test('collieries by name count as coal, labelled as such', () => {
+  const c = { name: 'Dalzell Colliery', class: 'unknown', x: 0, y: 0, plans: [] };
+  assert.equal(collieryByName(c), true);
+  assert.equal(displayClass(c), 'coal');
+  assert.equal(displayClass({ name: 'Wellington Pit', class: 'unknown' }), 'unknown');
+  assert.equal(displayClass({ name: 'Colliery Quarry', class: 'quarry' }), 'quarry');   // only unknowns are promoted
+  assert.equal(groupPits([c])[0].note, 'colliery · no mine plan matched');
 });
 
 test('one group per name; quarries only when asked for', () => {
