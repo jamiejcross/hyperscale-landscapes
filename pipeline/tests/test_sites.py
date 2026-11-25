@@ -33,7 +33,12 @@ def test_curated_bundles_are_small_and_valid():
         p = DATA / s["bundle"]
         assert p.stat().st_size < 5_000_000, s["id"]
         b = json.loads(gzip.decompress(p.read_bytes()))
-        assert b["schema"] == "hyperscale-landscapes/site-bundle@2"
+        assert b["schema"] in ("hyperscale-landscapes/site-bundle@2", "hyperscale-landscapes/site-bundle@3")
+        if b["schema"].endswith("@3"):   # props and subsurface present and well formed
+            t = b["props"]["trees"]
+            assert t["record"] == "<HHHBBB" and len(t["data"]) * 3 // 4 >= 9 * t["count"], s["id"]
+            assert b["subsurface"]["nonCommercial"] is True
+            assert "British Geological Survey" in b["subsurface"]["attribution"]
         assert b["osm"]["elements"]
         L = b["elevation"].get("lidar")
         assert L or b["elevation"].get("tiles"), s["id"]

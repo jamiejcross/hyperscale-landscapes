@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hyperscale-landscapes/site-bundle@3",
+  "title": "Curated-site bundle (gzipped JSON), schema @3",
+  "description": "Written by pipeline/hyperscale_landscapes/bake.py. @2 bundles (no props or subsurface) remain valid input: the web app reads osm and elevation and treats the other sections as optional.",
+  "type": "object",
+  "required": ["schema", "site", "bbox", "osm", "elevation"],
+  "properties": {
+    "schema": {"enum": ["hyperscale-landscapes/site-bundle@2", "hyperscale-landscapes/site-bundle@3"]},
+    "site": {"type": "string"},
+    "query": {"type": "string"},
+    "fetched": {"type": "string", "format": "date"},
+    "bbox": {"type": "object", "required": ["min_lat", "max_lat", "min_lon", "max_lon"]},
+    "attribution": {"type": "string"},
+    "osm": {"type": "object", "description": "Raw Overpass response for data/overpass/web.ql"},
+    "elevation": {"type": "object", "description": "lidar grid (int16-dm-rowdelta) or Terrarium tiles"},
+    "props": {
+      "type": "object",
+      "description": "3D symbols. Positions are metres east and north of the bbox SW corner in the app frame (web/js/geo.js makeProjection); bearings are degrees clockwise from north in that frame.",
+      "required": ["trees", "turbines", "supports", "lines"],
+      "properties": {
+        "trees": {
+          "type": "object",
+          "required": ["record", "fields", "xy_unit_m", "h_unit_m", "crown_r_unit_m", "count", "data", "archetypes", "sources"],
+          "properties": {
+            "record": {"const": "<HHHBBB"},
+            "fields": {"const": ["x", "y", "h_dm", "archetype", "source", "crown_r_dm"]},
+            "xy_unit_m": {"enum": [0.1, 0.5]},
+            "count": {"type": "integer", "minimum": 0},
+            "data": {"type": "string", "contentEncoding": "base64", "description": "count x 9-byte little-endian records"},
+            "archetypes": {"type": "array", "items": {"type": "string"}},
+            "sources": {"type": "array", "items": {"type": "string"}},
+            "thin_cell_m": {"type": "number"},
+            "chm": {"type": "object"},
+            "typing": {"type": "object"}
+          }
+        },
+        "turbines": {"type": "array", "items": {"type": "object", "required": ["x", "y", "hub_height", "rotor_diameter", "source", "facing"]}},
+        "supports": {"type": "array", "items": {"type": "object", "required": ["x", "y", "kind", "height", "height_source", "bearing"]}},
+        "lines": {"type": "array", "items": {"type": "object", "required": ["kind", "xy"]}}
+      }
+    },
+    "subsurface": {
+      "type": "object",
+      "description": "BGS geology along the walls, boreholes, pits and mine plans (providers/subsurface.py). Non-commercial use only.",
+      "required": ["walls", "boreholes", "pits", "nominal_thickness_m", "sources", "nonCommercial", "attribution"],
+      "properties": {
+        "walls": {"type": "object", "required": ["step_m", "units", "sides"],
+                  "description": "units: distinct BGS units; sides.{south,east,north,west}: m (metres along), bedrock/superficial/artificial/mass_movement (index into units, -1 none), shallow_coal (0/1)"},
+        "nonCommercial": {"const": true},
+        "attribution": {"type": "string"}
+      }
+    }
+  }
+}

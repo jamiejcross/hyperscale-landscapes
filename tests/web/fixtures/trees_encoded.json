@@ -1,0 +1,31 @@
+{
+ "trees": {
+  "record": "<HHHBBB",
+  "fields": [
+   "x",
+   "y",
+   "h_dm",
+   "archetype",
+   "source",
+   "crown_r_dm"
+  ],
+  "xy_unit_m": 0.1,
+  "h_unit_m": 0.1,
+  "crown_r_unit_m": 0.1,
+  "count": 4,
+  "data": "AAAAACgAAAMMewBOAHsAAQIwmDpAH8gABAAU/3x/PrcBAgH/",
+  "archetypes": [
+   "broadleaf",
+   "spruce",
+   "scots_pine",
+   "birch",
+   "young"
+  ],
+  "sources": [
+   "default",
+   "osm",
+   "nwss",
+   "nfi"
+  ]
+ }
+}
