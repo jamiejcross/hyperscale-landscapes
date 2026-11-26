@@ -1,6 +1,6 @@
 {
   "app.title": "Hyperscale Landscapes",
-  "app.tagline": "Open Tools for Printable Landscape Visualisations of Hyperscale AI Data Centres",
+  "app.tagline": "An Open Tool for Printable Landscape Visualisations of Hyperscale AI Data Centres",
   "step.pick": "Choose an area",
   "step.size": "Size and style",
   "step.preview": "Preview",
@@ -94,5 +94,6 @@
   "footer.sources": "Data sources and licences",
   "footer.code": "Source code",
   "footer.licence": "Hyperscale Landscapes is a non-commercial research and educational project (University of Glasgow, UK; Cornell University, USA). Source code: GPL-3.0. Exports and downloads: CC BY-NC-SA 4.0. Data sources keep their own licences; outputs that contain non-commercial material carry a notice.",
+  "footer.credits": "The Hyperscale Landscapes website is built in Javascript and Python, and uses open frameworks for 3D rendering (three.js) and mapping (leaflet). The website is co-created by Jamie Cross and Alex Nading and builds on arguments developed in their co-authored article, “The Hyperscale Landscape” (Nading and Cross, under review), which informed the conceptual framing, design decisions and choice of data sources. The site was designed by Cross using an approach to isometric landscapes inspired by the work of architects, graphic designers and game artists including Owen D. Pomfrey and Doug Miller, Glen Corpes and Peter Molyneux, Brad Crow and Tony Goodman, Li Han, Rod Hunt and Marina Tirurina. The colour palette of the “Guthrie” look is drawn from Sir James Guthrie’s Pastoral (1885) in the collection of the National Galleries of Scotland. The code was written and implemented using Claude Opus 5.5 (Anthropic), with all outputs verified, reviewed, revised and approved by Cross.",
   "footer.attr": "Map data © OpenStreetMap contributors"
 }
