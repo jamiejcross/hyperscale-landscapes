@@ -571,7 +571,6 @@ if (pendingView.site) {
 window.__app = state;   // for debugging and automated checks
 Object.defineProperty(window, "__studio", { get: () => studio });
 Object.defineProperty(window, "__scene", { get: () => scene });
-Object.defineProperty(window, "__studio", { get: () => studio });
 window.__picker = picker;
 
 // "Fetching map features… 42% (host)", or the MB received when the server

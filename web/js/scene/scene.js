@@ -196,7 +196,7 @@ export function createScene(container) {
   let props = null;            // 3D props (setProps)
   const propShown = { trees: true, turbines: true, pylons: true };
   let boundaryOn = true;            // the site red line (the "Data Centre Application Boundary" layer row)
-  let geology = null, geologyOn = false, geologyLabels = { geology: true, bgs: true };   // geology walls (setGeology)
+  let geology = null, geologyOn = false, geologyLabels = { geology: false, bgs: false };   // geology walls (setGeology); legends and wall labels off by default (JC, 26 Nov 2026)
   let pits = null, pitsOn = true, pitsMeta = {};   // pits on the surface (setPits)
   let propsSection = null;     // the bundle's props, for crowns and glyphs
   // Carto looks (Anthropogenic): built on first use per model, then cached.

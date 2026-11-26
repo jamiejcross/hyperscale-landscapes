@@ -66,8 +66,8 @@ export function mountStudio(el, scene, host) {
       <label class="check"><input type="checkbox" name="print"> Print colours</label>
     </fieldset>
     <fieldset name="geoPanel" hidden><legend>Geology legends</legend>
-      <label class="check"><input type="checkbox" name="legGeology" checked> Geology</label>
-      <label class="check"><input type="checkbox" name="legBgs" checked> British Geological Survey</label>
+      <label class="check"><input type="checkbox" name="legGeology"> Geology</label>
+      <label class="check"><input type="checkbox" name="legBgs"> British Geological Survey</label>
       <div name="geoLegend" class="geo-legend"></div>
       <div name="geoExport">
         <div class="inline">
