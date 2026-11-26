@@ -68,7 +68,6 @@ export function mountStudio(el, scene, host) {
     <fieldset name="geoPanel" hidden><legend>Geology legends</legend>
       <label class="check"><input type="checkbox" name="legGeology" checked> Geology</label>
       <label class="check"><input type="checkbox" name="legBgs" checked> British Geological Survey</label>
-      <label class="check"><input type="checkbox" name="geoLabels"> Labels on the walls (coal-bearing ground, deeper boreholes)</label>
       <div name="geoLegend" class="geo-legend"></div>
       <div name="geoExport">
         <div class="inline">
@@ -157,8 +156,8 @@ export function mountStudio(el, scene, host) {
   q('crowns').addEventListener('change', e => { scene.setCarto?.({ crowns: e.target.checked }); host.onChange?.(scene.view); });
   q('contours').addEventListener('change', e => { scene.setContours?.(e.target.checked); host.onChange?.(scene.view); });
   const legendShow = () => ({ geology: q('legGeology').checked, bgs: q('legBgs').checked });
-  for (const n of ['legGeology', 'legBgs']) q(n).addEventListener('change', () => { renderLegend(); host.onChange?.(scene.view); });
-  q('geoLabels').addEventListener('change', e => { scene.setGeologyLabels?.(e.target.checked); host.onChange?.(scene.view); });
+  // each toggle shows its legend and its labels on the walls
+  for (const n of ['legGeology', 'legBgs']) q(n).addEventListener('change', () => { scene.setGeologyLabels?.(legendShow()); renderLegend(); host.onChange?.(scene.view); });
   q('mist').addEventListener('change', e => { scene.setMist?.(e.target.checked); host.onChange?.(scene.view); });
   q('look').addEventListener('change', e => {
     const to = e.target.value;

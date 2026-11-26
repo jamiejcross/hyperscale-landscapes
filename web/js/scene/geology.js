@@ -18,6 +18,26 @@ import { BOREHOLE_NEAR_M } from './subsurface-info.js';
 const CW = 4096, SH = 512;                 // atlas: 4 strips of CW x SH
 const FONT = 'DejaVu Sans, Helvetica, Arial, sans-serif';
 const PIT_NEAR_M = 1000;
+// Wall labels in the signposts' style (pits.js labelTexture), at half its size.
+const SIGN = { h: 56, pad: 10, name: 22, note: 15, border: 2.5, sw: 30 };
+const PALE = 'rgba(255,250,236,0.97)', COAL = '#15110e', EDGE = '#f3e6c4', CREAM = '#fff7e3', CREAM2 = '#e9d8a8', NOTE = '#5a5248';
+function signWidth(c, s) {
+  c.font = `bold ${SIGN.name}px ${FONT}`; const a = c.measureText(s.name).width;
+  c.font = `${SIGN.note}px ${FONT}`; const b = s.note ? c.measureText(s.note).width : 0;
+  return Math.ceil(Math.max(a, b)) + 2 * SIGN.pad + (s.swatch ? SIGN.sw + 8 : 0);
+}
+// s: { name, note, dark, edge, nameColour, swatch(x, y, w, h) }, drawn at (0, 0)
+function drawSign(c, s, w) {
+  const h = SIGN.h, dark = !!s.dark, B = SIGN.border;
+  c.fillStyle = dark ? COAL : PALE; c.fillRect(0, 0, w, h);
+  c.strokeStyle = s.edge || (dark ? EDGE : COAL); c.lineWidth = B; c.strokeRect(B / 2, B / 2, w - B, h - B);
+  let tx = SIGN.pad;
+  if (s.swatch) { s.swatch(tx, (h - SIGN.sw) / 2, SIGN.sw, SIGN.sw); tx += SIGN.sw + 8; }
+  c.textBaseline = 'alphabetic';
+  c.fillStyle = s.nameColour || (dark ? CREAM : COAL); c.font = `bold ${SIGN.name}px ${FONT}`; c.fillText(s.name, tx, s.note ? 25 : 36);
+  if (s.note) { c.fillStyle = dark ? CREAM2 : NOTE; c.font = `${SIGN.note}px ${FONT}`; c.fillText(s.note, tx, 46); }
+}
+const showOf = v => (v && typeof v === 'object' ? { geology: !!v.geology, bgs: !!v.bgs } : { geology: !!v, bgs: !!v });
 const LOOK_STYLE = {
   field: { softenTowards: [236, 230, 214], softenBy: 0.45, turf: '#5e6a3c', seams: '#15110e', coalTint: 'rgba(70,58,30,0.22)' },
 };
@@ -25,8 +45,9 @@ const LOOK_STYLE = {
 // sub: the bundle's subsurface section; walls: the terrain-sides geometry
 // (non-indexed, unscaled model mm); grid: model grid; zExag: the model's
 // terrain exaggeration; palettes: PALETTES; evidence: EVIDENCE colours.
-// labels: draw the coal-ground and borehole labels on the walls (off by
-// default since 25 Nov 2026; the data and the drawing code stay).
+// labels: which wall labels to draw, { geology, bgs } (the two legend
+// toggles, JC 26 Nov 2026): geology = the legend's units; bgs = the records
+// (mine-plan panel, deeper boreholes). A boolean sets both.
 export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink: inkDefault = '#221d18', labels = false }) {
   const W = sub?.walls;
   if (!W || !walls) return null;
@@ -42,7 +63,7 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
 
   const mmPerM = grid.mmPerM, Wm = grid.Wmm / mmPerM, Hm = grid.Hmm / mmPerM;
   const textures = {}, materials = {};
-  let labelsOn = !!labels, currentLook = null;
+  let show = showOf(labels), currentLook = null;
 
   // textScale: how much wider than on the model each texel will be shown,
   // relative to its height (1 on the model; the unfolded-walls diagram uses
@@ -129,7 +150,6 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
           c.fillStyle = 'rgba(245,238,220,0.85)'; c.fillRect(a, y + th / 2 + 1, b - a, 1.5);   // seat earth
         }
         c.restore();
-        r.label = R.shallow_coal.slice(r.i0, r.i1 + 1).some(Boolean) ? 'COAL: BGS opencast coal resource' : 'COAL-BEARING STRATA';
         r.a = a; r.b = b; r.y = yOf(k, zRef) + 10 * mmPerM * zExag * SH / dz;
       }
 
@@ -153,58 +173,14 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
       for (const x of xsFrom(0, CW).reverse()) c.lineTo(x, yOf(k, zBelow(zs(x), 0.6, mmPerM, zExag)));
       c.closePath(); c.fill();
 
-      // coal labels (on top of everything in the section)
-      for (const r of coalRuns) {
-        if (!labelsOn) break;
-        c.font = `bold 22px ${FONT}`;
-        const tw = Math.max(c.measureText(r.label).width, (c.font = `17px ${FONT}`, c.measureText('seam positions schematic').width)) + 16;
-        const lx = Math.max(r.a + 8, Math.min(r.b - tw * FX(k) - 8, r.a + 18)), ly = Math.min(bottom - 60, r.y);
-        if (tw * FX(k) > r.b - r.a) continue;            // too short a run to label
-        aspect(k, lx, ly, () => {
-          c.fillStyle = 'rgba(255,250,236,0.93)'; c.fillRect(0, -5, tw, 56);
-          c.strokeStyle = S.seams; c.lineWidth = 2.5; c.strokeRect(0, -5, tw, 56);
-          c.fillStyle = S.seams; c.textBaseline = 'top';
-          c.font = `bold 22px ${FONT}`; c.fillText(r.label, 8, 0);
-          c.font = `17px ${FONT}`; c.fillText('seam positions schematic', 8, 28);
-        });
-        r.panelX = lx + tw * FX(k) + 20; r.panelY = ly - 5; r.labelX = lx; r.labelBottom = ly + 61;
-      }
       sideRuns[k] = coalRuns;
-      sideDraw[k] = { aspect, FX, zs, yOf, top, bottom, L };
+      sideDraw[k] = { aspect, FX, zs, yOf, top, bottom, L, br, cr, isSheet, unit, xa, xb, coverBase, colour, coalRuns };
     });
 
-    // 6. mine-plan seam panel: the nearest coal pit with plan seams within
-    // 1 km of a wall that has a coal run; once per site.
-    const panel = seamPanel();
-    lastPanel = panel && { side: SIDES[panel.k], pit: panel.pit.name, plan: panel.plan.catalogue, d: Math.round(panel.d), x: panel.run.panelX, y: panel.run.panelY };
-    if (panel && labelsOn) {              // a wall label: drawn only when wall labels are on
-      const { k, run, plan, pit } = panel, D = sideDraw[k];
-      const mine = (plan.mine_name || pit.name).toLowerCase().replace(/\b\w/g, ch => ch.toUpperCase());
-      const title = `Mine plan ${plan.catalogue}: ${mine}${plan.year_abandoned ? `, abandoned ${plan.year_abandoned}` : ''}`;
-      const sub1 = 'Seams named on the plan (BGS mine plans index)', sub2 = 'order and depths not shown';
-      const names = [...new Set(plan.seams)];
-      c.font = `bold 19px ${FONT}`; let w = c.measureText(title).width;
-      c.font = `14px ${FONT}`; w = Math.max(w, c.measureText(sub1).width, c.measureText(sub2).width);
-      c.font = `18px ${FONT}`; for (const nm of names) w = Math.max(w, c.measureText(`▬ ${nm}`).width);
-      const pw = w + 24, ph = 32 + 2 * 18 + names.length * 23 + 12;
-      let px = run.panelX ?? run.a + 8, py = run.panelY ?? run.y;
-      if (px + pw * D.FX(k) > CW - 8 && run.labelX != null) { px = run.labelX; py = run.labelBottom + 8; }   // no room beside the label: below it
-      px = Math.max(0, Math.min(CW - pw * D.FX(k) - 8, px)); py = Math.max(D.top + 4, Math.min(D.bottom - ph - 4, py));
-      D.aspect(k, px, py, () => {
-        const S = { ...LOOK_STYLE.field, ...(palettes[look]?.geology || {}) };
-        c.fillStyle = S.seams; c.globalAlpha = 0.94; c.fillRect(0, 0, pw, ph); c.globalAlpha = 1;
-        c.strokeStyle = '#f3e6c4'; c.lineWidth = 2; c.strokeRect(3, 3, pw - 6, ph - 6);
-        c.textBaseline = 'top';
-        c.fillStyle = '#fff7e3'; c.font = `bold 19px ${FONT}`; c.fillText(title, 12, 9);
-        c.fillStyle = '#e9d8a8'; c.font = `14px ${FONT}`; c.fillText(sub1, 12, 33); c.fillText(sub2, 12, 51);
-        c.fillStyle = '#fff7e3'; c.font = `18px ${FONT}`;
-        names.forEach((nm, i) => c.fillText(`▬ ${nm}`, 12, 73 + i * 23));
-      });
-    }
-
-    // 7. boreholes within 50 m of a wall: a red line to the recorded depth.
-    // Deepest first, so where labels would overlap the deeper borehole keeps its label.
-    const placed = [[], [], [], []];
+    // 7. boreholes within 50 m of a wall: a red line to the recorded depth
+    // (always drawn: it is the record itself). Deepest first, so where labels
+    // would overlap the deeper borehole keeps its label.
+    const RED = evidence.borehole, holes = [];
     for (const bh of [...(sub.boreholes || [])].sort((a, b) => (b.length_m || 0) - (a.length_m || 0))) {
       if (!(bh.length_m > 0)) continue;
       let best = null;
@@ -212,28 +188,122 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
       if (best.d > BOREHOLE_NEAR_M) continue;
       const D = sideDraw[best.k], x = best.t * CW, z0 = D.zs(x);
       const y0 = D.yOf(best.k, z0), y1 = Math.min(D.bottom, D.yOf(best.k, zBelow(z0, bh.length_m, mmPerM, zExag)));
-      const RED = evidence.borehole;
       c.lineCap = 'round';
       c.lineWidth = 9; c.strokeStyle = '#ffffff'; c.beginPath(); c.moveTo(x, y0); c.lineTo(x, y1); c.stroke();
       c.lineWidth = 5; c.strokeStyle = RED; c.stroke();
       c.lineCap = 'butt';
       c.fillStyle = RED; c.beginPath(); c.arc(x, y1, 7, 0, 7); c.fill();
-      if (bh.length_m < 10 || !labelsOn) continue;      // label the deeper ones only, when labels are on
-      const lines = [`BGS borehole ${bh.ref}`, `${bh.name || ''}${bh.year ? `, ${bh.year}` : ''}`.replace(/^, /, ''),
-        `${+bh.length_m.toFixed(1)} m deep (${bh.ags ? 'AGS log' : 'scanned log, not read'})`].filter(Boolean);
-      c.font = `bold 18px ${FONT}`; const w = Math.max(...lines.map(l => c.measureText(l).width)) + 14;
-      const fx = D.FX(best.k), lx = x + 12 + w * fx > CW ? x - 12 - w * fx : x + 12;
-      const ly = Math.min(D.bottom - lines.length * 22 - 10, y0 + (y1 - y0) * 0.45);
-      const box = [Math.min(lx, lx + (w + 4) * fx) - 4, ly - 6, Math.max(lx, lx + (w + 4) * fx) + 4, ly + lines.length * 22 + 4];
-      if (placed[best.k].some(b => box[0] < b[2] && b[0] < box[2] && box[1] < b[3] && b[1] < box[3])) continue;   // would cover another label
-      placed[best.k].push(box);
-      D.aspect(best.k, lx, ly, () => {
-        c.fillStyle = 'rgba(255,255,255,0.93)'; c.fillRect(-4, -6, w + 4, lines.length * 22 + 10);
-        c.strokeStyle = RED; c.lineWidth = 2; c.strokeRect(-4, -6, w + 4, lines.length * 22 + 10);
-        c.fillStyle = RED; c.textBaseline = 'top';
-        lines.forEach((l, i) => { c.font = `${i ? '' : 'bold '}18px ${FONT}`; c.fillText(l, 2, i * 22); });
+      if (bh.length_m >= 10) holes.push({ bh, k: best.k, x, y0, y1 });       // the deeper ones get a label
+    }
+
+    // 8. Wall labels, in the signposts' style (pits.js): a pale sign with an
+    // ink edge, a bold name and a grey second line; coal on a dark sign.
+    // "Geology" labels the legend's units (rocks, sheets, deposits, coal-
+    // bearing ground); "British Geological Survey" labels the records (the
+    // mine-plan panel and the deeper boreholes). No two labels overlap.
+    const placed = [[], [], [], []];
+    const free = (k, b) => !placed[k].some(q => b[0] < q[2] && q[0] < b[2] && b[1] < q[3] && q[1] < b[3]);
+    const surfY = (k, a, b) => { const D = sideDraw[k]; let y = D.top; for (let x = Math.max(0, a); x <= Math.min(CW, b); x += 8) y = Math.max(y, D.yOf(k, D.zs(x))); return y; };
+    // a sign inside [a, b] on side k, at the first free height from y down (at most `reach` px lower)
+    function put(k, a, b, y, s, { x: want, reach = Infinity } = {}) {
+      const D = sideDraw[k]; if (!D) return null;
+      const w = signWidth(c, s), ww = w * D.FX(k), h = SIGN.h;
+      if (ww > b - a - 8) return null;                  // too short a run to label
+      const x = Math.max(a + 4, Math.min(b - ww - 4, want ?? (a + b) / 2 - ww / 2));
+      const y0 = Math.max(y, surfY(k, x, x + ww) + 6);
+      for (let yy = y0; yy <= Math.min(D.bottom - h - 4, y0 + reach); yy += h / 2) {
+        const box = [x - 4, yy - 4, x + ww + 4, yy + h + 4];
+        if (!free(k, box)) continue;
+        placed[k].push(box); D.aspect(k, x, yy, () => drawSign(c, s, w)); return box;
+      }
+      return null;
+    }
+    const swatchOf = (u, kind) => (x, y, w, h) => {
+      c.fillStyle = colourOf(u); c.fillRect(x, y, w, h);
+      c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip(); pattern(c, kind, x, x + w, y, y + h, ink); c.restore();
+      c.strokeStyle = ink; c.lineWidth = 1.5; c.strokeRect(x, y, w, h);
+    };
+    const colourOf = u => unitColour(u, { units: P.units, softenTowards: S.softenTowards, softenBy: S.softenBy });
+    const coalSw = (x, y, w, h) => {
+      c.fillStyle = '#d9cfa8'; c.fillRect(x, y, w, h); c.fillStyle = S.coalTint; c.fillRect(x, y, w, h);
+      c.fillStyle = S.seams; for (const f of [0.2, 0.5, 0.78]) c.fillRect(x, y + f * h - 2, w, 4);
+      c.strokeStyle = EDGE; c.lineWidth = 1.5; c.strokeRect(x, y, w, h);
+    };
+
+    // coal-bearing ground first: the mine-plan panel sits beside it
+    if (show.geology) SIDES.forEach((_, k) => {
+      for (const r of sideDraw[k]?.coalRuns || []) {
+        const opencast = W.sides[SIDES[k]].shallow_coal.slice(r.i0, r.i1 + 1).some(Boolean);
+        const box = put(k, r.a, r.b, r.y, { name: 'Coal-bearing ground', dark: true, swatch: coalSw,
+          note: `${opencast ? 'BGS Shallow Coal: opencast coal resource area' : 'Coal named in the BGS bedrock unit'}; seams schematic` },
+        { x: r.a + 18, reach: SIGN.h * 2 })
+          // a short run: let the sign run past its ends rather than leave the coal unnamed
+          || put(k, Math.max(0, r.a - 600), Math.min(CW, r.b + 600), r.y, { name: 'Coal-bearing ground', dark: true, swatch: coalSw,
+            note: `${opencast ? 'BGS opencast coal resource' : 'Coal named in the BGS bedrock unit'}; seams schematic` }, { x: r.a, reach: SIGN.h * 2 });
+        if (box) { r.panelX = box[2] + 16; r.panelY = box[1] + 4; r.labelX = box[0] + 4; r.labelBottom = box[3]; }
+      }
+    });
+
+    // 6. mine-plan seam panel: the nearest coal pit with plan seams within
+    // 1 km of a wall that has a coal run; once per site.
+    const panel = seamPanel();
+    lastPanel = panel && { side: SIDES[panel.k], pit: panel.pit.name, plan: panel.plan.catalogue, d: Math.round(panel.d), x: panel.run.panelX, y: panel.run.panelY };
+    if (panel && show.bgs) {
+      const { k, run, plan, pit } = panel, D = sideDraw[k];
+      const mine = (plan.mine_name || pit.name).toLowerCase().replace(/\b\w/g, ch => ch.toUpperCase());
+      const title = `Mine plan ${plan.catalogue}: ${mine}${plan.year_abandoned ? `, abandoned ${plan.year_abandoned}` : ''}`;
+      const sub1 = 'Seams named on the plan (BGS mine plans index)', sub2 = 'order and depths not shown';
+      const names = [...new Set(plan.seams)];
+      c.font = `bold ${SIGN.name}px ${FONT}`; let w = c.measureText(title).width;
+      c.font = `${SIGN.note}px ${FONT}`; w = Math.max(w, c.measureText(sub1).width, c.measureText(sub2).width);
+      c.font = `17px ${FONT}`; for (const nm of names) w = Math.max(w, c.measureText(`▬ ${nm}`).width);
+      const pw = w + 2 * SIGN.pad, ph = 10 + 26 + 2 * 19 + names.length * 22 + 10;
+      let px = run.panelX ?? run.a + 8, py = run.panelY ?? run.y;
+      if (px + pw * D.FX(k) > CW - 8 && run.labelX != null) { px = run.labelX; py = run.labelBottom + 8; }   // no room beside the label: below it
+      px = Math.max(0, Math.min(CW - pw * D.FX(k) - 8, px)); py = Math.max(D.top + 4, Math.min(D.bottom - ph - 4, py));
+      placed[k].push([px - 4, py - 4, px + pw * D.FX(k) + 4, py + ph + 4]);
+      D.aspect(k, px, py, () => {
+        c.fillStyle = COAL; c.fillRect(0, 0, pw, ph);
+        c.strokeStyle = EDGE; c.lineWidth = SIGN.border; c.strokeRect(SIGN.border / 2, SIGN.border / 2, pw - SIGN.border, ph - SIGN.border);
+        c.textBaseline = 'alphabetic';
+        c.fillStyle = CREAM; c.font = `bold ${SIGN.name}px ${FONT}`; c.fillText(title, SIGN.pad, 30);
+        c.fillStyle = CREAM2; c.font = `${SIGN.note}px ${FONT}`; c.fillText(sub1, SIGN.pad, 52); c.fillText(sub2, SIGN.pad, 71);
+        c.fillStyle = CREAM; c.font = `17px ${FONT}`;
+        names.forEach((nm, i) => c.fillText(`▬ ${nm}`, SIGN.pad, 96 + i * 22));
       });
     }
+
+    // borehole labels beside their lines
+    if (show.bgs) for (const { bh, k, x, y0, y1 } of holes) {
+      const s = { name: `BGS borehole ${bh.ref}`, edge: RED, nameColour: RED,
+        note: [[bh.name, bh.year].filter(Boolean).join(', '), `${+bh.length_m.toFixed(1)} m deep (${bh.ags ? 'AGS log' : 'scanned log, not read'})`].filter(Boolean).join('; ') };
+      const D = sideDraw[k], ww = signWidth(c, s) * D.FX(k);
+      const lx = x + 14 + ww > CW ? x - 14 - ww : x + 14;
+      put(k, 0, CW, y0 + (y1 - y0) * 0.35, s, { x: lx, reach: SIGN.h * 1.5 });
+    }
+
+    // the legend's units, each once per wall on its longest run: deposits
+    // (at the top), sheets, then bedrock
+    if (show.geology) SIDES.forEach((_, k) => {
+      const D = sideDraw[k]; if (!D) return;
+      const longest = (rs, keyOf) => {
+        const by = new Map();
+        for (const r of rs) { const j = keyOf(r); if (j == null || j < 0 || !D.unit(j)?.LEX_D) continue; const a = D.xa(r.i0), b = D.xb(r.i1); if (!by.has(j) || b - a > by.get(j).b - by.get(j).a) by.set(j, { a, b, u: D.unit(j) }); }
+        return [...by.values()].sort((p, q) => (q.b - q.a) - (p.b - p.a));
+      };
+      for (const { a, b, u } of longest(D.cr, r => r.v)) {
+        const kind = u.layer === 'artificial' ? 'Artificial ground' : 'Superficial deposit';
+        put(k, a, b, D.top, { name: u.LEX_D, note: `${u.RCS_D || kind}; thickness assumed`, swatch: swatchOf(u, depositPattern(u.LEX_D)) });
+      }
+      for (const { a, b, u } of longest(D.br.filter(D.isSheet), r => r.v)) {
+        const m = (a + b) / 2;
+        put(k, a, b, D.yOf(k, D.coverBase(m) - 0.5 * mmPerM * zExag) + 4, { name: u.LEX_D, note: `${u.RCS_D ? `${u.RCS_D}; ` : ''}sheet, thickness assumed`, swatch: swatchOf(u, patternOf(u)) });
+      }
+      for (const { a, b, u } of longest(D.br.filter(r => !D.isSheet(r)), r => r.v)) {
+        const m = (a + b) / 2;
+        put(k, a, b, D.yOf(k, D.coverBase(m)) + 14, { name: u.LEX_D, note: u.RCS_D || 'Bedrock (BGS)', swatch: swatchOf(u, patternOf(u)) });
+      }
+    });
 
     return cv;
   }
@@ -312,8 +382,9 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
   function setLook(look) { currentLook = look; mesh.material = material(look); }
   // Wall labels on or off: repaint (the textures are cached per look).
   function setLabels(on) {
-    if (!!on === labelsOn) return;
-    labelsOn = !!on;
+    const next = showOf(on);
+    if (next.geology === show.geology && next.bgs === show.bgs) return;
+    show = next;
     for (const m of Object.values(materials)) m.dispose();
     for (const t of Object.values(textures)) t.dispose();
     for (const k of Object.keys(materials)) delete materials[k];
@@ -326,7 +397,7 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
     geo.deleteAttribute('uv'); geo.deleteAttribute('color'); geo.dispose();   // position/normal belong to the walls
     mesh.removeFromParent();
   }
-  return { mesh, setLook, setLabels, get labels() { return labelsOn; }, shade, dispose, atlas, swatch, coalSwatch, sub, surf, zmin, zmax, zExag, mmPerM, Wm, Hm, CW, SH,
+  return { mesh, setLook, setLabels, get labels() { return { ...show }; }, shade, dispose, atlas, swatch, coalSwatch, sub, surf, zmin, zmax, zExag, mmPerM, Wm, Hm, CW, SH,
     get panel() { return lastPanel; }, attribution: sub.attribution, nonCommercial: !!sub.nonCommercial };
 }
 

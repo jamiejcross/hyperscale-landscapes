@@ -189,7 +189,7 @@ export function createScene(container) {
   const meshes = {};
   let props = null;            // 3D props (setProps)
   const propShown = { trees: true, turbines: true, pylons: true };
-  let geology = null, geologyOn = false, geologyLabels = false;   // geology walls (setGeology)
+  let geology = null, geologyOn = false, geologyLabels = { geology: true, bgs: true };   // geology walls (setGeology)
   let pits = null, pitsOn = true, pitsMeta = {};   // pits on the surface (setPits)
   let propsSection = null;     // the bundle's props, for crowns and glyphs
   // Carto looks (Anthropogenic): built on first use per model, then cached.
@@ -968,7 +968,7 @@ export function createScene(container) {
   // One class of pit on or off: 'coal', 'unknown' or 'quarry'.
   function showPitClass(cls, on) { pits?.setShown(cls, on); pits?.setVisible(pitsOn); repaintDrapes(); }
   function showGeology(on) { geologyOn = !!on; refreshVisibility(); }
-  function setGeologyLabels(on) { geologyLabels = !!on; geology?.setLabels(geologyLabels); }
+  function setGeologyLabels(on) { geologyLabels = on && typeof on === 'object' ? { geology: !!on.geology, bgs: !!on.bgs } : { geology: !!on, bgs: !!on }; geology?.setLabels(geologyLabels); }
   function setPropsVisible(kind, on) {
     propShown[kind] = on; props?.setVisible(kind, on); glyphs?.setVisible(kind, on); refreshVisibility();
     if (kind === 'trees' && cartoActive()) paintCartoDrape();      // crowns are painted

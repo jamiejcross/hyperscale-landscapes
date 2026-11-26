@@ -1,6 +1,7 @@
 {
   "app.title": "Hyperscale Landscapes",
-  "app.tagline": "An Open Tool for Printable Landscape Visualisations of Hyperscale Data Centres. Coded with AI for use in campaigning, communications, and research on AI.",
+  "app.tagline": "An Open Tool for Printable Landscape Visualisations of Hyperscale Data Centres",
+  "app.tagline2": "Built with AI for use in campaigning, communications, and research on AI.",
   "step.pick": "Choose an area",
   "step.size": "Size and style",
   "step.preview": "Preview",
