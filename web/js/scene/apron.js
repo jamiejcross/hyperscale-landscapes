@@ -9,7 +9,7 @@
 // edge at the model's own edge vertices, and an ink line marks the border in
 // every look.
 import * as THREE from 'three';
-import { decodeContextGrid, apronMesh, contextShade, contextFeatures, distOutside, landFade, lineFade, edgeBlend, desaturate, mixRGB, hexRGB,
+import { decodeContextGrid, apronMesh, contextShade, contextFeatures, distOutside, landFade, lineFade, edgeBlend, EDGE_BLEND, desaturate, mixRGB, hexRGB,
   cullLabels, NAME_NOTES, NAME_RANK } from './apron-math.js';
 import { paintOverlays } from './overlays.js';
 import { paintWater, glyphWires } from './carto.js';
@@ -154,7 +154,7 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
       const dd = distOutside(x, y, Wmm, Hmm);
       let col = bare ? bgc : z[q] <= 0.05 ? sea : base;
       if (rAlpha && !bare) { const s = shade[q] / 255; col = col.map(v => v * (1 - rAlpha + rAlpha * s)); }   // the carto look's baked relief
-      if (fromEdge) col = mixRGB(fromEdge(x, y), col, edgeBlend(dd, padMm));      // the model's land runs on, then gives way
+      if (fromEdge && EDGE_BLEND > 0) col = mixRGB(fromEdge(x, y), col, edgeBlend(dd, padMm));      // the model's land runs on, then gives way (off: EDGE_BLEND 0)
       col = mixRGB(col, bgc, landFade(dd, padMm));
       const o = 4 * (j * LW + i); d[o] = col[0]; d[o + 1] = col[1]; d[o + 2] = col[2]; d[o + 3] = 255;
     }

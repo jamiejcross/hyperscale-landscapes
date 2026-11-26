@@ -168,7 +168,7 @@ label.file input { display: block; margin-top: .25rem; }
 
 footer.site { padding-top: 1.5rem; padding-bottom: 3rem; font-size: .85rem; color: var(--grey); }
 footer.site p { margin: 0; max-width: none; }
-footer.site p.credits { margin: .75rem 0; max-width: 60rem; }
+footer.site p.credits { margin: .75rem 0; max-width: none; }
 header.site .cc { display: block; flex: none; }
 header.site .cc img, footer.site .logos a img { display: block; width: 88px; height: 31px; }
 footer.site .logos { display: flex; flex-wrap: wrap; align-items: center; gap: 1.25rem; margin-bottom: 1rem; }

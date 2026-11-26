@@ -26,8 +26,10 @@ export const LAND_FADE_MAX = 0.5;      // JC, 26 Nov 2026: much lighter haze (wa
 export const landFade = (d, pad) => LAND_FADE_MAX * smoothstep(0, pad, d);
 // The first stretch of the apron blends from the model's own land colour at
 // its edge into the apron's landscape colour (a fraction of the pad).
-export const EDGE_BLEND = 0.04;        // JC, 26 Nov 2026: only enough to hide the seam (was 0.2: it carried the model's land cover ~300 m out)
-export const edgeBlend = (d, pad) => smoothstep(0, EDGE_BLEND * pad, d);
+// None (JC, 26 Nov 2026): no colour from the model bleeds out. It was 0.2, then 0.04, then 0.01;
+// the edge colour is a coarse (96 px) sample of the drape, so buildings, roads and water were averaged and carried out.
+export const EDGE_BLEND = 0;
+export const edgeBlend = (d, pad) => (EDGE_BLEND > 0 ? smoothstep(0, EDGE_BLEND * pad, d) : 1);
 // Lines and symbols fade more weakly (at most 45%).
 export const LINE_FADE_MAX = 0.45;
 export const lineFade = (d, pad) => LINE_FADE_MAX * smoothstep(0, pad, d);
