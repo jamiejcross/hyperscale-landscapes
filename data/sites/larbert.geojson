@@ -53,6 +53,54 @@
       "hub_height": 73,
       "rotor_diameter": 100,
       "source": "energymap.co.uk, Tod Hill Wind Farm (REPD 3415; Falkirk P/11/0326/FUL): GE 2.85-100, hub 73 m, rotor 100 m. Third-party database, not the planning file: to verify."
+    },
+    "massing": {
+      "tier": "plans",
+      "red_line": {
+        "ref": "P/26/0237/FUL",
+        "keyVal": "TFY4B9HC05J00",
+        "evidence": "documented",
+        "source": "edevelopment.falkirk.gov.uk public access map (WFS Planning_Application_Polygons)",
+        "retrieved": "2026-11-26",
+        "area_ha": 18.78,
+        "form_area_ha": 18.92,
+        "geometry": {
+          "type": "MultiPolygon",
+          "coordinates": [[[[-3.8402605,56.0346032],[-3.840549,56.0345086],[-3.8417824,56.0345395],[-3.8439745,56.0341497],[-3.8453826,56.0337982],[-3.8460334,56.0334856],[-3.847325,56.0330152],[-3.8478004,56.0328111],[-3.8482136,56.0326134],[-3.8489183,56.0322104],[-3.8489885,56.03218],[-3.848563,56.0318761],[-3.8478027,56.0314255],[-3.8473866,56.0312202],[-3.8467012,56.030915],[-3.8465004,56.030838],[-3.8455126,56.030465],[-3.8449318,56.0304248],[-3.8446362,56.0304592],[-3.8445769,56.0304751],[-3.8443275,56.0304196],[-3.8441631,56.0302462],[-3.8439908,56.0301704],[-3.8437026,56.0301124],[-3.8426098,56.030122],[-3.8405708,56.0301556],[-3.8407281,56.0303454],[-3.8416075,56.0310413],[-3.8426607,56.0319155],[-3.8427335,56.0319756],[-3.8402293,56.0328215],[-3.8401964,56.0326787],[-3.8387162,56.0329433],[-3.8376305,56.0337574],[-3.8386455,56.0340648],[-3.8402605,56.0346032]]]]
+        }
+      },
+      "other_red_lines": [],
+      "buildings": [
+        {
+          "name": "DC1 (north)",
+          "kind": "building",
+          "evidence": "documented",
+          "height_m": 28,
+          "height_basis": "28 m above FFL (EIAR App. 9-2, via AECOM review)",
+          "source": "P/26/0237/FUL, EIAR Fig. 3-1a General Arrangement Layout (WSP rev P06): data-centre block (data halls, galleries, generators); office wing excluded",
+          "area_m2": 33056,
+          "georeference": "fitted to council red line: 0.8 m RMS, rotation 0.0°, scale ×1.00",
+          "geometry": {
+            "type": "MultiPolygon",
+            "coordinates": [[[[-3.8396339,56.0330147],[-3.8429911,56.0325569],[-3.843574,56.0338965],[-3.8402167,56.0343544],[-3.8396339,56.0330147]]]]
+          }
+        },
+        {
+          "name": "DC2 (south)",
+          "kind": "building",
+          "evidence": "documented",
+          "height_m": 28,
+          "height_basis": "28 m above FFL (EIAR App. 9-2, via AECOM review)",
+          "source": "P/26/0237/FUL, EIAR Fig. 3-1a General Arrangement Layout (WSP rev P06): data-centre block (data halls, galleries, generators); office wing excluded",
+          "area_m2": 14899,
+          "georeference": "fitted to council red line: 0.8 m RMS, rotation 0.0°, scale ×1.00",
+          "geometry": {
+            "type": "MultiPolygon",
+            "coordinates": [[[[-3.8444135,56.0319211],[-3.842559,56.0309368],[-3.8435915,56.0303269],[-3.845446,56.0313113],[-3.8444135,56.0319211]]]]
+          }
+        }
+      ],
+      "zones": []
     }
   }
 }

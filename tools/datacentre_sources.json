@@ -1,0 +1,16 @@
+{
+  "_about": "Planning applications whose council-mapped red lines tools/fetch_council_boundaries.py fetches. Hosts and keyVals are from data/sites/docs/_portal_index_2026-11-25.json (Idox Public Access). form_area_ha is the site area stated on the application form, where we have read it; null where not read (no figure is invented).",
+  "applications": [
+    {"site": "auchtertool-cato", "ref": "26/01243/PPP",  "keyVal": "TE9GGMHFFWY00", "host": "planning.fife.gov.uk",              "form_area_ha": 68.90},
+    {"site": "chapelcross",      "ref": "26/1649/PIP",   "keyVal": "TLPCUJGBKSH00", "host": "eaccess.dumgal.gov.uk",             "form_area_ha": 55},
+    {"site": "larbert",          "ref": "P/26/0237/FUL", "keyVal": "TFY4B9HC05J00", "host": "edevelopment.falkirk.gov.uk",       "form_area_ha": 18.92},
+    {"site": "greenock",         "ref": "26/0136/IC",    "keyVal": "TIKFMBIMKXV00", "host": "planning.inverclyde.gov.uk",        "form_area_ha": 28.21},
+    {"site": "south-gyle",       "ref": "25/04239/PPP",  "keyVal": "T16TBMEWJO800", "host": "citydev-portal.edinburgh.gov.uk",   "form_area_ha": 5.74},
+    {"site": "south-gyle",       "ref": "25/03575/SCR",  "keyVal": "SZ4X9BEW0XE00", "host": "citydev-portal.edinburgh.gov.uk",   "form_area_ha": null},
+    {"site": "ravenscraig",      "ref": "25/00838/PAN",  "keyVal": "T0BHY2BA0EC00", "host": "eplanning.northlanarkshire.gov.uk", "form_area_ha": null},
+    {"site": "coldstream",       "ref": "25/00556/SCR",  "keyVal": "SVVR76NT0BQ00", "host": "eplanning.scotborders.gov.uk",      "form_area_ha": null},
+    {"site": "westerhill",       "ref": "TP/ED/25/0428", "keyVal": "T0B1NMGJ09L00", "host": "planning.eastdunbarton.gov.uk",     "form_area_ha": null},
+    {"site": "duns",             "ref": "25/01835/SCR",  "keyVal": "T7264GNT0BQ00", "host": "eplanning.scotborders.gov.uk",      "form_area_ha": null},
+    {"site": "duns",             "ref": "26/01660/PAN",  "keyVal": "TNX9RENT0BQ00", "host": "eplanning.scotborders.gov.uk",      "form_area_ha": null}
+  ]
+}

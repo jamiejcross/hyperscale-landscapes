@@ -315,6 +315,166 @@
           "required": [
             "source"
           ]
+        },
+        "massing": {
+          "description": "Planning geometry for the proposed data centre (screen only, never printed). tier/red_line/other_red_lines/buildings/zones are written by tools/massing.py; other keys are hand-entered and kept.",
+          "type": "object",
+          "required": [
+            "tier"
+          ],
+          "properties": {
+            "tier": {
+              "enum": [
+                "plans",
+                "red_line",
+                "indicative",
+                null
+              ]
+            },
+            "red_line": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/red_line"
+                }
+              ]
+            },
+            "other_red_lines": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/red_line"
+              }
+            },
+            "buildings": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/drawn"
+              }
+            },
+            "zones": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/drawn"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "geometry": {
+      "type": "object",
+      "required": [
+        "type",
+        "coordinates"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "Polygon",
+            "MultiPolygon"
+          ]
+        }
+      }
+    },
+    "drawn": {
+      "type": "object",
+      "required": [
+        "name",
+        "kind",
+        "evidence",
+        "source",
+        "geometry"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "evidence": {
+          "enum": [
+            "documented",
+            "indicative"
+          ],
+          "description": "documented = from a full application, a siting plan or a parameter plan (drawn solid); indicative = an illustrative layout, or placed by us (drawn dashed)"
+        },
+        "height_m": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "height_min_m": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "height_basis": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "minLength": 5
+        },
+        "area_m2": {
+          "type": "number",
+          "minimum": 0
+        },
+        "georeference": {
+          "type": "string",
+          "description": "fit statement: RMS against the council red line, rotation, scale"
+        },
+        "geometry": {
+          "$ref": "#/$defs/geometry"
+        }
+      }
+    },
+    "red_line": {
+      "type": "object",
+      "required": [
+        "ref",
+        "evidence",
+        "source",
+        "retrieved",
+        "area_ha",
+        "geometry"
+      ],
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "keyVal": {
+          "type": "string"
+        },
+        "evidence": {
+          "const": "documented"
+        },
+        "source": {
+          "type": "string"
+        },
+        "retrieved": {
+          "type": "string",
+          "format": "date"
+        },
+        "area_ha": {
+          "type": "number"
+        },
+        "form_area_ha": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "geometry": {
+          "$ref": "#/$defs/geometry"
         }
       }
     }

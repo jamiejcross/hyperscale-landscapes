@@ -1,0 +1,41 @@
+<?xml version='1.0' encoding="UTF-8" ?>
+<wfs:FeatureCollection
+   xmlns:ms="http://mapserver.gis.umn.edu/mapserver"
+   xmlns:gml="http://www.opengis.net/gml/3.2"
+   xmlns:wfs="http://www.opengis.net/wfs/2.0"
+   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+   xsi:schemaLocation="http://mapserver.gis.umn.edu/mapserver http://edevelopment.falkirk.gov.uk/PAM/LIVE/MapServer?SERVICE=WFS&amp;VERSION=2.0.0&amp;REQUEST=DescribeFeatureType&amp;TYPENAME=Planning_Application_Polygons&amp;OUTPUTFORMAT=application%2Fgml%2Bxml%3B%20version%3D3.2 http://www.opengis.net/wfs/2.0 http://schemas.opengis.net/wfs/2.0/wfs.xsd http://www.opengis.net/gml/3.2 http://schemas.opengis.net/gml/3.2.1/gml.xsd"
+   timeStamp="2026-11-26T10:48:37" numberMatched="1" numberReturned="1">
+      <wfs:boundedBy>
+      	<gml:Envelope srsName="urn:ogc:def:crs:EPSG::27700">
+      		<gml:lowerCorner>284881.034750 683445.563375</gml:lowerCorner>
+      		<gml:upperCorner>285593.378500 683940.326125</gml:upperCorner>
+      	</gml:Envelope>
+      </wfs:boundedBy>
+    <wfs:member>
+      <ms:Planning_Application_Polygons gml:id="Planning_Application_Polygons.TFY4B9HC05J00">
+        <gml:boundedBy>
+        	<gml:Envelope srsName="urn:ogc:def:crs:EPSG::27700">
+        		<gml:lowerCorner>284881.034750 683445.563375</gml:lowerCorner>
+        		<gml:upperCorner>285593.378500 683940.326125</gml:upperCorner>
+        	</gml:Envelope>
+        </gml:boundedBy>
+        <ms:msGeometry>
+          <gml:Polygon gml:id="Planning_Application_Polygons.TFY4B9HC05J00.1" srsName="urn:ogc:def:crs:EPSG::27700">
+            <gml:exterior>
+              <gml:LinearRing>
+                <gml:posList srsDimension="2">285432.026125 683940.326125 285413.770000 683930.277250 285337.022375 683935.759250 285199.291375 683896.025875 285110.514125 683859.260500 285069.039250 683825.552125 284987.166500 683775.367125 284956.939375 683753.449375 284930.605625 683732.138000 284885.504125 683688.468000 284881.034750 683685.197750 284906.644750 683650.669750 284952.673375 683599.254000 284977.984125 683575.720000 285019.783000 683540.620000 285032.067000 683531.715125 285092.505125 683488.555500 285128.571750 683483.120000 285147.094375 683486.453250 285150.835500 683488.122750 285166.212125 683481.534000 285175.938875 683461.968875 285186.448000 683453.248625 285204.234500 683446.314625 285272.352750 683445.563375 285399.505625 683445.909875 285390.266125 683467.290500 285337.534750 683546.193500 285274.510125 683645.219875 285270.149000 683652.034125 285428.688250 683742.003250 285430.311625 683726.063750 285523.323000 683753.048125 285593.378500 683841.835000 285531.048500 683877.730500 285432.026125 683940.326125 </gml:posList>
+              </gml:LinearRing>
+            </gml:exterior>
+          </gml:Polygon>
+        </ms:msGeometry>
+        <ms:REFVAL>P/26/0237/FUL</ms:REFVAL>
+        <ms:KEYVAL>TFY4B9HC05J00</ms:KEYVAL>
+        <ms:DATEMODIFIED>2026-06-04 00:00:00</ms:DATEMODIFIED>
+        <ms:ADDRESS>Land To The North East Of Glenbervie NurseryStirling RoadLarbert</ms:ADDRESS>
+        <ms:DESCRIPTION>Construction of an AI Data Centre with 300MW Demand Utility Capacity and Car Parking, Landscaping, Roads, Access and Associated Works</ms:DESCRIPTION>
+        <ms:OBJECTID>179133</ms:OBJECTID>
+      </ms:Planning_Application_Polygons>
+    </wfs:member>
+</wfs:FeatureCollection>
+

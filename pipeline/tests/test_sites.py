@@ -33,8 +33,17 @@ def test_curated_bundles_are_small_and_valid():
         p = DATA / s["bundle"]
         assert p.stat().st_size < 5_000_000, s["id"]
         b = json.loads(gzip.decompress(p.read_bytes()))
-        assert b["schema"] in ("hyperscale-landscapes/site-bundle@2", "hyperscale-landscapes/site-bundle@3")
-        if b["schema"].endswith("@3"):   # props and subsurface present and well formed
+        assert b["schema"] in ("hyperscale-landscapes/site-bundle@2", "hyperscale-landscapes/site-bundle@3",
+                               "hyperscale-landscapes/site-bundle@4")
+        if "context" in b:   # @4: the context grid is complete and snapped to the model edges
+            from hyperscale_landscapes import context as C
+            e = b["context"]["elevation"]
+            assert e["registration"] == "vertex" and len(e["data"]) * 3 // 4 >= e["w"] * e["h"] * 2, s["id"]
+            assert e["w"] == e["model_cells_x"] + 2 * e["pad_cells_x"] + 1 and e["h"] == e["model_cells_y"] + 2 * e["pad_cells_y"] + 1
+            assert abs(e["x0_m"] + e["pad_cells_x"] * e["dx_m"]) < 0.01, s["id"]
+            assert b["context"]["label"] == "CONTEXT" and b["context"]["osm"]["elements"] is not None
+            assert "Copernicus" in e["attribution"]
+        if b["schema"][-2:] in ("@3", "@4"):   # props and subsurface present and well formed
             t = b["props"]["trees"]
             assert t["record"] == "<HHHBBB" and len(t["data"]) * 3 // 4 >= 9 * t["count"], s["id"]
             assert b["subsurface"]["nonCommercial"] is True
@@ -52,15 +61,20 @@ def test_curated_bundles_are_small_and_valid():
         assert b.get("bbox") == site["model_bbox"], f"{s['id']}: bundle needs re-baking"
 
 
+def _site_files():
+    """The curated site files (data/sites also holds the data-centre FeatureCollections)."""
+    return [DATA / s["file"] for s in json.loads((DATA / "index.json").read_text())["sites"]]
+
+
 def test_every_site_validates_against_the_schema():
     import jsonschema
     schema = json.loads((DATA / "schema.json").read_text())
-    for f in sorted(DATA.glob("*.geojson")):
+    for f in _site_files():
         jsonschema.validate(json.loads(f.read_text()), schema)
 
 
 def test_every_site_has_a_source_and_a_sane_extent():
-    for f in sorted(DATA.glob("*.geojson")):
+    for f in _site_files():
         p = json.loads(f.read_text())["properties"]
         assert p["sources"] and all(s["url"].startswith("http") for s in p["sources"]), f.name
         bb = p["model_bbox"]

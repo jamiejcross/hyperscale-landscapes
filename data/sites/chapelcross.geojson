@@ -48,6 +48,206 @@
       "min_lon": -3.25206,
       "max_lon": -3.20193
     },
-    "model_bbox_note": "3.2 × 1.6 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary."
+    "model_bbox_note": "3.2 × 1.6 km (east–west × north–south) centred on the APRS pin; a modelling extent, not a site boundary.",
+    "massing": {
+      "tier": "plans",
+      "red_line": {
+        "ref": "26/1649/PIP",
+        "keyVal": "TLPCUJGBKSH00",
+        "evidence": "documented",
+        "source": "eaccess.dumgal.gov.uk public access map (WFS Planning_Application_Polygons)",
+        "retrieved": "2026-11-26",
+        "area_ha": 56.58,
+        "form_area_ha": 55,
+        "geometry": {
+          "type": "MultiPolygon",
+          "coordinates": [[[[-3.2258343,55.0230079],[-3.2202061,55.021763],[-3.2201389,55.0207561],[-3.2228151,55.018651],[-3.2190816,55.017219],[-3.2186932,55.0176637],[-3.2134566,55.0232999],[-3.2177202,55.0253355],[-3.2227989,55.0277197],[-3.223759,55.0268493],[-3.2267058,55.0252243],[-3.2264072,55.0250174],[-3.2284021,55.0239372],[-3.2334854,55.0211043],[-3.2313101,55.0198668],[-3.2258343,55.0230079]]]]
+        }
+      },
+      "other_red_lines": [],
+      "buildings": [
+        {
+          "name": "substation",
+          "kind": "building",
+          "evidence": "indicative",
+          "height_m": 15,
+          "height_basis": "maximum of the height-parameter zone it sits in (15 m); actual heights not fixed at PPiP",
+          "source": "26/1649/PIP Indicative Masterplan CX-ARC-XX-ZZ-DR-A-1001 P01 (1:2500)",
+          "area_m2": 17891,
+          "georeference": "fitted to council red line: 3.0 m RMS, rotation 0.5°, scale ×1.01",
+          "geometry": {
+            "type": "MultiPolygon",
+            "coordinates": [[[[-3.2302377,55.0212341],[-3.2318695,55.0202911],[-3.2332103,55.0210569],[-3.2315785,55.022],[-3.2302377,55.0212341]]]]
+          }
+        },
+        {
+          "name": "data centre building (B1-B8), incl. plant zone",
+          "kind": "building",
+          "evidence": "indicative",
+          "height_m": 40,
+          "height_basis": "maximum of the height-parameter zone it sits in (40 m); actual heights not fixed at PPiP",
+          "source": "26/1649/PIP Indicative Masterplan CX-ARC-XX-ZZ-DR-A-1001 P01 (1:2500)",
+          "area_m2": 18461,
+          "georeference": "fitted to council red line: 3.0 m RMS, rotation 0.5°, scale ×1.01",
+          "geometry": {
+            "type": "MultiPolygon",
+            "coordinates": [[[[-3.2305636,55.021834],[-3.2283966,55.0230792],[-3.2273547,55.0224807],[-3.2295217,55.0212355],[-3.2305636,55.021834]]]]
+          }
+        },
+        {
+          "name": "data centre building (B1-B8), incl. plant zone",
+          "kind": "building",
+          "evidence": "indicative",
+          "height_m": 40,
+          "height_basis": "maximum of the height-parameter zone it sits in (40 m); actual heights not fixed at PPiP",
+          "source": "26/1649/PIP Indicative Masterplan CX-ARC-XX-ZZ-DR-A-1001 P01 (1:2500)",
+          "area_m2": 18567,
+          "georeference": "fitted to council red line: 3.0 m RMS, rotation 0.5°, scale ×1.01",
+          "geometry": {
+            "type": "MultiPolygon",
+            "coordinates": [[[[-3.2282166,55.0231836],[-3.2260499,55.0244383],[-3.2250019,55.023841],[-3.2271685,55.0225862],[-3.2282166,55.0231836]]]]
+          }
+        },
+        {
+          "name": "data centre building (B1-B8), incl. plant zone",
+          "kind": "building",
+          "evidence": "indicative",
+          "height_m": 40,
+          "height_basis": "maximum of the height-parameter zone it sits in (40 m); actual heights not fixed at PPiP",
+          "source": "26/1649/PIP Indicative Masterplan CX-ARC-XX-ZZ-DR-A-1001 P01 (1:2500)",
+          "area_m2": 18566,
+          "georeference": "fitted to council red line: 3.0 m RMS, rotation 0.5°, scale ×1.01",
+          "geometry": {
+            "type": "MultiPolygon",
+            "coordinates": [[[[-3.2236371,55.0236161],[-3.2257867,55.0248454],[-3.2247303,55.0254551],[-3.2225807,55.0242258],[-3.2236371,55.0236161]]]]
+          }
+        },
+        {
+          "name": "data centre building (B1-B8), incl. plant zone",
+          "kind": "building",
+          "evidence": "indicative",
+          "height_m": 40,
+          "height_basis": "maximum of the height-parameter zone it sits in (40 m); actual heights not fixed at PPiP",
+          "source": "26/1649/PIP Indicative Masterplan CX-ARC-XX-ZZ-DR-A-1001 P01 (1:2500)",
+          "area_m2": 18470,
+          "georeference": "fitted to council red line: 3.0 m RMS, rotation 0.5°, scale ×1.01",
+          "geometry": {
+            "type": "MultiPolygon",
+            "coordinates": [[[[-3.2243187,55.0256556],[-3.2221476,55.0269135],[-3.221107,55.0263208],[-3.2232781,55.0250629],[-3.2243187,55.0256556]]]]
+          }
+        },
+        {
+          "name": "industrial units / training",
+          "kind": "building",
+          "evidence": "indicative",
+          "height_m": 9,
+          "height_basis": "maximum of the height-parameter zone it sits in (9 m); actual heights not fixed at PPiP",
+          "source": "26/1649/PIP Indicative Masterplan CX-ARC-XX-ZZ-DR-A-1001 P01 (1:2500)",
+          "area_m2": 8169,
+          "georeference": "fitted to council red line: 3.0 m RMS, rotation 0.5°, scale ×1.01",
+          "geometry": {
+            "type": "MultiPolygon",
+            "coordinates": [[[[-3.219888,55.0198642],[-3.2210303,55.0185898],[-3.2217422,55.0188004],[-3.2206,55.0200749],[-3.219888,55.0198642]]]]
+          }
+        },
+        {
+          "name": "data centre building (B1-B8), incl. plant zone",
+          "kind": "building",
+          "evidence": "indicative",
+          "height_m": 40,
+          "height_basis": "maximum of the height-parameter zone it sits in (40 m); actual heights not fixed at PPiP",
+          "source": "26/1649/PIP Indicative Masterplan CX-ARC-XX-ZZ-DR-A-1001 P01 (1:2500)",
+          "area_m2": 18747,
+          "georeference": "fitted to council red line: 3.0 m RMS, rotation 0.5°, scale ×1.01",
+          "geometry": {
+            "type": "MultiPolygon",
+            "coordinates": [[[[-3.2224597,55.0246056],[-3.2202826,55.0258524],[-3.2192293,55.0252454],[-3.2214064,55.0239986],[-3.2224597,55.0246056]]]]
+          }
+        },
+        {
+          "name": "data centre building (B1-B8), incl. plant zone",
+          "kind": "building",
+          "evidence": "indicative",
+          "height_m": 40,
+          "height_basis": "maximum of the height-parameter zone it sits in (40 m); actual heights not fixed at PPiP",
+          "source": "26/1649/PIP Indicative Masterplan CX-ARC-XX-ZZ-DR-A-1001 P01 (1:2500)",
+          "area_m2": 18879,
+          "georeference": "fitted to council red line: 3.0 m RMS, rotation 0.5°, scale ×1.01",
+          "geometry": {
+            "type": "MultiPolygon",
+            "coordinates": [[[[-3.2196752,55.0197359],[-3.2182243,55.0212788],[-3.2168934,55.0208657],[-3.2183443,55.0193227],[-3.2196752,55.0197359]]]]
+          }
+        },
+        {
+          "name": "data centre building (B1-B8), incl. plant zone",
+          "kind": "building",
+          "evidence": "indicative",
+          "height_m": 40,
+          "height_basis": "maximum of the height-parameter zone it sits in (40 m); actual heights not fixed at PPiP",
+          "source": "26/1649/PIP Indicative Masterplan CX-ARC-XX-ZZ-DR-A-1001 P01 (1:2500)",
+          "area_m2": 20042,
+          "georeference": "fitted to council red line: 3.0 m RMS, rotation 0.5°, scale ×1.01",
+          "geometry": {
+            "type": "MultiPolygon",
+            "coordinates": [[[[-3.2189628,55.0219266],[-3.2184022,55.0227726],[-3.2154945,55.0221366],[-3.2160551,55.0212906],[-3.2189628,55.0219266]]]]
+          }
+        },
+        {
+          "name": "data centre building (B1-B8), incl. plant zone",
+          "kind": "building",
+          "evidence": "indicative",
+          "height_m": 40,
+          "height_basis": "maximum of the height-parameter zone it sits in (40 m); actual heights not fixed at PPiP",
+          "source": "26/1649/PIP Indicative Masterplan CX-ARC-XX-ZZ-DR-A-1001 P01 (1:2500)",
+          "area_m2": 18841,
+          "georeference": "fitted to council red line: 3.0 m RMS, rotation 0.5°, scale ×1.01",
+          "geometry": {
+            "type": "MultiPolygon",
+            "coordinates": [[[[-3.2176702,55.0239351],[-3.2148015,55.023317],[-3.2153297,55.0225078],[-3.2181983,55.0231259],[-3.2176702,55.0239351]]]]
+          }
+        }
+      ],
+      "zones": [
+        {
+          "name": "height zone up to 40 m",
+          "kind": "height parameter zone",
+          "evidence": "documented",
+          "height_m": 40,
+          "source": "26/1649/PIP Building Height Parameter Plan CX-ARC-XX-ZZ-DR-A-1003 P01 (1:2500), read from the rendered drawing",
+          "area_m2": 287929,
+          "georeference": "fitted to council red line: 2.8 m RMS, rotation 0.5°, scale ×1.01",
+          "geometry": {
+            "type": "MultiPolygon",
+            "coordinates": [[[[-3.2179211,55.0244127],[-3.214354,55.0236616],[-3.216065,55.0209857],[-3.217873,55.0190689],[-3.2200483,55.0197128],[-3.2182737,55.021597],[-3.2182889,55.0216248],[-3.2195485,55.0218941],[-3.2179211,55.0244127]]],[[[-3.2222898,55.0271493],[-3.2189484,55.025242],[-3.2216303,55.0236923],[-3.222174,55.0240004],[-3.2222088,55.0239999],[-3.2234851,55.0232601],[-3.2236892,55.023305],[-3.223919,55.0233016],[-3.2240834,55.0233912],[-3.2245121,55.0234728],[-3.2250278,55.0231688],[-3.2254852,55.0234181],[-3.22552,55.0234175],[-3.229797,55.0209509],[-3.23147,55.0218784],[-3.2243977,55.0260006],[-3.224423,55.0259442],[-3.2242443,55.0258468],[-3.2242165,55.0258472],[-3.2225123,55.0268337],[-3.2225133,55.0268537],[-3.2226566,55.0269396],[-3.2222898,55.0271493]]]]
+          }
+        },
+        {
+          "name": "height zone up to 15 m",
+          "kind": "height parameter zone",
+          "evidence": "documented",
+          "height_m": 15,
+          "source": "26/1649/PIP Building Height Parameter Plan CX-ARC-XX-ZZ-DR-A-1003 P01 (1:2500), read from the rendered drawing",
+          "area_m2": 17065,
+          "georeference": "fitted to council red line: 2.8 m RMS, rotation 0.5°, scale ×1.01",
+          "geometry": {
+            "type": "MultiPolygon",
+            "coordinates": [[[[-3.2316203,55.0219642],[-3.2303035,55.0212075],[-3.2318716,55.020303],[-3.2332087,55.0210474],[-3.2316203,55.0219642]]]]
+          }
+        },
+        {
+          "name": "height zone up to 9 m",
+          "kind": "height parameter zone",
+          "evidence": "documented",
+          "height_m": 9,
+          "source": "26/1649/PIP Building Height Parameter Plan CX-ARC-XX-ZZ-DR-A-1003 P01 (1:2500), read from the rendered drawing",
+          "area_m2": 15593,
+          "georeference": "fitted to council red line: 2.8 m RMS, rotation 0.5°, scale ×1.01",
+          "geometry": {
+            "type": "MultiPolygon",
+            "coordinates": [[[[-3.220601,55.0200688],[-3.219916,55.0198669],[-3.2203986,55.0192952],[-3.2184775,55.0187276],[-3.2188071,55.0183143],[-3.2198444,55.0186029],[-3.2198926,55.0185902],[-3.2200589,55.0184156],[-3.2207157,55.0186098],[-3.2202518,55.0191333],[-3.2202601,55.0191612],[-3.2204437,55.0192144],[-3.2204922,55.0192097],[-3.2210356,55.018597],[-3.2217278,55.0188028],[-3.220601,55.0200688]]]]
+          }
+        }
+      ]
+    }
   }
 }
