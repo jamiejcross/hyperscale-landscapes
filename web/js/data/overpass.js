@@ -151,9 +151,21 @@ function geometryOf(el, linear) {
   return null;
 }
 
-// Split raw Overpass JSON into the layers the model uses.
-export function parseOSM(osm) {
+// `out geom(bbox)` leaves nulls where a way leaves the box, so a loch across
+// the model's edge arrives as an open line and would be lost. The context
+// fetch (a wider box) usually holds the whole outline: use it when it does.
+const clipped = el => (el.geometry || []).some(p => !p) || (el.members || []).some(m => (m.geometry || []).some(p => !p));
+function whole(el, full) {
+  if (!full || !clipped(el)) return el;
+  const f = full.get(`${el.type}/${el.id}`);
+  return f && !clipped(f) ? f : el;
+}
+
+// Split raw Overpass JSON into the layers the model uses. context: the
+// bundle's wider context OSM (optional), for outlines cut by the model's box.
+export function parseOSM(osm, { context } = {}) {
   const out = { buildings: [], roads: [], waterways: [], water: [], coastlines: [], features: [] };
+  const full = context?.elements ? new Map(context.elements.map(e => [`${e.type}/${e.id}`, e])) : null;
   for (const el of osm.elements || []) {
     const t = el.tags || {};
     if (t.building && el.type === 'way') {
@@ -192,7 +204,7 @@ export function parseOSM(osm) {
       continue;
     }
     if (t.natural === 'water' || t.water) {
-      const g = geometryOf(el, false);
+      const g = geometryOf(whole(el, full), false);
       if (g && g.type !== 'LineString' && g.type !== 'Point') out.water.push({ geometry: g });
       continue;
     }

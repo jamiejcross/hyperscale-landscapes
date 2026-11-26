@@ -193,7 +193,7 @@ $('options').onsubmit = async e => {
     const elev = await loadElevation(state.bbox, state.bundle);
     status.textContent = t('build.loading.features');
     const raw = state.bundle?.osm || await fetchOSM(state.bbox, s => { status.textContent = featureStatus(s); });
-    const osm = parseOSM(raw);
+    const osm = parseOSM(raw, { context: state.bundle?.osm ? state.bundle.context?.osm : null });
     status.textContent = t('build.loading.geometry');
     await new Promise(r => setTimeout(r, 30));
     const sources = { elevation: elev.attribution, features: OSM_ATTR };

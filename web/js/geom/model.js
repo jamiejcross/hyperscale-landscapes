@@ -320,8 +320,10 @@ function waterLevels(grid, water, sea, lakes, H, zAt, opts, report) {
     for (const rs of polygonsOf(w.geometry)) {
       const rings = rs.map(r => r.map(([lon, lat]) => grid.mm(lon, lat)));
       let lvl = Infinity, minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+      // the level from the shore inside the plate (an outline may run past it)
+      const inside = rings[0].filter(([x, y]) => x >= 0 && x <= grid.Wmm && y >= 0 && y <= grid.Hmm);
+      for (const [x, y] of inside.length ? inside : rings[0]) lvl = Math.min(lvl, zAt(x, y));
       for (const [x, y] of rings[0]) {
-        lvl = Math.min(lvl, zAt(x, y));
         minx = Math.min(minx, x); maxx = Math.max(maxx, x); miny = Math.min(miny, y); maxy = Math.max(maxy, y);
       }
       const i0 = Math.max(0, Math.floor(minx / grid.dx)), i1 = Math.min(cx - 1, Math.ceil(maxx / grid.dx));
