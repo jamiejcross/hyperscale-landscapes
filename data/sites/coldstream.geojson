@@ -66,7 +66,19 @@
       },
       "other_red_lines": [],
       "buildings": [],
-      "zones": []
+      "zones": [],
+      "extent": {
+        "area_m2": 75000,
+        "height_m": 15,
+        "count": 1,
+        "stage": "screening",
+        "source": "Scottish Borders 25/00556/SCR, Screening Opinion (request reproduced, p. 12)",
+        "quote": "a total GEA footprint of c. 75,000 sq.m ... a maximum height of c. 15m (not including chiller plant/flues)",
+        "note": "Screening-stage figure.",
+        "evidence": "indicative",
+        "area_basis": "stated footprint",
+        "retrieved": "2026-11-26"
+      }
     }
   }
 }

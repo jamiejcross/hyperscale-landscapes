@@ -66,7 +66,19 @@
       },
       "other_red_lines": [],
       "buildings": [],
-      "zones": []
+      "zones": [],
+      "extent": {
+        "area_m2": 65000,
+        "height_m": 15,
+        "count": 1,
+        "stage": "screening",
+        "source": "North Lanarkshire 25/00744/EIASCR, EIA Screening Request §3.4 (p. 11)",
+        "quote": "a total GEA footprint of c. 65,000 sqm ... a maximum height of c. 15m (not including chiller plant/flues)",
+        "note": "Screening-stage figure. APRS quotes a 158,119 m² GEA footprint, probably from a later document not yet found. The red line is from the pre-application notice (25/00838/PAN), a different stage.",
+        "evidence": "indicative",
+        "area_basis": "stated footprint",
+        "retrieved": "2026-11-26"
+      }
     }
   }
 }

@@ -80,7 +80,19 @@
         }
       ],
       "buildings": [],
-      "zones": []
+      "zones": [],
+      "extent": {
+        "area_m2": 27000,
+        "height_m": 24,
+        "count": 3,
+        "stage": "screening",
+        "source": "Scottish Borders 25/01835/SCR, EIA Screening Report (Ironside Farrar) §2.3.4, §5.1.4",
+        "quote": "Each two-storey building will have a height up to 24m and an internal floor space of 54,000m2 over the two floors (ground footprint: 27,000m2)",
+        "note": "Screening-stage figure; three buildings of 27,000 m² ground footprint each.",
+        "evidence": "indicative",
+        "area_basis": "stated footprint",
+        "retrieved": "2026-11-26"
+      }
     }
   }
 }

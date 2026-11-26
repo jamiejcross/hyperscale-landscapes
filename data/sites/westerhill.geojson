@@ -66,7 +66,19 @@
       },
       "other_red_lines": [],
       "buildings": [],
-      "zones": []
+      "zones": [],
+      "extent": {
+        "area_m2": 85000,
+        "height_m": 15,
+        "count": 1,
+        "stage": "screening",
+        "source": "East Dunbartonshire TP/ED/25/0245, EIA Screening Decision",
+        "quote": "a total footprint of circa 85,000 sqm, with the buildings having either 1 or 2 storeys, with a maximum height of circa 15 metres",
+        "note": "Screening-stage figure. The red line is from the pre-application notice, a different stage.",
+        "evidence": "indicative",
+        "area_basis": "stated footprint",
+        "retrieved": "2026-11-26"
+      }
     }
   }
 }
