@@ -9,22 +9,23 @@ everywhere).
 
 ## Before public release
 
-1. **APRS's permission and credit.** The site list and its facts come from
-   APRS's map. Facts aren't copyright, but the compilation may carry database
-   right, and our site data is licensed CC BY 4.0. Ask APRS whether they're
-   happy for it to be reused under CC BY 4.0, and how they'd like to be
-   credited. Until then, the source is cited on every site.
+1. ~~**APRS's permission and credit.**~~ **Decided (JC, 26 Nov 2026):** the site
+   list is used under fair dealing for non-commercial teaching and research
+   (database right, reg. 20), with APRS credited on every site. See
+   DATA_LICENCES.md, "Planning records and drawings". Asking APRS how they'd
+   like to be credited is still a courtesy worth doing.
 2. **Planning references.** No site has a planning reference yet. For each,
    add the council's reference and portal URL (`planning_refs`). That is what
    lets `status` move from "as reported" to verified.
-3. **Footprints.** No site has a footprint. The models no longer show the
-   proposed building (JC, 24 Nov 2026), but a sourced red-line boundary
-   would still help check the pins (item 4). Add one only from a planning
-   drawing or a digitised published plan, with `footprint_precision`.
-   Red-line plans are usually drawn on an Ordnance Survey base map, so a
-   boundary traced from one may carry OS copyright: check before adding (to
-   verify). A boundary, once added, will also be drawn in the 3D view
-   (parked until then; see PLAN.md, field style).
+3. ~~**Footprints.**~~ **Done and decided (JC, 26 Nov 2026):** council-mapped
+   red lines for 9 sites (`tools/fetch_council_boundaries.py`) and building
+   outlines from planning drawings for Larbert, South Gyle, Chapelcross,
+   Greenock and Auchtertool (`tools/georef_drawing.py`), held in each site's
+   `properties.massing` (screen only; the top-level `geometry` stays null).
+   They are drawn on Ordnance Survey data and used under fair dealing for
+   non-commercial research, criticism and review, with OS, council and
+   drawing credits in every caption; see DATA_LICENCES.md. No
+   `DEV_ONLY_PLANNING_GEOMETRY` flag is needed.
 4. **Pin precision.** Pins are APRS's markers. Irvine is explicitly
    approximate. Check each against the red-line boundary once a footprint is
    added.

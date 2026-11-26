@@ -36,6 +36,35 @@ Sources marked *to verify* must be checked before the first public release.
 | Overture Maps (opt-in only) | buildings / roads fallback | mixed by theme | © Overture Maps Foundation; © OpenStreetMap contributors | to verify |
 | Curated sites (`data/sites/`) | site metadata | CC BY 4.0 | Hyperscale Landscapes contributors | — |
 
+## Planning records and drawings (decided by JC, 26 Nov 2026)
+
+The proposed-data-centre layer draws on planning records. JC decided to use them under the
+UK fair dealing exceptions for non-commercial research, criticism and review, and
+illustration for instruction (CDPA 1988 ss. 29, 30, 32), and, for the site list, the
+fair dealing exception for databases used for non-commercial teaching or research
+(Copyright and Rights in Databases Regulations 1997, reg. 20). Grounds:
+
+- the project is non-commercial research and education (Terms of use above);
+- the purpose is criticism and review of proposals in the public planning process;
+- only what that purpose needs is used: a boundary line per application and building
+  outlines, not the drawings themselves or their base maps;
+- every use carries a sufficient acknowledgement (below), in the caption and manifest.
+
+This is a judgement under the exceptions, not a licence from the rights holders. It
+replaces the earlier plan to keep this geometry behind a `DEV_ONLY_PLANNING_GEOMETRY`
+flag until an OS licensing check was done (`data/sites/TODO.md` items 1 and 3).
+
+| Source | Used for | Basis | Acknowledgement |
+|---|---|---|---|
+| Councils' planning registers (Idox Public Access map services, WFS `Planning_Application_Polygons`; `tools/fetch_council_boundaries.py`) | application boundaries (red lines), drawn on screen only | fair dealing (CDPA ss. 29, 30); the boundaries are drawn on Ordnance Survey data | "Application boundary: <council> planning register, <ref>. Contains OS data © Crown copyright and database right 2026." |
+| Developers' planning drawings (Larbert, South Gyle, Chapelcross, Greenock; `tools/georef_drawing.py`) and the Auchtertool illustrative layout (traced by hand) | building outlines, siting and parameter zones, traced and georeferenced; screen only | fair dealing (CDPA ss. 29, 30); the drawings are on OS base maps | "Building outlines from <drawing title and number>, <ref>. Contains OS data © Crown copyright and database right 2026." |
+| APRS map of proposed data centres in Scotland (`tools/import_aprs_map.py`) | the site list and the figures reported by APRS | facts are not protected; the compilation under database fair dealing (reg. 20), source credited | "Site list: APRS, map of proposed data centres in Scotland" (already cited on every site) |
+
+The traced outlines and boundaries are not offered under CC BY 4.0 with the rest of
+`data/sites/`; they are reused here on the basis above, and anyone reusing them must make
+their own assessment. The check images that overlay our outlines on the developers'
+drawings (`docs/reference/check-*.png`) are working files and are not published.
+
 ## Trees and canopy (checked 24 Nov 2026)
 
 | Source | Used for | Licence | Attribution | Status |
