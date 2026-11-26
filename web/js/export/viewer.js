@@ -34,6 +34,9 @@ export const MODULES = {
   'hl/legend': 'js/scene/legend.js',
   'hl/apron': 'js/scene/apron.js',
   'hl/apron-math': 'js/scene/apron-math.js',
+  'hl/datacentre': 'js/scene/datacentre.js',
+  'hl/datacentre-math': 'js/scene/datacentre-math.js',
+  'hl/geo': 'js/geo.js',
   gifenc: 'vendor/gifenc.js',
 };
 const KEY_OF = Object.fromEntries(Object.entries(MODULES).map(([k, p]) => [p, k]));
@@ -60,7 +63,7 @@ export function rewrite(text, from) {
 }
 
 export async function buildViewer({ model, legend, colours, printColours, caption, sub, drape, drapeKind = null, zExag, slug, alt, seed = null, view = null,
-  props = null, subsurface = null, context = null, text = {}, relief = null }) {
+  props = null, subsurface = null, context = null, text = {}, relief = null, datacentre = null }) {
   // Pack every non-empty layer into one gzipped buffer.
   const parts = [], layout = {}, ids = [];
   let offset = 0;
@@ -95,6 +98,8 @@ export async function buildViewer({ model, legend, colours, printColours, captio
   if (subsurface) add('subsurface', new TextEncoder().encode(JSON.stringify(subsurface)), 'json');
   // the context apron (screen only): the bundle's context section, with the model bbox it is framed on
   if (context) add('context', new TextEncoder().encode(JSON.stringify(context)), 'json');
+  // the proposed data centre (screen only): the plan as the web app made it
+  if (datacentre) add('datacentre', new TextEncoder().encode(JSON.stringify(datacentre)), 'json');
   const raw = new Uint8Array(offset);
   let o = 0; for (const p of parts) { raw.set(p, o); o += p.byteLength; }
   const geom = b64(gzipSync(raw, { level: 9 }));

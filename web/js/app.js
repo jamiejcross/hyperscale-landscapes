@@ -8,7 +8,10 @@ import { listSites, loadSite } from './data/sites.js';
 import { fetchOSM, parseOSM } from './data/overpass.js';
 import { loadElevation, ATTRIBUTION as ELEV_ATTRIBUTION } from './data/elevation.js';
 import { readBoundary } from './data/upload.js';
-import { buildModel, printObjects, pauseHeights } from './geom/model.js';
+import { buildModel, printObjects, pauseHeights, concat, nudgeDuplicates } from './geom/model.js';
+import { planDatacentre, datacentrePrintMesh } from './geom/datacentre-plan.js';
+import { captionLine as dcCaptionLine, datacentreAvailable } from './scene/datacentre-math.js';
+import { heightSampler } from './scene/props-math.js';
 import { createScene, landcoverCanvas, layerSwatch, DEFAULT_LOOK } from './scene/scene.js';
 import { mountExtras, mountScaleRow, EXTRAS_KEYS, whyButton, whyBox, wireWhy } from './scene/extras.js';
 import { legendModel, subsurfaceCounts } from './scene/subsurface-info.js';
@@ -32,11 +35,13 @@ let scene = null, studio = null;
 // Shareable view URL (?site=&style=&az=&el=). A view in the address bar on
 // load is applied once the first model is built.
 let pendingView = parseView(location.search);
+// Proposed data centre: shown on screen (dcOn) and added to the print files (dcPrint), both off by default.
+state.dcOn = !!pendingView.dc; state.dcPrint = false; state.dcPlan = null; state.massing = null;
 const writeUrl = urlWriter(() => {
   const v = { site: state.site ? $('site-select').value || null : null };
   if (scene) {
     const a = scene.cameraAngles();
-    Object.assign(v, { style: scene.view.look, az: a.az, el: a.el, ctx: state.ctxView, labels: scene.labelsOn });
+    Object.assign(v, { style: scene.view.look, az: a.az, el: a.el, ctx: state.ctxView, labels: scene.labelsOn, dc: !!(state.dcOn && state.dcPlan) });
   }
   return v;
 });
@@ -60,6 +65,7 @@ const picker = createPicker($('map'), {
 function setBBox(b, { name = '', site = null, bundle = null } = {}) {
   state.bbox = b; state.name = name; state.site = site; state.bundle = bundle;
   state.boundary = null;                    // a new area has no red line until one is supplied
+  state.massing = site?.properties?.massing || null;   // a curated site's planning record (proposed data centre)
   const { w, h } = bboxSizeKm(b);
   const area = $('area');
   const tooLarge = w * h > LIMITS.maxAreaKm2 || Math.max(w, h) > LIMITS.maxSideKm;
@@ -85,7 +91,14 @@ function setBoundary(gj, { file = null, drawn = false, site = null } = {}) {
     : file ? `boundary as supplied in the file ${file}` : 'area drawn by the user in this tool';
   state.boundary = { polygons, label, drawn };
 }
-const boundaryLegend = () => (state.boundary && state.model?.model.vectors?.boundary ? `Red line: ${state.boundary.label}.` : null);
+const boundaryLegend = () => {
+  const red = state.boundary && state.model?.model.vectors?.boundary ? `Red line: ${state.boundary.label}.` : null;
+  const dc = dcCaption();
+  return [red, dc && `Solid line: documented in the planning record; dashed line: indicative. ${dc}`].filter(Boolean).join(' ') || null;
+};
+// The proposed data centre's caption line, while it is shown.
+const dcCaption = ({ inPrint = state.dcPrint } = {}) => (state.dcOn && state.dcPlan && state.massing
+  ? dcCaptionLine(state.massing, state.dcPlan, { zExag: state.model?.opts.zExag, inPrint: inPrint && state.dcPlan.items.length > 0 }) : null);
 // Rings in print mm, as flat [x0, y0, …] arrays.
 const boundaryRings = (polygons, grid) => polygons.flatMap(rings => rings.map(r => r.flatMap(([lon, lat]) => grid.mm(lon, lat).map(v => +v.toFixed(2)))));
 
@@ -109,8 +122,11 @@ async function chooseSite(entry) {
   const p = site.properties, bb = p.model_bbox;
   picker.showBBox({ minLat: bb.min_lat, maxLat: bb.max_lat, minLon: bb.min_lon, maxLon: bb.max_lon });
   setBBox(state.bbox, { name: p.name, site, bundle });
-  // A sourced boundary, if the site record has one (none do yet; see data/sites/TODO.md).
+  // A sourced boundary: the site record's own geometry, else the council's
+  // application boundary from the planning record (massing.red_line).
+  const rl = p.massing?.red_line;
   if (site.geometry) setBoundary(site, { site: (p.sources || [])[0]?.title || 'the site record' });
+  else if (rl?.geometry) setBoundary(rl.geometry, { site: `${p.local_authority} Council's public-access map, application ${rl.ref} (retrieved ${rl.retrieved}); contains OS data © Crown copyright and database right 2026` });
   if (p.location) picker.showPin(p.location, p.name);
   const row = (k, v) => v == null || v === '' ? '' : `<dt>${k}</dt><dd>${v}</dd>`;
   const by = p.reported_by ? ` (reported by ${esc(p.reported_by)})` : '';
@@ -262,6 +278,7 @@ function showPreview() {
     labels: pendingView?.labels ?? scene.labelsOn, onLabels: () => writeUrl() });
   state.ctxView = document.querySelector('[data-context-view]:checked')?.value || null;
   mountScaleRow(ul, scene, { text: t });
+  mountDatacentre(model, opts);
   studio.refreshGeology();
   const counts = model.report.counts;
   studio.update();
@@ -276,6 +293,31 @@ function showPreview() {
   $('pauses').textContent = 'Single-colour printers: pause to change filament at ' +
     pauseHeights(model, opts.base).map(p => `${p.zMm} mm (${p.changeTo})`).join(', ') + '.';
   $('preview').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+}
+
+// Proposed data centre (brief v2): two rows in the Model fieldset. The first
+// shows it on screen; the second adds its buildings to the 3MF and STL. Both
+// are off by default; the print files are unchanged unless the second is on.
+function mountDatacentre(model, opts) {
+  const slot = studio.part('modelSet');
+  slot.querySelector('[data-dc-rows]')?.remove();
+  state.dcPlan = null;
+  if (!state.massing) { scene.setDatacentre(null); return; }
+  const av = datacentreAvailable(state.massing);
+  const plan = av.ok ? planDatacentre(state.massing, model.grid, heightSampler(model.grid, model.heights), { buildingExag: opts.buildingExag }) : null;
+  const drawn = !!plan && (plan.items.length + plan.zones.length) > 0;
+  state.dcPlan = drawn ? plan : null;
+  scene.setDatacentre(state.dcPlan, { on: state.dcOn && drawn });
+  const reason = !av.ok ? av.reason : !drawn ? t('dc.outside') : '';
+  const printable = drawn && plan.items.length > 0;
+  const div = document.createElement('div'); div.dataset.dcRows = '';
+  div.innerHTML = `<label class="check"${reason ? ` title="${esc(reason)}"` : ''}><input type="checkbox" name="dc"${drawn ? '' : ' disabled'}${state.dcOn && drawn ? ' checked' : ''}> ${t('dc.toggle')}</label>
+    <label class="check dc-sub"${printable ? '' : ` title="${esc(reason || t('dc.print.none'))}"`}><input type="checkbox" name="dcPrint"${printable ? '' : ' disabled'}${state.dcPrint && printable ? ' checked' : ''}> ${t('dc.print')}</label>
+    <p class="hint" data-dc-hint>${esc(reason || t('dc.why'))}</p>`;
+  slot.append(div);
+  const on = div.querySelector('[name=dc]'), pr = div.querySelector('[name=dcPrint]');
+  on.onchange = () => { state.dcOn = on.checked; scene.showDatacentre(on.checked); refreshCaption(); studio.renderLegend(); writeUrl(); };
+  pr.onchange = () => { state.dcPrint = pr.checked; refreshCaption(); };
 }
 
 // A layer as the screen names it. The power layer is "Electricity infrastructure"
@@ -310,7 +352,9 @@ function refreshCaption() {
   const counts = state.model.model.report.counts;
   $('caption').textContent = captionText(state.model.opts, state.model.form) + ` Counts: ${counts.buildings} buildings, ${counts.receptors} schools, care or community buildings, ${counts.roads} roads.`
     + (scene && lookNote(scene) ? ` ${lookNote(scene)}.` : '')
-    + (scene && geologyNote(scene) ? ` ${geologyNote(scene)}. ${geologyCounts()}` : '');
+    + (scene && geologyNote(scene) ? ` ${geologyNote(scene)}. ${geologyCounts()}` : '')
+    + (dcCaption() ? ` ${dcCaption()}` : '')
+    + (state.dcPrint && state.dcPlan?.items.length ? ` ${t('dc.print.note')}` : '');
 }
 
 // Counts for the on-page caption when the geology or pits are shown (from the bundle).
@@ -387,11 +431,17 @@ $('dl-3mf').onclick = async () => {
   try {
     const preset = state.presets[$('options').elements.preset.value];
     const parts = printObjects(model, preset).map(o => ({ ...o }));
+    // Proposed data-centre buildings, only when asked for (otherwise the file is unchanged).
+    const dcMesh = state.dcPrint && state.dcPlan?.items.length ? datacentrePrintMesh(state.dcPlan) : null;
+    if (dcMesh) {
+      const host = parts.find(o => o.layers.includes('buildings')) || parts.at(-1);
+      host.mesh = nudgeDuplicates(concat([host.mesh, dcMesh]));
+    }
     const blob = await write3MF({
       title: state.name || 'Terrain model', parts,
       metadata: {
         Designer: 'Hyperscale Landscapes (browser)',
-        Description: captionText(opts, form, { print: true }),
+        Description: captionText(opts, form, { print: true }) + (dcMesh ? ` ${t('dc.print.note')} ${dcCaptionLine(state.massing, state.dcPlan, { zExag: opts.zExag, inPrint: true })}` : ''),
         Copyright: `${elevAttr()}; Map data ${OSM_ATTR}`,
         LicenseTerms: 'Map data ODbL 1.0',
         CreationDate: new Date().toISOString().slice(0, 10),
@@ -403,7 +453,9 @@ $('dl-3mf').onclick = async () => {
 $('dl-stl').onclick = () => {
   const { model } = state.model;
   const ids = ['terrain', 'water', 'buildings', 'receptors', 'roads', 'rail', 'railDisused', 'power', 'residues'];
-  save(writeSTL(ids.map(i => model.layers[i]), `Hyperscale Landscapes: ${state.name}`.slice(0, 79)), `${slug()}.stl`);
+  const meshes = ids.map(i => model.layers[i]);
+  if (state.dcPrint && state.dcPlan?.items.length) meshes.push(datacentrePrintMesh(state.dcPlan));   // only when asked for
+  save(writeSTL(meshes, `Hyperscale Landscapes: ${state.name}`.slice(0, 79)), `${slug()}.stl`);
 };
 $('dl-viewer').onclick = async () => {
   const { model, opts, form } = state.model;
@@ -424,6 +476,8 @@ $('dl-viewer').onclick = async () => {
       relief: reliefOf(model, opts),
       props: state.bundle?.props || null, subsurface: state.bundle?.subsurface || null,
       context: state.bundle?.context ? { ...state.bundle.context, model_bbox: state.bundle.bbox } : null,
+      datacentre: state.dcPlan ? { plan: state.dcPlan, on: !!state.dcOn, caption: dcCaptionLine(state.massing, state.dcPlan, { zExag: opts.zExag }),
+        text: { toggle: t('dc.toggle'), why: t('dc.why') } } : null,
       text: Object.fromEntries([...EXTRAS_KEYS, ...GEOLOGY_TEXT_KEYS].map(k => [k, t(k)])),
       sub: `${state.bbox.minLat.toFixed(3)}–${state.bbox.maxLat.toFixed(3)}°N, ${Math.abs(state.bbox.maxLon).toFixed(3)}–${Math.abs(state.bbox.minLon).toFixed(3)}°W · ${w.toFixed(1)} × ${h.toFixed(1)} km · from the ${opts.printSize} mm print model`,
       drape: state.drape, drapeKind: state.surface === 'landcover' ? 'landcover' : state.surface,

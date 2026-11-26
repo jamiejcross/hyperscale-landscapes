@@ -26,6 +26,8 @@ import { createApron } from './apron.js';
 import { metresPerPx, niceBar } from './scalebar.js';
 import { heightSampler } from './props-math.js';
 import { decodeTrees } from '../data/props.js';
+import { createDatacentre } from './datacentre.js';
+import { cutTerrain, restoreTerrain } from './datacentre-math.js';
 export { layerSwatch } from './palettes.js';
 
 export const LANDCOVER_COLOURS = {
@@ -172,11 +174,12 @@ export function createScene(container) {
     updateScaleBar();
     if (pits) pits.layout(camera, renderer.getSize(drawSize), inner);
     if (apron && apron.root.visible && apronOn) apron.layout(camera, renderer.getSize(drawSize), ctxInner, H);
+    if (dc && dcOn) dc.layout(camera, renderer.getSize(drawSize));
     if (scene.fog) {               // haze follows the camera (live view, grabs and every turntable frame)
       [scene.fog.near, scene.fog.far] = hazeRange(camera.position.distanceTo(controls.target), PALETTES.anthropogenic.carto);
     }
     renderer.render(scene, camera);
-    if (stylisedLook(view.look) && view.ink && lookDef(view.look).inkPass !== false) ink.render(scene, camera, { hide: [ground, ...INKLESS.map(id => meshes[id]).filter(Boolean), ...(props?.parts.lines || []), ...(props?.parts.trees || []), ...(pits ? [pits.group] : []), ...(apron ? apron.inkHide : [])], joinApron: !!apron && (apronOn || energyOn) && apron.root.visible });
+    if (stylisedLook(view.look) && view.ink && lookDef(view.look).inkPass !== false) ink.render(scene, camera, { hide: [ground, ...INKLESS.map(id => meshes[id]).filter(Boolean), ...(props?.parts.lines || []), ...(props?.parts.trees || []), ...(pits ? [pits.group] : []), ...(dc ? [dc.group] : []), ...(apron ? apron.inkHide : [])], joinApron: !!apron && (apronOn || energyOn) && apron.root.visible });
   }
 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.28 }));
@@ -196,9 +199,12 @@ export function createScene(container) {
   let glyphs = null, glyphInfo = null;
   let heightsGrid = null, reliefMeta = null, layerColours = {};
   let groundAt = null;         // print terrain height (mm) at print x, y, for the camera floor
+  let dc = null, dcOn = false, dcCut = null;     // proposed data centre (setDatacentre; screen only)
   let apron = null, apronOn = true, energyOn = true, apronEdge = null;   // the context apron (setContext): Landscape and Energy context
-  // With either context shown, the camera stays above the terrain (this elevation or more).
-  const CONTEXT_MIN_EL = 15;
+  // With either context shown, the camera may come down to the level of the terrain
+  // (JC, 26 Nov 2026; was 15°): minCameraY keeps it just above the ground, the
+  // context's own ground beyond the model.
+  const CONTEXT_MIN_EL = FIELD.minEl;
   let minElNow = FIELD.minEl;
   let span = 150, H = 20, modelWmm = 0, modelHmm = 0;
 
@@ -310,6 +316,7 @@ export function createScene(container) {
   function setWaterFilled(on) {
     on = !!on && !!waterFill;
     if (on === waterFilled) return;
+    const recut = dcUncut();                        // fill from (and restore to) the uncut land
     const { nx, dx, dy, Hmm } = waterGrid;
     const targets = ['terrain', 'terrain-steep', 'terrain-sides'].map(id => meshes[id]).filter(Boolean);
     if (on && !waterOrig) waterOrig = new Map();
@@ -339,6 +346,7 @@ export function createScene(container) {
     }
     if (geology) geology.mesh.geometry.computeBoundingSphere();
     waterFilled = on;
+    if (recut) dcRecut();
   }
   // Contour lines (no hillshade) from the height grid, made once per model.
   function contourLines() {
@@ -400,6 +408,7 @@ export function createScene(container) {
         show: { roads: shown.roads !== false, rail: shown.rail !== false, power: shown.power !== false, residues: shown.residues !== false } });
     }
     if (pits && pitsOn && !view.print) pits.paint(g, modelSize);   // pit symbols (BGS BritPits)
+    if (dc && dcOn) dc.paint(g, modelSize, P);                // data-centre parameter zones
     paintBoundary(g, vectors?.boundary, modelSize);          // the site red line, on top
     d.tex.needsUpdate = true;
   }
@@ -547,6 +556,7 @@ export function createScene(container) {
   function ensureScreenTerrain() {
     if (screenT) return screenT;
     const t0 = performance.now();
+    const recut = dcUncut();                        // built from the uncut land
     const terr = meshes.terrain.geometry, src = terr.attributes.position.array, idx = terr.index.array;
     const used = new Uint8Array(src.length / 3); let n = 0;
     for (let i = 0; i < idx.length; i++) if (!used[idx[i]]) { used[idx[i]] = 1; n++; }
@@ -575,6 +585,8 @@ export function createScene(container) {
     inner.add(mesh, border);
     screenT = { T, mesh, border, wallOrig, wallLift, lifted: false,
       stats: { ...T.stats, wallTriangles: kept, borderSegments: seg.length / 6, ms: Math.round(performance.now() - t0) } };
+    if (recut) dcRecut();
+    if (dcCut) cutScreenTerrain();
     return screenT;
   }
   // Stage 4: glyphs on the smoothed ground.
@@ -597,7 +609,7 @@ export function createScene(container) {
     const W = Wmm >= Hmm ? long : Math.round(long * Wmm / Hmm), H = Wmm >= Hmm ? Math.round(long * Hmm / Wmm) : long;
     const show = { brushwork: view.brushwork, relief: view.relief, crowns: view.crowns && propShown.trees !== false };
     for (const k of ['water', 'roads', 'rail', 'power', 'residues', 'buildings', 'receptors']) show[k] = shown[k] !== false;
-    const key = JSON.stringify([view.look, W, H, drapeVersion, show, pits && pitsOn ? pits.shown : null]);
+    const key = JSON.stringify([view.look, W, H, drapeVersion, show, pits && pitsOn ? pits.shown : null, !!(dc && dcOn)]);
     if (carto?.key === key) { if (!carto.tex) uploadCarto(); return carto.stats; }
     if (!carto || carto.canvas.width !== W || carto.canvas.height !== H) {
       carto?.tex?.dispose();
@@ -618,6 +630,7 @@ export function createScene(container) {
       vectors, Wmm, Hmm, mmPerM, C, ink: P.ink, trees: cartoCache.trees || null, seed, show });
     const g = carto.canvas.getContext('2d');
     if (pits && pitsOn) pits.paint(g, modelSize);             // pit symbols (BGS BritPits), on top
+    if (dc && dcOn) dc.paint(g, modelSize, P);                // data-centre parameter zones
     paintBoundary(g, vectors?.boundary, modelSize);          // the site red line, on top
     carto.key = key;
     carto.stats = { ...stats, reliefMs: Math.round(reliefMs), ms: Math.round(stats.ms), totalMs: Math.round(performance.now() - t0) };
@@ -731,6 +744,7 @@ export function createScene(container) {
     for (const k of Object.keys(meshes)) { inner.remove(meshes[k]); disposeMesh(meshes[k]); delete meshes[k]; }
     for (const k of Object.keys(shown)) delete shown[k];
     props?.dispose(); props = null;
+    if (dc) { inner.remove(dc.group); dc.dispose(); } dc = null; dcCut = null;
     geology?.dispose(); geology = null;
     pits?.dispose(); pits = null;
     apron?.dispose(); apron = null; apronEdge = null;
@@ -807,6 +821,69 @@ export function createScene(container) {
     if (cartoActive()) paintCartoDrape();
   }
 
+  // ---- Proposed data centre (brief v2; screen only) ----
+  // plan: from datacentre-math.js planDatacentre, or null. Built off; showDatacentre turns it on.
+  function setDatacentre(plan, { on = false } = {}) {
+    showDatacentre(false);
+    if (dc) { inner.remove(dc.group); dc.dispose(); dc = null; }
+    if (!plan || (!plan.items.length && !plan.zones.length)) return null;
+    dc = createDatacentre(plan, { look: PALETTES[view.look] });
+    dc.group.visible = false; inner.add(dc.group);
+    if (groundAt) dc.placeLabels(groundAt);
+    if (on) showDatacentre(true);
+    return dc.counts;
+  }
+  // On: the buildings shown, and the screen terrain cut to each platform where
+  // it is higher. The print arrays are never written: the land top gets its own
+  // copy of the positions first (as painted water does), and every vertex the
+  // cut lowers is recorded so turning it off puts it back exactly.
+  function showDatacentre(on) {
+    on = !!on && !!dc;
+    if (on === dcOn) return;
+    dcOn = on;
+    if (dc) dc.group.visible = on;
+    if (on) { dcCut = { changed: null, screen: null }; dcRecut(); if (screenT) cutScreenTerrain(); }
+    else if (dcCut) {
+      dcUncut();
+      if (screenT && dcCut.screen) {
+        const a = screenT.mesh.geometry.attributes.position;
+        restoreTerrain(a.array, dcCut.screen); a.needsUpdate = true; screenT.mesh.geometry.computeVertexNormals();
+      }
+      dcCut = null;
+    }
+    paintField();
+  }
+  // The land top's cut, taken out (returns whether it was in) and put back,
+  // so painted water's fill and the screen terrain always start from the uncut land.
+  function dcUncut() {
+    const terr = meshes.terrain;
+    if (!dcCut?.changed || !terr) return false;
+    const a = terr.geometry.attributes.position;
+    restoreTerrain(a.array, dcCut.changed); dcCut.changed = null;
+    a.needsUpdate = true; terr.geometry.computeVertexNormals();
+    return true;
+  }
+  function dcRecut() {
+    const terr = meshes.terrain;
+    if (!dcCut || dcCut.changed || !terr || !dc.plan.items.length) return;
+    if (!terr.userData.ownPositions) {
+      const copy = new THREE.BufferAttribute(Float32Array.from(terr.geometry.attributes.position.array), 3);
+      terr.geometry.setAttribute('position', copy);
+      meshes['terrain-base']?.geometry.setAttribute('position', copy);     // the underside shares it
+      terr.userData.ownPositions = true;
+    }
+    const a = terr.geometry.attributes.position;
+    dcCut.changed = cutTerrain(a.array, dc.plan.items);
+    a.needsUpdate = true; terr.geometry.computeVertexNormals();
+  }
+  // Anthropogenic's smoothed land: cut the same way (its own arrays).
+  function cutScreenTerrain() {
+    if (!dcCut || !screenT || dcCut.screen) return;
+    const a = screenT.mesh.geometry.attributes.position;
+    dcCut.screen = cutTerrain(a.array, dc.plan.items); a.needsUpdate = true; screenT.mesh.geometry.computeVertexNormals();
+  }
+  const datacentreInfo = () => (dc ? { on: dcOn, ...dc.counts, cutVertices: dcCut?.changed ? dcCut.changed.length / 2 : 0 } : null);
+
   // ---- Looks ----
   // Switch the look (materials, ink colour, background) without rebuilding any geometry.
   function setLook(look) {
@@ -815,7 +892,7 @@ export function createScene(container) {
     INK.colour = PALETTES[look].ink;
     if (carto && !lookDef(look).carto) { carto.tex?.dispose(); carto.tex = null; screenT && (screenT.mesh.material.map = null); }   // free the GPU copy
     for (const m of Object.values(meshes)) applyMaterial(m);
-    props?.setLook(look); geology?.setLook(look);
+    props?.setLook(look); geology?.setLook(look); dc?.setLook(PALETTES[look]);
     refreshVisibility();
     paintField();
     setBackground(PALETTES[look].background);
@@ -1080,7 +1157,7 @@ export function createScene(container) {
   return { renderer, scene, camera, controls, view, meshes, focalMm, setContext, showContext, showEnergy, showLabels, get labelsOn() { return labelsOn; }, contextInfo, showScaleBar, get scaleBarOn() { return scaleOn; }, get apron() { return apron; }, setModel, setDrape, setLook, setVisible, setView, setSpin,
     cameraAngles, setCameraAngles, setInkWidth, setBrushwork,
     setSun, setFov, setHeightScale, setBackground, setPrintColours, setScreenColours, setShadow, grab,
-    pause, resume, renderAt, orbitStart, orbitTo, orbitEnd, setCarto, setMist, setContours, lookNotes, cartoInfo, electricity, setGeology, showGeology, setGeologyLabels, setPits, showPits, showPitClass, get geology() { return (geology || pits) && { walls: !!geology, panel: geology?.panel, on: geologyOn, shown: !!geology?.mesh.visible || (!!pits && pitsOn && pits.anyShown), attribution: geology?.attribution ?? pitsMeta.attribution, sub: geology?.sub ?? pitsMeta.sub, instance: geology, nonCommercial: geology ? geology.nonCommercial : pitsMeta.nonCommercial }; }, setProps, setPropsVisible, setTreeFactor, get props() { return props; }, get pits() { return pits; } };
+    pause, resume, renderAt, orbitStart, orbitTo, orbitEnd, setCarto, setMist, setContours, lookNotes, cartoInfo, electricity, setGeology, showGeology, setGeologyLabels, setPits, showPits, showPitClass, get geology() { return (geology || pits) && { walls: !!geology, panel: geology?.panel, on: geologyOn, shown: !!geology?.mesh.visible || (!!pits && pitsOn && pits.anyShown), attribution: geology?.attribution ?? pitsMeta.attribution, sub: geology?.sub ?? pitsMeta.sub, instance: geology, nonCommercial: geology ? geology.nonCommercial : pitsMeta.nonCommercial }; }, setProps, setPropsVisible, setTreeFactor, get props() { return props; }, get pits() { return pits; }, setDatacentre, showDatacentre, datacentreInfo, get datacentreOn() { return dcOn; } };
 }
 
 // Separate wall triangles (|normal z| small) from the top cap and the

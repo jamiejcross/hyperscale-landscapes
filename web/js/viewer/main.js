@@ -56,7 +56,7 @@ const caption = () => ({ ...D.caption, disclosure: exag(), top: D.caption.top.re
 // Shareable view: ?style=&az=&el= (camera angles), read on load and kept up
 // to date as the view changes.
 let ctxView = null;
-const writeUrl = urlWriter(() => { const a = scene.cameraAngles(); return { style: scene.view.look, az: a.az, el: a.el, ctx: ctxView, labels: scene.labelsOn }; });
+const writeUrl = urlWriter(() => { const a = scene.cameraAngles(); return { style: scene.view.look, az: a.az, el: a.el, ctx: ctxView, labels: scene.labelsOn, dc: !!scene.datacentreOn }; });
 const v0 = parseView(location.search);
 const studio = mountStudio($('studio'), scene, {
   caption, filename: () => `${D.slug}-${new Date().toISOString().slice(0, 10)}`,
@@ -79,6 +79,20 @@ if (heights && (propsData || subsurface || contextData)) {
   studio.refreshGeology();
 }
 mountScaleRow(ul, scene, { text });
+// The proposed data centre, if the web app packed one (screen only; off unless it was on).
+const dcData = json('datacentre');
+if (dcData?.plan) {
+  scene.setDatacentre(dcData.plan, { on: !!(v0.dc ?? dcData.on) });
+  const row = document.createElement('div');
+  row.innerHTML = `<label class="check"><input type="checkbox" name="dc"${scene.datacentreOn ? ' checked' : ''}> ${dcData.text.toggle}</label><p class="hint">${dcData.text.why}</p>`;
+  studio.part('modelSet').append(row);
+  row.querySelector('input').onchange = e => { scene.showDatacentre(e.target.checked); refreshDcCaption(); writeUrl(); };
+}
+function refreshDcCaption() {
+  const el = $('dc-caption') || $('caption').insertAdjacentElement('afterend', Object.assign(document.createElement('p'), { id: 'dc-caption', className: 'hint' }));
+  el.textContent = dcData?.plan && scene.datacentreOn ? dcData.caption : '';
+}
+refreshDcCaption();
 {
   const v = parseView(location.search);
   if (typeof D.view?.brushwork === 'boolean') studio.setBrushwork(D.view.brushwork);

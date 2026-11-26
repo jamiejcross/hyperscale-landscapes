@@ -50,3 +50,10 @@ test('context view and labels round-trip; defaults stay out of the URL', () => {
   assert.equal(viewSearch('', { ctx: 'geology', labels: true }), '?ctx=geology&labels=1');
   assert.equal(viewSearch('?ctx=energy&labels=1', { ctx: null, labels: false }), '');
 });
+
+test('dc=1 (the proposed data centre shown) round-trips; anything else is left out', () => {
+  assert.equal(parseView('?site=larbert&dc=1').dc, true);
+  assert.equal('dc' in parseView('?dc=yes'), false);
+  assert.equal(viewSearch('', { dc: true }), '?dc=1');
+  assert.equal(viewSearch('?dc=1', { dc: false }), '');
+});
