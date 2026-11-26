@@ -114,7 +114,7 @@ sources are listed with their licences in [DATA_LICENCES.md](DATA_LICENCES.md).
 Curated site data is CC BY 4.0. The source code is GPL-3.0-or-later
 ([LICENSE](LICENSE)). All exports and downloads are
 [CC BY-NC-SA 4.0](LICENCE-CC-BY-NC-SA-4.0.txt): this is a non-commercial
-research and educational project (University of Glasgow). See the terms of use at the top of
+research and educational project (University of Glasgow, UK; Cornell University, USA). See the terms of use at the top of
 [DATA_LICENCES.md](DATA_LICENCES.md).
 
 ## Credits

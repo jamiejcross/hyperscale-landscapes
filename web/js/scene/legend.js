@@ -101,8 +101,10 @@ export function layoutKey(items, { cols, colW, fs, measure, measureBold = measur
   const sized = items.map(it => {
     if (it.head) { const lines = wrapText(it.head, colW, measureBold); return { item: it, lines, h: lines.length * lh + Math.round(fs * (it.big ? 0.8 : 0.5)) }; }
     if (it.note) { const lines = wrapText(it.note, colW, measure); return { item: it, lines, h: lines.length * lh + Math.round(fs * 0.3) }; }
-    const lines = wrapText(it.text, colW - iw - gap, measure);
-    return { item: it, lines, h: Math.max(ih, lines.length * lh) + Math.round(fs * 0.35) };
+    // geology rows (it.sign): the name in bold and a grey second line, as the signposts
+    const lines = wrapText(it.text, colW - iw - gap, it.sign ? measureBold : measure);
+    const subLines = it.sub ? wrapText(it.sub, colW - iw - gap, t => measure(t) * 0.92) : [];
+    return { item: it, lines, subLines, h: Math.max(ih, (lines.length + subLines.length) * lh) + Math.round(fs * 0.35) };
   });
   const total = sized.reduce((s, r) => s + r.h, 0), target = total / cols;
   let col = 0, y = 0, maxY = 0;
@@ -150,8 +152,10 @@ export function keyBand(items, W, { fs = Math.max(11, Math.round(W / 130)) } = {
           g.fillStyle = it.swatch; g.fillRect(x, iy, L.iw, L.ih);
           g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 1; g.strokeRect(x + 0.5, iy + 0.5, L.iw - 1, L.ih - 1);
         } else if (it.swatch) g.drawImage(it.swatch, x, iy, L.iw, L.ih);
-        g.fillStyle = fg; g.font = font(fs);
+        g.fillStyle = fg; g.font = font(fs, it.sign ? 700 : 400);
         r.lines.forEach((l, i) => g.fillText(l, x + L.iw + L.gap, y + fs + i * L.lh));
+        g.fillStyle = muted; g.font = font(Math.round(fs * 0.92));
+        r.subLines.forEach((l, i) => g.fillText(l, x + L.iw + L.gap, y + fs + (r.lines.length + i) * L.lh));
       }
       g.restore();
     },
@@ -184,7 +188,8 @@ export function legendSVG(items, { title, lines = [], fontCSS = '', width = 1200
     if (it.mark) out.push(`<g transform="translate(${x} ${iy}) scale(${k})">${markSVGOf(it.mark, 0, 0)}</g>`);
     else if (typeof it.swatch === 'string') out.push(`<rect x="${x}" y="${iy}" width="${L.iw}" height="${L.ih}" fill="${it.swatch}" stroke="rgba(0,0,0,0.35)"/>`);
     else if (it.swatch) out.push(`<image href="${it.swatch.toDataURL('image/png')}" x="${x}" y="${iy}" width="${L.iw}" height="${L.ih}"/>`);
-    r.lines.forEach((l, i) => text(x + L.iw + L.gap, y + fs + i * L.lh, l));
+    r.lines.forEach((l, i) => text(x + L.iw + L.gap, y + fs + i * L.lh, l, it.sign ? ' font-weight="700"' : ''));
+    r.subLines.forEach((l, i) => text(x + L.iw + L.gap, y + fs + (r.lines.length + i) * L.lh, l, ' fill="#5c5c5c" font-size="12"'));
   }
   let y = top + L.height + 24;
   out.push(`<rect x="0" y="${y}" width="${width}" height="4" fill="#000"/>`);

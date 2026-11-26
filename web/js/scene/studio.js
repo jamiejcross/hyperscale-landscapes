@@ -65,7 +65,9 @@ export function mountStudio(el, scene, host) {
       <label class="check"><input type="checkbox" name="shadow"> Ground shadow</label>
       <label class="check"><input type="checkbox" name="print"> Print colours</label>
     </fieldset>
-    <fieldset name="geoPanel" hidden><legend>Geology legend</legend>
+    <fieldset name="geoPanel" hidden><legend>Geology legends</legend>
+      <label class="check"><input type="checkbox" name="legGeology" checked> Geology</label>
+      <label class="check"><input type="checkbox" name="legBgs" checked> British Geological Survey</label>
       <label class="check"><input type="checkbox" name="geoLabels"> Labels on the walls (coal-bearing ground, deeper boreholes)</label>
       <div name="geoLegend" class="geo-legend"></div>
       <div name="geoExport">
@@ -154,6 +156,8 @@ export function mountStudio(el, scene, host) {
   q('relief').addEventListener('change', e => { scene.setCarto?.({ relief: e.target.checked }); host.onChange?.(scene.view); });
   q('crowns').addEventListener('change', e => { scene.setCarto?.({ crowns: e.target.checked }); host.onChange?.(scene.view); });
   q('contours').addEventListener('change', e => { scene.setContours?.(e.target.checked); host.onChange?.(scene.view); });
+  const legendShow = () => ({ geology: q('legGeology').checked, bgs: q('legBgs').checked });
+  for (const n of ['legGeology', 'legBgs']) q(n).addEventListener('change', () => { renderLegend(); host.onChange?.(scene.view); });
   q('geoLabels').addEventListener('change', e => { scene.setGeologyLabels?.(e.target.checked); host.onChange?.(scene.view); });
   q('mist').addEventListener('change', e => { scene.setMist?.(e.target.checked); host.onChange?.(scene.view); });
   q('look').addEventListener('change', e => {
@@ -182,10 +186,10 @@ export function mountStudio(el, scene, host) {
   // ---- the legend: the layers ticked in the layer key, then the geology ----
   function keyItems() {
     const G = scene.geology?.instance, c = host.caption();
-    const items = mapKeyItems(host.layerList?.(), { elec: scene.electricity?.() || {}, redLine: c.legend || null, geology: !!G,
+    const show = legendShow();
+    const items = mapKeyItems(host.layerList?.(), { elec: scene.electricity?.() || {}, redLine: c.legend || null, geology: !!G && show.bgs,
       context: document.querySelector('[data-context-view]:checked')?.value || null });
-    if (G) items.push({ head: 'Geology legend', big: true },
-      ...legendItems({ geology: G, look: scene.view.look, pitsShown: scene.pits?.shown }));
+    if (G) items.push(...legendItems({ geology: G, look: scene.view.look, pitsShown: scene.pits?.shown, show }));
     return items;
   }
   function keyNotice() {
@@ -282,20 +286,20 @@ export function mountStudio(el, scene, host) {
   function renderLegend() {
     const G = scene.geology?.instance, box = q('geoLegend');
     if (!G) { box.innerHTML = ''; return; }
-    const opts = { geology: G, look: scene.view.look, pitsShown: scene.pits?.shown };
+    const opts = { geology: G, look: scene.view.look, pitsShown: scene.pits?.shown, show: legendShow() };
     const items = legendItems(opts);
+    // a name in bold and a grey second line, as the mine signposts on the model
     const html = it => {
-      if (it.head) return `<h3>${escHTML(it.head)}</h3>`;
+      if (it.head) return it.big ? `<h3 class="geo-group">${escHTML(it.head)}</h3>` : `<h4>${escHTML(it.head)}</h4>`;
       if (it.note) return `<p class="hint">${escHTML(it.note)}</p>`;
       const icon = it.swatch ? `<img alt="" src="${it.swatch.toDataURL('image/png')}" width="26" height="16">`
         : `<svg width="26" height="18" viewBox="0 -2 26 20" aria-hidden="true">${markSVG(it.mark, 0, 0)}</svg>`;
-      return `<div class="geo-row">${icon}<span>${escHTML(it.text)}</span></div>`;
+      return `<div class="geo-row">${icon}<span><b>${escHTML(it.text)}</b>${it.sub ? `<small>${escHTML(it.sub)}</small>` : ''}</span></div>`;
     };
-    // two columns, breaking at the superficial deposits (else at coal and records)
-    let cut = items.findIndex(it => it.head === 'Superficial and artificial deposits');
-    if (cut < 1) cut = items.findIndex(it => it.head === 'Coal and records');
-    const cols = cut > 0 ? [items.slice(0, cut), items.slice(cut)] : [items];
-    box.innerHTML = `<div class="geo-cols">${cols.map(c => `<div>${c.map(html).join('')}</div>`).join('')}</div>`;
+    // one column per legend: Geology, then British Geological Survey
+    const cols = [];
+    for (const it of items) { if (it.group || !cols.length) cols.push([]); cols[cols.length - 1].push(it); }
+    box.innerHTML = cols.length ? `<div class="geo-cols">${cols.map(c => `<div>${c.map(html).join('')}</div>`).join('')}</div>` : '';
     // (the note on what is data and what is drawn goes only in the Sources JSON: manifest())
   }
   function wallsCaption() { const c = host.caption(), note = lookNote(scene); return note ? { ...c, footer: `${c.footer} · ${note}` } : c; }
@@ -304,7 +308,7 @@ export function mountStudio(el, scene, host) {
     const G = scene.geology?.instance; if (!G) return null;
     const info = q('geoInfo'); info.textContent = 'Drawing the walls…';
     try {
-      const svg = wallsSVG({ geology: G, look: scene.view.look, caption: wallsCaption(), pitsShown: scene.pits?.shown, fontCSS: (await host.fontCSS?.()) || '' });
+      const svg = wallsSVG({ geology: G, look: scene.view.look, caption: wallsCaption(), pitsShown: scene.pits?.shown, legendShow: legendShow(), fontCSS: (await host.fontCSS?.()) || '' });
       const blob = kind === 'svg' ? new Blob([svg], { type: 'image/svg+xml' }) : await wallsPNG(svg, 2);
       download(blob, `${host.filename()}-walls.${kind}`);
       info.textContent = `Geology cross sections (${kind.toUpperCase()}): ${(blob.size / 1e6).toFixed(1)} MB.`;

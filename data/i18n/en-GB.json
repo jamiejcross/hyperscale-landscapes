@@ -1,6 +1,6 @@
 {
   "app.title": "Hyperscale Landscapes",
-  "app.tagline": "Open Tools for Visualising AI Data Infrastructures in Place",
+  "app.tagline": "Open Tools for Printable Landscape Visualisations of Hyperscale AI Data Centres",
   "step.pick": "Choose an area",
   "step.size": "Size and style",
   "step.preview": "Preview",
@@ -93,6 +93,6 @@
   "footer.privacy": "Privacy",
   "footer.sources": "Data sources and licences",
   "footer.code": "Source code",
-  "footer.licence": "Hyperscale Landscapes is a non-commercial research and educational project (University of Glasgow). Source code: GPL-3.0. Exports and downloads: CC BY-NC-SA 4.0. Data sources keep their own licences; outputs that contain non-commercial material carry a notice.",
+  "footer.licence": "Hyperscale Landscapes is a non-commercial research and educational project (University of Glasgow, UK; Cornell University, USA). Source code: GPL-3.0. Exports and downloads: CC BY-NC-SA 4.0. Data sources keep their own licences; outputs that contain non-commercial material carry a notice.",
   "footer.attr": "Map data © OpenStreetMap contributors"
 }

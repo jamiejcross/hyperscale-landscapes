@@ -4,7 +4,7 @@
 // diagram's vertical exaggeration stated, the legend and the BGS notice.
 // Modelled on export/section.js: an SVG (the wall paintings are embedded
 // PNGs), and a PNG made from it. Screen artefact only.
-import { legendModel, captionNote, nominalTable } from '../scene/subsurface-info.js';
+import { legendModel, captionNote, nominalTable, BOREHOLE_NEAR_M } from '../scene/subsurface-info.js';
 import { profileAt } from '../scene/geology-math.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -30,7 +30,7 @@ export function diagramVex({ dzTrueM, kx, zExag, minPx = 170, max = 12 }) {
 
 // geology: the scene's geology instance; look: the current look;
 // caption: captionLines(...) for the site; pitsShown: { coal, unknown, quarry }.
-export function wallsSVG({ geology, look, caption, name, pitsShown = { coal: true, unknown: true, quarry: false }, fontCSS = '', width = 1800 }) {
+export function wallsSVG({ geology, look, caption, name, pitsShown = { coal: true, unknown: true, quarry: false }, legendShow = { geology: true, bgs: true }, fontCSS = '', width = 1800 }) {
   const G = geology, sub = G.sub;
   const m = { l: 40, r: 40 }, pw = width - m.l - m.r;
   const kx = pw / (G.Wm + G.Hm);                                 // px per metre along the walls
@@ -89,15 +89,18 @@ export function wallsSVG({ geology, look, caption, name, pitsShown = { coal: tru
 
   // ---- legend (generated from the bundle)
   const colW = (pw - 30) / 2, lineH = 17;
-  const items = [{ head: 'Legend', big: true }, ...legendItems({ geology: G, look, pitsShown })]
+  const items = [{ head: 'Legend', big: true }, ...legendItems({ geology: G, look, pitsShown, show: legendShow })]
     .map(it => (it.swatch ? { ...it, swatch: { href: it.swatch.toDataURL('image/png'), w: 26, h: 16 } } : it));
+  if (items.length === 1) items.length = 0;    // both legends unticked: no legend
   // lay items out in two columns, filling the left first
-  const heightOf = it => it.head ? (it.big ? 28 : 8 + wrap(it.head, colW, 6.9).length * lineH) : 4 + wrap(it.text ?? it.note, colW - (it.note ? 0 : 36)).length * lineH;
+  // a row: its name in bold, then its second line in grey (the signposts' style)
+  const rowLines = it => [...wrap(it.text, colW - 36, it.sign ? 6.9 : 6.6).map(l => [l, !!it.sign]), ...(it.sub ? wrap(it.sub, colW - 36, 6.0).map(l => [l, false]) : [])];
+  const heightOf = it => it.head ? (it.big ? 28 : 8 + wrap(it.head, colW, 6.9).length * lineH) : it.note ? 4 + wrap(it.note, colW).length * lineH : 6 + rowLines(it).length * lineH;
   const total = items.reduce((s, it) => s + heightOf(it), 0);
   let col = 0, cy = y, colTop = y, colBottom = y;
   items.forEach((it, n) => {
     const hh = heightOf(it), keep = it.head && items[n + 1] ? heightOf(items[n + 1]) : 0;   // a heading stays with its first row
-    if (col === 0 && cy - colTop + hh + keep > total / 2 + 40 && !it.big) { col = 1; colBottom = cy; cy = colTop; }
+    if (col === 0 && cy - colTop + hh + keep > total / 2 + 40 && !(it.big && !it.group)) { col = 1; colBottom = cy; cy = colTop; }
     const x0 = m.l + col * (colW + 30);
     if (it.head) {
       if (it.big) text(x0, cy + 18, it.head, ' font-size="17" font-weight="700"');
@@ -108,7 +111,7 @@ export function wallsSVG({ geology, look, caption, name, pitsShown = { coal: tru
       const sy = cy + 4;
       if (it.swatch) out.push(`<image href="${it.swatch.href}" x="${x0}" y="${sy}" width="${it.swatch.w}" height="${it.swatch.h}"/>`);
       else out.push(markSVG(it.mark, x0, sy));
-      wrap(it.text, colW - 36).forEach((l, i) => text(x0 + 36, sy + 12 + i * lineH, l, ''));
+      rowLines(it).forEach(([l, bold], i) => text(x0 + 36, sy + 12 + i * lineH, l, bold ? ' font-weight="700"' : ` fill="${GREY}" font-size="12"`));
     }
     cy += hh;
   });
@@ -147,46 +150,36 @@ const tx = (k, vars = {}) => Object.entries(vars).reduce((s, [a, v]) => s.replac
 // data/i18n), filled in for this site: { title, data, assumed, schematic, on_this_site }.
 export function dataNote(opts) { return legendItems(opts, true); }
 
-export function legendItems({ geology, look, pitsShown = { coal: true, unknown: true, quarry: false } }, wantNote = false) {
+export function legendItems({ geology, look, pitsShown = { coal: true, unknown: true, quarry: false }, show = { geology: true, bgs: true } }, wantNote = false) {
   let note = null;
   const G = geology, sub = G.sub, LG = legendModel(sub, { Wm: G.Wm, Hm: G.Hm });
-  const items = [];   // rows are short (two lines at most); the detail goes to the note at the end
-  const sw = cv => cv;
-  // BGS labels are "Formation — lithology"; a row shows the formation alone
-  // unless two rows share it.
-  const short = list => list.map(e => {
-    const name = e.label.split(' — ')[0];
-    return list.filter(o => o.label.split(' — ')[0] === name).length > 1 ? e.label : name;
-  });
-  if (LG.bedrock.length) {
-    items.push({ head: 'Bedrock' });
-    const rows = short(LG.bedrock);
-    LG.bedrock.forEach((e, i) => items.push({ swatch: sw(G.swatch(e.unit, look)), text: rows[i] }));
-  }
-  if (LG.sheets.length) {
-    items.push({ head: 'Sheets' });
-    const rows = short(LG.sheets);
-    LG.sheets.forEach((e, i) => items.push({ swatch: sw(G.swatch(e.unit, look)), text: rows[i] }));
-  }
-  if (LG.cover.length) {
-    items.push({ head: 'Superficial and artificial deposits' });
-    for (const e of LG.cover) items.push({ swatch: sw(G.swatch(e.unit, look, { cover: true })), text: e.label });
-  }
-  items.push({ head: 'Coal and records' });
-  if (LG.coal) {
-    items.push({ swatch: sw(G.coalSwatch(look)), text: 'Coal-bearing ground' });
+  // Two legends (JC, 26 Nov 2026): "Geology" (rocks, sheets, deposits) and
+  // "British Geological Survey" (the records). Each row is a name and, where
+  // the data give one, a second line (`sub`) from the same record: the
+  // signposts' two-line style.
+  const rocks = [], records = [];
+  const rockRow = (e, opts) => ({ swatch: G.swatch(e.unit, look, opts), text: e.unit.LEX_D || e.label, sub: e.unit.RCS_D || null });
+  if (LG.bedrock.length) rocks.push({ head: 'Bedrock' }, ...LG.bedrock.map(e => rockRow(e)));
+  if (LG.sheets.length) rocks.push({ head: 'Sheets' }, ...LG.sheets.map(e => rockRow(e)));
+  if (LG.cover.length || LG.coal) {
+    rocks.push({ head: 'Deposits' });
+    for (const e of LG.cover) rocks.push({ swatch: G.swatch(e.unit, look, { cover: true }), text: e.label,
+      sub: e.unit.RCS_D || (e.artificial ? 'Artificial ground (BGS)' : 'Superficial deposit (BGS)') });
+    if (LG.coal) rocks.push({ swatch: G.coalSwatch(look), text: 'Coal-bearing ground',
+      sub: LG.opencast ? 'BGS Shallow Coal: opencast coal resource area' : 'Coal named in the BGS bedrock unit' });
   }
   const pan = G.panel;
-  if (pan) items.push({ mark: 'panel', text: `Mine plan ${pan.plan}` });
   // the site's own records, for the note at the end
   const site = [];
   if (pan) {
     const pl = LG.plans.find(p => p.catalogue === String(pan.plan));
+    records.push({ mark: 'panel', text: `Mine plan ${pan.plan}`, sub: pl ? `${pl.mine}${pl.year ? `, abandoned ${pl.year}` : ''}` : 'BGS Mine Plans index' });
     site.push(pl ? tx('geology.note.plan.mine', { plan: pan.plan, mine: `${pl.mine}${pl.year ? `, abandoned ${pl.year}` : ''}` }) : tx('geology.note.plan', { plan: pan.plan }));
   }
   if (LG.boreholes.length) {
     const deepest = [...LG.boreholes].sort((a, b) => b.depth - a.depth)[0];
-    items.push({ mark: 'borehole', text: `BGS boreholes (${LG.boreholes.length})` });
+    records.push({ mark: 'borehole', text: `BGS boreholes (${LG.boreholes.length})`,
+      sub: deepest.depth >= 10 ? `Deepest ${deepest.ref}, ${+deepest.depth.toFixed(1)} m` : `Within ${BOREHOLE_NEAR_M} m of a wall` });
     site.push(deepest.depth >= 10 ? tx('geology.note.boreholes.deepest', { n: LG.boreholes.length, ref: deepest.ref, depth: +deepest.depth.toFixed(1) })
       : tx('geology.note.boreholes', { n: LG.boreholes.length }));
   }
@@ -194,10 +187,15 @@ export function legendItems({ geology, look, pitsShown = { coal: true, unknown: 
   const PIT = { coal: 'Coal mine (BritPits)', quarry: 'Quarry (BritPits)', unknown: 'Quarry, type not recorded (BritPits)' };
   for (const [cls, label] of Object.entries(PIT)) {
     const names = LG.pits[cls]; if (!names.length) continue;
-    items.push({ mark: cls, text: label });
     const list = names.join(', ');
+    records.push({ mark: cls, text: label, sub: pitsShown[cls] ? list : tx('geology.note.hidden', { list }) });
     site.push(tx(`geology.note.${cls}`, { names: pitsShown[cls] ? list : tx('geology.note.hidden', { list }) }));
   }
+  if (records.length) records.unshift({ head: 'Records' });
+  for (const r of [...rocks, ...records]) if (!r.head) r.sign = true;    // drawn in the signposts' two-line style
+  const items = [];
+  if (show.geology && rocks.length) items.push({ head: 'Geology', big: true, group: 'geology' }, ...rocks);
+  if (show.bgs && records.length) items.push({ head: 'British Geological Survey', big: true, group: 'bgs' }, ...records);
   const anyPits = LG.pits.coal.length + LG.pits.unknown.length + LG.pits.quarry.length;
 
   // What is data and what is drawn: one synthesised note (wording in data/i18n),
