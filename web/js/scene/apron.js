@@ -50,6 +50,22 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
   const mesh = new THREE.Mesh(geo); mesh.name = 'context-apron-land';
   mesh.userData = { inkId: APRON_INK_ID, context: true }; mesh.receiveShadow = false;   // (the shadow map covers the model only) mesh.castShadow = false;
   root.add(mesh);
+  // A floor across the model's footprint, in the apron's own colours (same
+  // texture, same mapping): shown when the model's terrain is hidden, so the
+  // ground does not open onto the sky through the model (JC 26 Nov 2026).
+  const floorGeo = new THREE.BufferGeometry();
+  let FZ = Infinity; for (const i of m.inner) FZ = Math.min(FZ, m.positions[3 * i + 2]);   // level with the lowest point of the apron's inner edge
+  if (!Number.isFinite(FZ)) FZ = 0.3;
+  const fuv = (x, y) => [(x - ext.x0) / (ext.x1 - ext.x0), (y - ext.y0) / (ext.y1 - ext.y0)];
+  floorGeo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, FZ, Wmm, 0, FZ, Wmm, Hmm, FZ, 0, Hmm, FZ], 3));
+  floorGeo.setAttribute('uv', new THREE.Float32BufferAttribute([...fuv(0, 0), ...fuv(Wmm, 0), ...fuv(Wmm, Hmm), ...fuv(0, Hmm)], 2));
+  floorGeo.setIndex([0, 1, 2, 0, 2, 3]); floorGeo.computeVertexNormals();
+  const floor = new THREE.Mesh(floorGeo); floor.name = 'context-apron-floor';
+  floor.userData = { inkId: APRON_INK_ID, context: true }; floor.visible = false;
+  root.add(floor);
+  let floorOn = false;
+  const showFloor = () => { floor.visible = floorOn && mesh.visible; };
+  function setFloor(on) { floorOn = !!on; showFloor(); }
 
   // Ground height on the apron (mm): bilinear on the context grid, the model's mapping.
   const kz = relief.zExag * mmPerM;
@@ -324,6 +340,7 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
     // so only the model's edge fade shows, not the shape of the land
     mesh.material = material(look, lit && !bare);
     mesh.visible = land || bare; labelGroup.visible = land && labelsOn; landShown = land;
+    floor.material = mesh.material; showFloor();
     // power lines painted on the land belong to the Energy Context
     const stats = land || bare ? paint({ P, carto: useGlyphs ? C : null, bgHex, drapeW, show: { ...show, power: energy && show.power !== false }, edge, bare }) : null;
     border.material.color.set(P.ink);
@@ -350,7 +367,7 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
     supports: sup.length, wireSegments: wirePos.length / 6, labels: labels.length, features: Object.fromEntries(Object.entries(V).map(([k, a]) => [k, a.length])),
   };
   const inkHide = [labelGroup, ...(wires ? [wires] : [])];
-  return { root, mesh, border, inkHide, setLook, setVisible, setLabels, setEdge, layout, dispose, stats, zAt,
+  return { root, mesh, border, inkHide, setLook, setVisible, setFloor, setLabels, setEdge, layout, dispose, stats, zAt,
     get glyphs() { return glyphs; }, get layoutItems() { return lastItems; }, pad_m: context.pad_m, source: E.source, attribution: E.attribution, osmAttribution: context.osm?.attribution,
     offset_m: E.offset_m, names: labels.map(L => L.n.name) };
 }

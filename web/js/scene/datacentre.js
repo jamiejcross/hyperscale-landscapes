@@ -45,7 +45,7 @@ const LABEL_PX = 17;
 export function createDatacentre(plan, { look }) {
   const group = new THREE.Group(); group.name = 'datacentre';
   const mats = {
-    body: new THREE.MeshLambertMaterial({ color: 0xd9d1bd, flatShading: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }),
+    body: new THREE.MeshLambertMaterial({ color: 0xd9d1bd, flatShading: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }),   // both sides: solid from every angle, whatever the winding
     solid: new THREE.LineBasicMaterial({ color: 0x2b2115, fog: false }),
     dashed: new THREE.LineDashedMaterial({ color: 0x2b2115, dashSize: plan.dashMm, gapSize: plan.gapMm, fog: false }),
     thread: new THREE.LineBasicMaterial({ color: 0x2b2115, transparent: true, opacity: 0.8, fog: false }),

@@ -27,7 +27,7 @@ import { metresPerPx, niceBar } from './scalebar.js';
 import { heightSampler } from './props-math.js';
 import { decodeTrees } from '../data/props.js';
 import { createDatacentre } from './datacentre.js';
-import { cutTerrain, restoreTerrain } from './datacentre-math.js';
+import { cutTerrain, restoreTerrain, insideItems } from './datacentre-math.js';
 export { layerSwatch } from './palettes.js';
 
 export const LANDCOVER_COLOURS = {
@@ -194,6 +194,7 @@ export function createScene(container) {
   const meshes = {};
   let props = null;            // 3D props (setProps)
   const propShown = { trees: true, turbines: true, pylons: true };
+  let boundaryOn = true;            // the site red line (the "Data Centre Application Boundary" layer row)
   let geology = null, geologyOn = false, geologyLabels = { geology: true, bgs: true };   // geology walls (setGeology)
   let pits = null, pitsOn = true, pitsMeta = {};   // pits on the surface (setPits)
   let propsSection = null;     // the bundle's props, for crowns and glyphs
@@ -414,7 +415,7 @@ export function createScene(container) {
     }
     if (pits && pitsOn && !view.print) pits.paint(g, modelSize);   // pit symbols (BGS BritPits)
     if (dc && dcOn) dc.paint(g, modelSize, P);                // data-centre parameter zones
-    paintBoundary(g, vectors?.boundary, modelSize);          // the site red line, on top
+    if (boundaryOn) paintBoundary(g, vectors?.boundary, modelSize);   // the site red line, on top
     d.tex.needsUpdate = true;
   }
   const paintField = () => { if (cartoActive()) paintCartoDrape(); else if (stylised()) paintDrape(view.look); };
@@ -501,6 +502,7 @@ export function createScene(container) {
     if (!apron) return;
     const on = contextActive();
     apron.setVisible(on);
+    apron.setFloor(shown.terrain === false);     // terrain hidden: the apron's floor under the model, not the sky
     applyCameraLimits();
     if (!on) return;
     const [mode, fn] = displayedEdge();
@@ -619,7 +621,7 @@ export function createScene(container) {
     const W = Wmm >= Hmm ? long : Math.round(long * Wmm / Hmm), H = Wmm >= Hmm ? Math.round(long * Hmm / Wmm) : long;
     const show = { brushwork: view.brushwork, relief: view.relief, crowns: view.crowns && propShown.trees !== false };
     for (const k of ['water', 'roads', 'rail', 'residues', 'buildings', 'receptors', 'generation', 'storage', 'transmission']) show[k] = shown[k] !== false;
-    const key = JSON.stringify([view.look, W, H, drapeVersion, show, pits && pitsOn ? pits.shown : null, !!(dc && dcOn)]);
+    const key = JSON.stringify([view.look, W, H, drapeVersion, show, pits && pitsOn ? pits.shown : null, !!(dc && dcOn), boundaryOn]);
     if (carto?.key === key) { if (!carto.tex) uploadCarto(); return carto.stats; }
     if (!carto || carto.canvas.width !== W || carto.canvas.height !== H) {
       carto?.tex?.dispose();
@@ -641,7 +643,7 @@ export function createScene(container) {
     const g = carto.canvas.getContext('2d');
     if (pits && pitsOn) pits.paint(g, modelSize);             // pit symbols (BGS BritPits), on top
     if (dc && dcOn) dc.paint(g, modelSize, P);                // data-centre parameter zones
-    paintBoundary(g, vectors?.boundary, modelSize);          // the site red line, on top
+    if (boundaryOn) paintBoundary(g, vectors?.boundary, modelSize);   // the site red line, on top
     carto.key = key;
     carto.stats = { ...stats, reliefMs: Math.round(reliefMs), ms: Math.round(stats.ms), totalMs: Math.round(performance.now() - t0) };
     uploadCarto();
@@ -847,11 +849,15 @@ export function createScene(container) {
   // it is higher. The print arrays are never written: the land top gets its own
   // copy of the positions first (as painted water does), and every vertex the
   // cut lowers is recorded so turning it off puts it back exactly.
+  // Trees inside a proposed building are hidden while it is shown (trees are
+  // drawn taller than true height, so they would stand through its roof).
+  function dcTreeMask() { props?.setTreeMask?.(dcOn && dc ? (x, y) => insideItems(dc.plan.items, x, y) : null); }
   function showDatacentre(on) {
     on = !!on && !!dc;
     if (on === dcOn) return;
     dcOn = on;
     if (dc) dc.group.visible = on;
+    dcTreeMask();
     if (on) { dcCut = { changed: null, screen: null }; dcRecut(); if (screenT) cutScreenTerrain(); }
     else if (dcCut) {
       dcUncut();
@@ -944,6 +950,7 @@ export function createScene(container) {
     props = createProps({ props: section, grid, heights, zExag, seed: seedFrom(s ?? 'props'), ramp: toonRamp });
     inner.add(props.group);
     props.setLook(view.look);
+    dcTreeMask();
     for (const k of Object.keys(propShown)) propShown[k] = true;
     refreshVisibility();
     return props.counts;
@@ -977,6 +984,7 @@ export function createScene(container) {
   function showPits(on) { pitsOn = !!on; pits?.setVisible(pitsOn); repaintDrapes(); }
   // One class of pit on or off: 'coal', 'unknown' or 'quarry'.
   function showPitClass(cls, on) { pits?.setShown(cls, on); pits?.setVisible(pitsOn); repaintDrapes(); }
+  function showBoundary(on) { boundaryOn = !!on; if (painted() || cartoActive()) paintField(); }
   function showGeology(on) { geologyOn = !!on; refreshVisibility(); }
   function setGeologyLabels(on) { geologyLabels = on && typeof on === 'object' ? { geology: !!on.geology, bgs: !!on.bgs } : { geology: !!on, bgs: !!on }; geology?.setLabels(geologyLabels); }
   function setPropsVisible(kind, on) {
@@ -1170,7 +1178,7 @@ export function createScene(container) {
   return { renderer, scene, camera, controls, view, meshes, focalMm, setContext, showContext, showEnergy, showLabels, get labelsOn() { return labelsOn; }, contextInfo, showScaleBar, get scaleBarOn() { return scaleOn; }, get apron() { return apron; }, setModel, setDrape, setLook, setVisible, setView, setSpin,
     cameraAngles, setCameraAngles, setInkWidth, setBrushwork,
     setSun, setFov, setHeightScale, setBackground, setPrintColours, setScreenColours, setShadow, grab,
-    pause, resume, renderAt, orbitStart, orbitTo, orbitEnd, setCarto, setMist, setContours, lookNotes, cartoInfo, electricity, setGeology, showGeology, setGeologyLabels, setPits, showPits, showPitClass, get geology() { return (geology || pits) && { walls: !!geology, panel: geology?.panel, on: geologyOn, shown: !!geology?.mesh.visible || (!!pits && pitsOn && pits.anyShown), attribution: geology?.attribution ?? pitsMeta.attribution, sub: geology?.sub ?? pitsMeta.sub, instance: geology, nonCommercial: geology ? geology.nonCommercial : pitsMeta.nonCommercial }; }, setProps, setPropsVisible, setTreeFactor, get props() { return props; }, get pits() { return pits; }, setDatacentre, showDatacentre, datacentreInfo, get datacentreOn() { return dcOn; } };
+    pause, resume, renderAt, orbitStart, orbitTo, orbitEnd, setCarto, setMist, setContours, lookNotes, cartoInfo, electricity, setGeology, showGeology, setGeologyLabels, setPits, showPits, showPitClass, get geology() { return (geology || pits) && { walls: !!geology, panel: geology?.panel, on: geologyOn, shown: !!geology?.mesh.visible || (!!pits && pitsOn && pits.anyShown), attribution: geology?.attribution ?? pitsMeta.attribution, sub: geology?.sub ?? pitsMeta.sub, instance: geology, nonCommercial: geology ? geology.nonCommercial : pitsMeta.nonCommercial }; }, setProps, setPropsVisible, setTreeFactor, get props() { return props; }, get pits() { return pits; }, setDatacentre, showDatacentre, datacentreInfo, showBoundary, get boundaryOn() { return boundaryOn; }, get datacentreOn() { return dcOn; } };
 }
 
 // Separate wall triangles (|normal z| small) from the top cap and the

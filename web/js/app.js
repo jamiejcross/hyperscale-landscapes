@@ -37,6 +37,7 @@ let scene = null, studio = null;
 let pendingView = parseView(location.search);
 // Proposed data centre: shown on screen (dcOn) and added to the print files (dcPrint), both off by default.
 state.dcOn = !!pendingView.dc; state.dcPrint = false; state.dcPlan = null; state.massing = null;
+state.boundaryOn = true;     // the red line: the "Data Centre Application Boundary" layer row
 const writeUrl = urlWriter(() => {
   const v = { site: state.site ? $('site-select').value || null : null };
   if (scene) {
@@ -92,7 +93,7 @@ function setBoundary(gj, { file = null, drawn = false, site = null } = {}) {
   state.boundary = { polygons, label, drawn };
 }
 const boundaryLegend = () => {
-  const red = state.boundary && state.model?.model.vectors?.boundary ? `Red line: ${state.boundary.label}.` : null;
+  const red = state.boundary && state.boundaryOn !== false && state.model?.model.vectors?.boundary ? `Red line: ${state.boundary.label}.` : null;
   const dc = dcCaption();
   return [red, dc && `Solid line: documented in the planning record; dashed line: indicative. ${dc}`].filter(Boolean).join(' ') || null;
 };
@@ -299,25 +300,50 @@ function showPreview() {
 // shows it on screen; the second adds its buildings to the 3MF and STL. Both
 // are off by default; the print files are unchanged unless the second is on.
 function mountDatacentre(model, opts) {
-  const slot = studio.part('modelSet');
-  slot.querySelector('[data-dc-rows]')?.remove();
+  const ul = $('layer-list'), note = $('dc-note'), slot = $('dc-print-slot');
+  ul.querySelectorAll('[data-dc-row]').forEach(li => li.remove());
+  slot.textContent = ''; note.hidden = true; note.textContent = '';
   state.dcPlan = null;
-  if (!state.massing) { scene.setDatacentre(null); return; }
-  const av = datacentreAvailable(state.massing);
-  const plan = av.ok ? planDatacentre(state.massing, model.grid, heightSampler(model.grid, model.heights), { buildingExag: opts.buildingExag }) : null;
-  const drawn = !!plan && (plan.items.length + plan.zones.length) > 0;
-  state.dcPlan = drawn ? plan : null;
-  scene.setDatacentre(state.dcPlan, { on: state.dcOn && drawn });
-  const reason = !av.ok ? av.reason : !drawn ? t('dc.outside') : '';
-  const printable = drawn && plan.items.length > 0;
-  const div = document.createElement('div'); div.dataset.dcRows = '';
-  div.innerHTML = `<label class="check"${reason ? ` title="${esc(reason)}"` : ''}><input type="checkbox" name="dc"${drawn ? '' : ' disabled'}${state.dcOn && drawn ? ' checked' : ''}> ${t('dc.toggle')}</label>
-    <label class="check dc-sub"${printable ? '' : ` title="${esc(reason || t('dc.print.none'))}"`}><input type="checkbox" name="dcPrint"${printable ? '' : ' disabled'}${state.dcPrint && printable ? ' checked' : ''}> ${t('dc.print')}</label>
-    <p class="hint" data-dc-hint>${esc(reason || t('dc.why'))}</p>`;
-  slot.append(div);
-  const on = div.querySelector('[name=dc]'), pr = div.querySelector('[name=dcPrint]');
-  on.onchange = () => { state.dcOn = on.checked; scene.showDatacentre(on.checked); refreshCaption(); studio.renderLegend(); writeUrl(); };
-  pr.onchange = () => { state.dcPrint = pr.checked; refreshCaption(); };
+  // rows go after Buildings, in this order
+  let at = ul.querySelector('input[data-layer="buildings"]')?.closest('li') || null;
+  const row = (name, why, swatchCSS, { checked, disabled = false, title = '' }) => {
+    const li = document.createElement('li'); li.dataset.dcRow = '';
+    li.innerHTML = `<label class="check"${title ? ` title="${esc(title)}"` : ''}><input type="checkbox"${checked ? ' checked' : ''}${disabled ? ' disabled' : ''}><span class="swatch" style="${swatchCSS}"></span>${esc(name)}${whyButton(t('preview.why'))}</label>
+      ${whyBox(`<p>${esc(why)}</p>`)}`;
+    if (at) at.after(li); else ul.append(li);
+    at = li; wireWhy(li);
+    return li.querySelector('input');
+  };
+  // the proposed buildings (and height zones), off by default
+  let plan = null, drawn = false, reason = '';
+  if (state.massing) {
+    const av = datacentreAvailable(state.massing);
+    plan = av.ok ? planDatacentre(state.massing, model.grid, heightSampler(model.grid, model.heights), { buildingExag: opts.buildingExag }) : null;
+    drawn = !!plan && (plan.items.length + plan.zones.length) > 0;
+    reason = !av.ok ? av.reason : !drawn ? t('dc.outside') : '';
+    state.dcPlan = drawn ? plan : null;
+    scene.setDatacentre(state.dcPlan, { on: state.dcOn && drawn });
+    const on = row(t('dc.toggle'), reason || t('dc.toggle.why'), 'background:#d9d1bd;border:1.5px solid #2b2115;box-sizing:border-box',
+      { checked: state.dcOn && drawn, disabled: !drawn, title: reason });
+    on.name = 'dc';
+    on.onchange = () => { state.dcOn = on.checked; scene.showDatacentre(on.checked); refreshCaption(); studio.renderLegend(); writeUrl(); };
+    note.textContent = t('dc.why'); note.hidden = false;
+  } else scene.setDatacentre(null);
+  // the application boundary (the red line), on by default
+  if (state.boundary && model.vectors?.boundary) {
+    const b = row(t('dc.boundary'), t('dc.boundary.why'), 'background:transparent;border:2.5px solid #e8452c;box-sizing:border-box', { checked: state.boundaryOn !== false });
+    scene.showBoundary(state.boundaryOn !== false);
+    b.name = 'boundary';
+    b.onchange = () => { state.boundaryOn = b.checked; scene.showBoundary(b.checked); refreshCaption(); studio.renderLegend(); };
+  }
+  // section 4, 3D printing: add the buildings to the print files (off by default)
+  if (state.massing) {
+    const printable = drawn && plan.items.length > 0;
+    slot.innerHTML = `<label class="check"${printable ? '' : ` title="${esc(reason || t('dc.print.none'))}"`}><input type="checkbox" name="dcPrint"${printable ? '' : ' disabled'}${state.dcPrint && printable ? ' checked' : ''}> ${t('dc.print')}</label>
+      ${printable ? '' : `<p class="hint">${esc(reason || t('dc.print.none'))}</p>`}`;
+    const pr = slot.querySelector('[name=dcPrint]');
+    pr.onchange = () => { state.dcPrint = pr.checked; refreshCaption(); };
+  }
 }
 
 // A layer as the screen names it. The print's Power layer is three rows on

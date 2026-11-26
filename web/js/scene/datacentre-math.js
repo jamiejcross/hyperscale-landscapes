@@ -33,6 +33,8 @@ export const bboxOf = polys => {
   return [x0, y0, x1, y1];
 };
 const inPolys = (x, y, polys) => polys.some(p => pointInPolygon(x, y, p));
+// True where (x, y) (print mm) falls inside one of the plan's buildings or extents.
+export const insideItems = (items, x, y) => items.some(it => inPolys(x, y, it.polys));
 
 // Ground under a footprint: the median (the platform level), the lowest and the
 // highest, from the vertices and a grid of samples inside (step mm).

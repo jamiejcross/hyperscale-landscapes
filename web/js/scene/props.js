@@ -65,7 +65,7 @@ export function createProps({ props, grid, heights, zExag = 2, seed = 1, ramp })
   const mmPerM = grid.mmPerM, zAt = heightSampler(grid, heights);
   const parts = { trees: [], turbines: [], pylons: [], lines: [] };
   const mats = {};                    // look -> { inst, turbine, pylon }
-  let look = 'guthrie', treeFactor = zExag, rotorPhase = 0;
+  let look = 'guthrie', treeFactor = zExag, rotorPhase = 0, treeMask = null;   // treeMask(x, y): hide a tree there
   const T = decodeTrees(props);
 
   // ---- trees ----
@@ -97,7 +97,8 @@ export function createProps({ props, grid, heights, zExag = 2, seed = 1, ramp })
         const x = T.x[i] * mmPerM, y = T.y[i] * mmPerM, hz = T.h[i] * mmPerM * treeFactor;
         const sxy = Math.max(1, T.crownR[i]) * mmPerM / t.unitR;
         q.setFromAxisAngle(Z, yaw[i]);
-        m4.compose(v.set(x, y, zAt(x, y) - 0.05), q, s.set(sxy, sxy, hz));
+        const hide = treeMask?.(x, y);
+        m4.compose(v.set(x, y, zAt(x, y) - 0.05), q, hide ? s.set(0, 0, 0) : s.set(sxy, sxy, hz));
         t.mesh.setMatrixAt(k, m4);
       });
       t.mesh.instanceMatrix.needsUpdate = true;
@@ -202,6 +203,8 @@ export function createProps({ props, grid, heights, zExag = 2, seed = 1, ramp })
     colourTrees();
   }
   function setTreeFactor(k) { treeFactor = k; placeTrees(); }
+  // Hide the trees where fn(x, y) is true (print mm), e.g. inside proposed buildings; null shows all.
+  function setTreeMask(fn) { treeMask = fn || null; placeTrees(); }
   function setVisible(kind, on) { for (const m of parts[kind] || []) m.visible = on; if (kind === 'turbines') for (const r of rotors) r.rotor.parent.visible = on; }
   function dispose() {
     group.traverse(o => { if (o.geometry) o.geometry.dispose(); });
@@ -211,6 +214,6 @@ export function createProps({ props, grid, heights, zExag = 2, seed = 1, ramp })
   }
   placeTrees(); setLook(look); setRotor(0);
   const counts = { trees: T?.count || 0, turbines: rotors.length, towers: towers.length, poles: poles.length, lineSegments: linePos.length / 6 };
-  return { group, parts, lines, counts, setLook, setTreeFactor, setRotor, setVisible, dispose,
+  return { group, parts, lines, counts, setLook, setTreeFactor, setTreeMask, setRotor, setVisible, dispose,
     get rotorPhase() { return rotorPhase; }, get treeFactor() { return treeFactor; } };
 }
