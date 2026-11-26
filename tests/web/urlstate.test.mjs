@@ -49,6 +49,10 @@ test('context view and labels round-trip; defaults stay out of the URL', () => {
   assert.deepEqual(parseView('?ctx=off&labels=2'), {});
   assert.equal(viewSearch('', { ctx: 'geology', labels: true }), '?ctx=geology&labels=1');
   assert.equal(viewSearch('?ctx=energy&labels=1', { ctx: null, labels: false }), '');
+  // Terrain and Electricity Grid together, in either order
+  assert.deepEqual(parseView('?ctx=landscape,energy'), { ctx: 'landscape,energy' });
+  assert.deepEqual(parseView('?ctx=energy,landscape'), { ctx: 'landscape,energy' });
+  assert.deepEqual(parseView('?ctx=geology,energy'), {});
 });
 
 test('dc=1 (the proposed data centre shown) round-trips; anything else is left out', () => {

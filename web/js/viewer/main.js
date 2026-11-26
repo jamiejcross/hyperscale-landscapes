@@ -4,7 +4,7 @@
 // scene, studio and caption code as the web app.
 import { createScene, layerSwatch } from 'hl/scene';
 import { mountStudio, geologyNote, lookNote } from 'hl/studio';
-import { mountExtras, mountScaleRow, whyButton, whyBox, wireWhy } from 'hl/extras';
+import { mountExtras, mountScaleRow, whyButton, whyBox, wireWhy, contextViewValue } from 'hl/extras';
 import { parseView, urlWriter } from 'hl/urlstate';
 import { PALETTES } from 'hl/palettes';
 import { setGeologyText } from 'hl/export/walls';
@@ -75,7 +75,7 @@ if (heights && (propsData || subsurface || contextData)) {
     contextView: v0.ctx ?? D.view?.ctx ?? null, onContextView: v => { ctxView = v; writeUrl(); },
     labels: v0.labels ?? D.view?.labels ?? false, onLabels: () => writeUrl(),
     onChange: () => { studio.renderLegend(); studio.update(); } });
-  ctxView = document.querySelector('[data-context-view]:checked')?.value || null;
+  ctxView = contextViewValue();
   studio.refreshGeology();
 }
 mountScaleRow(ul, scene, { text });

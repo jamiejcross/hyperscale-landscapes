@@ -66,6 +66,8 @@ const POWER_GROUP_OF = { powerGen: 'generation', powerStore: 'storage', powerGri
 const POWER_AREA_MESHES = ['powerGen', 'powerStore', 'powerGrid', 'genPegs', 'gridPegs'];
 // Object IDs for the ink pass (1-15): a change of ID between neighbouring pixels is an edge.
 // Narrow waterways share the terrain's ID, so their stepped edges get no ink.
+// three.js layer for the data centre's redraw over the ink (redrawDatacentre).
+const DC_LAYER = 3;
 const INK_IDS = { terrain: 1, 'terrain-steep': 1, 'terrain-sides': 2, 'terrain-base': 3, water: 4, waterAreas: 4, waterLines: 1, buildings: 5,
   receptors: 6, powerGen: 7, powerStore: 7, powerGrid: 7, genPegs: 7, gridPegs: 7, roads: 8, power: 9, powerLines: 9, rail: 10, railDisused: 11, residues: 12 };
 // Shared by the stylised looks (colours are per palette).
@@ -135,6 +137,7 @@ export function createScene(container) {
   sun.shadow.bias = -0.0002; sun.shadow.normalBias = 0.04;
   sun.shadow.radius = 6; sun.shadow.blurSamples = 12;
   scene.add(hemi, sun, sun.target);
+  hemi.layers.enable(DC_LAYER); sun.layers.enable(DC_LAYER);      // lights for the data centre's redraw (redrawDatacentre)
 
   const model = new THREE.Group();
   model.rotation.x = -Math.PI / 2;            // model z-up (mm) -> three y-up
@@ -176,6 +179,18 @@ export function createScene(container) {
     scaleKey = key; scaleEl.style.display = b && scaleOn ? '' : 'none';
     if (b) { scaleBarEl.style.width = `${b.px.toFixed(1)}px`; scaleLabelEl.textContent = b.label; }
   }
+  // The proposed data centre is solid (JC, 26 Nov 2026): the ink pass works
+  // from its own render and would draw the edges of what stands behind the
+  // buildings (terrain, buildings, pylons) over their walls. So after the ink,
+  // the buildings and their own lines are drawn again on DC_LAYER, depth-tested
+  // against the colour render: where they are the nearest surface they cover
+  // the ink; elsewhere nothing changes.
+  function redrawDatacentre() {
+    const bg = scene.background, mask = camera.layers.mask, autoClear = renderer.autoClear, shadowAuto = renderer.shadowMap.autoUpdate;
+    scene.background = null; camera.layers.set(DC_LAYER); renderer.autoClear = false; renderer.shadowMap.autoUpdate = false;
+    renderer.render(scene, camera);
+    scene.background = bg; camera.layers.mask = mask; renderer.autoClear = autoClear; renderer.shadowMap.autoUpdate = shadowAuto;
+  }
   function draw() {
     updateScaleBar();
     if (pits) pits.layout(camera, renderer.getSize(drawSize), inner);
@@ -185,7 +200,9 @@ export function createScene(container) {
       [scene.fog.near, scene.fog.far] = hazeRange(camera.position.distanceTo(controls.target), PALETTES.anthropogenic.carto);
     }
     renderer.render(scene, camera);
-    if (stylisedLook(view.look) && view.ink && lookDef(view.look).inkPass !== false) ink.render(scene, camera, { hide: [ground, ...[...INKLESS, ...(painted() ? [] : POWER_AREA_MESHES)].map(id => meshes[id]).filter(Boolean), ...(props?.parts.lines || []), ...(props?.parts.trees || []), ...(pits ? [pits.group] : []), ...(dc ? [dc.group] : []), ...(apron ? apron.inkHide : [])], joinApron: !!apron && (apronOn || energyOn) && apron.root.visible });
+    const inked = stylisedLook(view.look) && view.ink && lookDef(view.look).inkPass !== false;
+    if (inked) ink.render(scene, camera, { hide: [ground, ...[...INKLESS, ...(painted() ? [] : POWER_AREA_MESHES)].map(id => meshes[id]).filter(Boolean), ...(props?.parts.lines || []), ...(props?.parts.trees || []), ...(pits ? [pits.group] : []), ...(dc ? [dc.group] : []), ...(apron ? apron.inkHide : [])], joinApron: !!apron && (apronOn || energyOn) && apron.root.visible });
+    if (inked && dc && dcOn) redrawDatacentre();
   }
 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.28 }));
@@ -863,6 +880,7 @@ export function createScene(container) {
     if (dc) { inner.remove(dc.group); dc.dispose(); dc = null; }
     if (!plan || (!plan.items.length && !plan.zones.length)) return null;
     dc = createDatacentre(plan, { look: PALETTES[view.look] });
+    dc.group.traverse(o => { if (o.isMesh || o.isLineSegments) o.layers.enable(DC_LAYER); });   // drawn again over the ink
     dc.group.visible = false; inner.add(dc.group);
     if (groundAt) dc.placeLabels(groundAt);
     if (on) showDatacentre(true);
@@ -1058,7 +1076,7 @@ export function createScene(container) {
 
   function setSpin(on) { controls.autoRotate = on; }
   // Field ink line width, CSS px (1–3).
-  function setInkWidth(px) { INK.lineWidth = THREE.MathUtils.clamp(+px || 1.8, 0.5, 3); view.inkWidth = INK.lineWidth; }
+  function setInkWidth(px) { INK.lineWidth = THREE.MathUtils.clamp(+px || 0.8, 0.5, 3); view.inkWidth = INK.lineWidth; }
 
   // Camera angles as seen from the model's centre, in degrees: az is the
   // compass bearing the camera stands at (clockwise from north), el its

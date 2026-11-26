@@ -15,6 +15,10 @@ export const EXTRAS_KEYS = ['preview.why', 'context.layer', 'context.layer.why',
 // Each layer row's explanation: a small ▾ button after the name (inside the
 // label, but with no text of its own, so the label's text stays the name)
 // opens the note below. wireWhy(root) is safe to call more than once.
+// Context views on at first: Terrain and Electricity Grid together (JC, 26 Nov 2026).
+export const DEFAULT_CONTEXT = 'landscape,energy';
+// The context views ticked, as 'landscape', 'energy', 'landscape,energy' or 'geology'; null if none.
+export const contextViewValue = () => [...document.querySelectorAll('[data-context-view]:checked')].map(r => r.value).join(',') || null;
 export const whyButton = label => `<button type="button" class="why-btn" aria-expanded="false" aria-label="${label}" title="${label}"></button>`;
 export const whyBox = html => `<div class="why" hidden>${html}</div>`;
 export function wireWhy(root) {
@@ -102,19 +106,29 @@ export function mountExtras(ul, scene, { props, subsurface, grid, heights, zExag
     const soil = treeSlot?.querySelector('[name=sides]'), geo = treeSlot?.querySelector('[name=geology]');
     const host = contextSlot || ul.appendChild(document.createElement('li'));
     host.innerHTML = `<h3>${text('views.title')}</h3>
-      <div class="context-views" role="radiogroup" aria-label="${text('views.title')}">${VIEWS.map(([v, k]) =>
-        `<label class="check"><input type="radio" name="context-view" value="${v}" data-context-view>${text(k)}</label>`).join('')}</div>`;
-    const radios = [...host.querySelectorAll('[data-context-view]')];
+      <div class="context-views" role="group" aria-label="${text('views.title')}">${VIEWS.map(([v, k]) =>
+        `<label class="check"><input type="checkbox" name="context-view" value="${v}" data-context-view>${text(k)}</label>`).join('')}</div>`;
+    const boxes = [...host.querySelectorAll('[data-context-view]')];
+    // Terrain and Electricity Grid can be on together (JC, 26 Nov 2026);
+    // Geological stands alone. One view is always on.
     setView = (v, { notify = true } = {}) => {
-      if (!VIEWS.some(([k]) => k === v)) v = VIEWS[0][0];
-      for (const r of radios) r.checked = r.value === v;
-      scene.showContext(v === 'landscape'); scene.showEnergy(v === 'energy');
-      const on = v === 'geology';
-      if (soil) soil.checked = on; if (geo) geo.checked = on;
+      let on = String(v || '').split(',').filter(k => VIEWS.some(([x]) => x === k));
+      if (on.includes('geology')) on = ['geology'];
+      if (!on.length) on = DEFAULT_CONTEXT.split(',').filter(k => VIEWS.some(([x]) => x === k));
+      if (!on.length) on = [VIEWS[0][0]];
+      for (const r of boxes) r.checked = on.includes(r.value);
+      scene.showContext(on.includes('landscape')); scene.showEnergy(on.includes('energy'));
+      const geoOn = on.includes('geology');
+      if (soil) soil.checked = geoOn; if (geo) geo.checked = geoOn;
       soil?.dispatchEvent(new Event('change'));                 // the studio applies both
-      if (notify) { onContextView(v); onChange(); }
+      if (notify) { onContextView(on.join(',')); onChange(); }
     };
-    for (const r of radios) r.onchange = () => r.checked && setView(r.value);
+    for (const r of boxes) r.onchange = () => {
+      let on = boxes.filter(b => b.checked).map(b => b.value);
+      if (r.checked) on = r.value === 'geology' ? ['geology'] : on.filter(k => k !== 'geology');
+      else if (!on.length) { r.checked = true; return; }      // keep one view on
+      setView(on.join(','));
+    };
     setView(contextView, { notify: false });
   } else {
     scene.showContext(false); scene.showEnergy(false);

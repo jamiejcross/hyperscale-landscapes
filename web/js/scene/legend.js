@@ -57,7 +57,7 @@ export function markSVGOf(kind, x, y) {
 // rows, names and swatch colours, so the two always agree). Only ticked rows.
 // elec: { pylons, turbines } counts; redLine: the caption's red-line text or null;
 // geology: true when the geology part follows (it lists the pits itself).
-// context: the context view shown ('landscape', 'energy', ...) or null.
+// context: the context views shown ('landscape', 'energy', 'landscape,energy', 'geology') or null.
 export function mapKeyItems(list, { elec = {}, redLine = null, geology = false, context = null } = {}) {
   const items = [{ head: 'On the map' }];
   if (redLine) items.push({ mark: 'redLine', text: redLine.replace(/^Red line:\s*/, 'Red line: ').replace(/\.$/, '') });
@@ -78,8 +78,9 @@ export function mapKeyItems(list, { elec = {}, redLine = null, geology = false, 
     } else if (input.dataset.pits && !geology) items.push({ mark: input.dataset.pits, text: label });
     else if (input.dataset.prop === 'trees') items.push({ mark: 'tree', text: label });
   }
-  if (context === 'landscape') items.push({ swatch: '#d9d4c8', text: 'CONTEXT (not printed): the land, routes, water and place names round the model, faded with distance' });
-  if (context === 'energy') items.push({ mark: 'pylon', text: 'CONTEXT (not printed): pylons, poles and overhead lines round the model' });
+  const ctxOn = String(context || '').split(',');
+  if (ctxOn.includes('landscape')) items.push({ swatch: '#d9d4c8', text: 'CONTEXT (not printed): the land, routes, water and place names round the model, faded with distance' });
+  if (ctxOn.includes('energy')) items.push({ mark: 'pylon', text: 'CONTEXT (not printed): pylons, poles and overhead lines round the model' });
   return items.length > 1 ? items : [];
 }
 

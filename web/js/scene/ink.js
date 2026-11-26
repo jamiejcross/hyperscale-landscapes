@@ -14,7 +14,7 @@
 import * as THREE from 'three';
 import { EDGE, TERRAIN_ID, APRON_ID, ringRadius, outlineScale } from './ink-math.js';
 
-export const INK = { colour: '#221d18', strength: 1.0, lineWidth: 1.8 };
+export const INK = { colour: '#221d18', strength: 1.0, lineWidth: 0.8 };   // CSS px; default 0.8 (JC, 26 Nov 2026; was 1.8)
 
 const f = v => v.toFixed(4);
 

@@ -35,7 +35,7 @@ export function mountStudio(el, scene, host) {
       <select name="look" aria-label="Style">
         ${Object.entries(LOOKS).map(([k, label]) => `<option value="${k}"${k === scene.view.look ? ' selected' : ''}>${label}</option>`).join('')}
       </select>
-      <label class="range" name="inkRow"${LOOK_DEFS[scene.view.look]?.inkPass === false ? ' hidden' : ''}>Outline <input type="range" name="ink" min="0.5" max="3" step="0.1" value="1.8"><output name="inkV"></output></label>
+      <label class="range" name="inkRow"${LOOK_DEFS[scene.view.look]?.inkPass === false ? ' hidden' : ''}>Outline <input type="range" name="ink" min="0.5" max="3" step="0.1" value="0.8"><output name="inkV"></output></label>
       <label class="check" name="brushRow"${PALETTES[scene.view.look]?.brushwork ? '' : ' hidden'}><input type="checkbox" name="brush"${scene.view.brushwork ? ' checked' : ''}> Brushwork (a texture, not data)</label>
       <label class="check" name="reliefRow"${LOOK_DEFS[scene.view.look]?.carto ? '' : ' hidden'}><input type="checkbox" name="relief"${scene.view.relief !== false ? ' checked' : ''}> Relief shading (from the model's heights)</label>
       <label class="check" name="crownRow"${LOOK_DEFS[scene.view.look]?.carto ? '' : ' hidden'}><input type="checkbox" name="crowns"${scene.view.crowns !== false ? ' checked' : ''}> Crown symbols (woodland drawn as symbols)</label>
@@ -187,7 +187,7 @@ export function mountStudio(el, scene, host) {
     const G = scene.geology?.instance, c = host.caption();
     const show = legendShow();
     const items = mapKeyItems(host.layerList?.(), { elec: scene.electricity?.() || {}, redLine: c.legend || null, geology: !!G && show.bgs,
-      context: document.querySelector('[data-context-view]:checked')?.value || null });
+      context: [...document.querySelectorAll('[data-context-view]:checked')].map(r => r.value).join(',') || null });
     if (G) items.push(...legendItems({ geology: G, look: scene.view.look, pitsShown: scene.pits?.shown, show }));
     return items;
   }

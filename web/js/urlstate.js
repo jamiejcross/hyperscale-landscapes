@@ -10,7 +10,7 @@
 // test this file directly.
 
 export const STYLES = ['guthrie', 'field', 'anthropogenic'];
-export const CONTEXT_VIEWS = ['landscape', 'energy', 'geology'];
+export const CONTEXT_VIEWS = ['landscape', 'energy', 'landscape,energy', 'geology'];
 const RETIRED = { mossmorran: 'guthrie' };
 export const EL_MIN = 0, EL_MAX = 90;
 const SITE_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
@@ -29,7 +29,8 @@ export function parseView(search) {
   if (Number.isFinite(az)) out.az = round1(((az % 360) + 360) % 360);
   const el = num(p.get('el'));
   if (Number.isFinite(el)) out.el = round1(Math.min(EL_MAX, Math.max(EL_MIN, el)));
-  const ctx = p.get('ctx');
+  // Terrain and Electricity Grid may be on together (written landscape,energy in either order)
+  const ctx = (p.get('ctx') || '').split(',').sort((a, b) => CONTEXT_VIEWS.indexOf(a) - CONTEXT_VIEWS.indexOf(b)).join(',');
   if (CONTEXT_VIEWS.includes(ctx)) out.ctx = ctx;
   if (p.get('labels') === '1') out.labels = true;
   else if (p.get('labels') === '0') out.labels = false;

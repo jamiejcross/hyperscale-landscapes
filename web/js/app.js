@@ -13,7 +13,7 @@ import { planDatacentre, datacentrePrintMesh } from './geom/datacentre-plan.js';
 import { captionLine as dcCaptionLine, datacentreAvailable } from './scene/datacentre-math.js';
 import { heightSampler } from './scene/props-math.js';
 import { createScene, landcoverCanvas, layerSwatch, DEFAULT_LOOK } from './scene/scene.js';
-import { mountExtras, mountScaleRow, EXTRAS_KEYS, whyButton, whyBox, wireWhy } from './scene/extras.js';
+import { mountExtras, mountScaleRow, EXTRAS_KEYS, whyButton, whyBox, wireWhy, contextViewValue } from './scene/extras.js';
 import { legendModel, subsurfaceCounts } from './scene/subsurface-info.js';
 import { contourCanvas } from './scene/contours.js';
 import { SURFACES, imageryCanvas } from './data/imagery.js';
@@ -277,7 +277,7 @@ function showPreview() {
     context: state.bundle?.context || null, bbox: state.bundle?.bbox || null, relief: reliefOf(model, opts),
     contextSlot: $('context-slot'), contextView: pendingView?.ctx ?? state.ctxView, onContextView: v => { state.ctxView = v; writeUrl(); },
     labels: pendingView?.labels ?? scene.labelsOn, onLabels: () => writeUrl() });
-  state.ctxView = document.querySelector('[data-context-view]:checked')?.value || null;
+  state.ctxView = contextViewValue();
   mountScaleRow(ul, scene, { text: t });
   mountDatacentre(model, opts);
   studio.refreshGeology();
