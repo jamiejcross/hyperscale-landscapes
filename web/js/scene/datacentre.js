@@ -2,7 +2,7 @@
 // part, shared by the web app and the offline viewer. Buildings are flat-filled
 // in the look's building colour, on level platforms, outlined in ink: solid for
 // documented features, dashed for indicative ones. Parameter zones are a pale
-// tint on the drape with a solid edge and a height label. Nothing animates and
+// tint on the drape with a solid edge (height labels off for now). Nothing animates and
 // nothing is symbolic. The plan comes from datacentre-math.js; the terrain cut
 // for the platforms is done by the scene (reversible), never on the print.
 import * as THREE from 'three';
@@ -41,6 +41,8 @@ function mergeGeoms(gs) {
 
 const FONT = 'DejaVu Sans, Helvetica, Arial, sans-serif';
 const LABEL_PX = 17;
+// Zone height labels ("up to 40 m"): off and hidden for now (JC, 26 Nov 2026; may return).
+const HEIGHT_LABELS = false;
 
 export function createDatacentre(plan, { look }) {
   const group = new THREE.Group(); group.name = 'datacentre';
@@ -73,7 +75,7 @@ export function createDatacentre(plan, { look }) {
   }
   // Zone height labels ("up to 40 m"), on a short thread above the zone.
   const labels = [];
-  for (const z of plan.zones) {
+  for (const z of HEIGHT_LABELS ? plan.zones : []) {
     if (!Number.isFinite(z.heightM)) continue;
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture(`up to ${z.heightM} m`), depthTest: false, depthWrite: false, sizeAttenuation: false, fog: false }));
     sp.center.set(0.5, 0); sp.renderOrder = 10; sp.userData.aspect = sp.material.map.image.width / sp.material.map.image.height;
