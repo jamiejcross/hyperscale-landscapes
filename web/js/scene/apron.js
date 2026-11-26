@@ -50,23 +50,6 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
   const mesh = new THREE.Mesh(geo); mesh.name = 'context-apron-land';
   mesh.userData = { inkId: APRON_INK_ID, context: true }; mesh.receiveShadow = false;   // (the shadow map covers the model only) mesh.castShadow = false;
   root.add(mesh);
-  // A floor across the model's footprint, in the apron's own colours (same
-  // texture, same mapping): shown when the model's terrain is hidden, so the
-  // ground does not open onto the sky through the model (JC 26 Nov 2026).
-  const floorGeo = new THREE.BufferGeometry();
-  let FZ = Infinity; for (const i of m.inner) FZ = Math.min(FZ, m.positions[3 * i + 2]);   // level with the lowest point of the apron's inner edge
-  if (!Number.isFinite(FZ)) FZ = 0.3;
-  const fuv = (x, y) => [(x - ext.x0) / (ext.x1 - ext.x0), (y - ext.y0) / (ext.y1 - ext.y0)];
-  floorGeo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, FZ, Wmm, 0, FZ, Wmm, Hmm, FZ, 0, Hmm, FZ], 3));
-  floorGeo.setAttribute('uv', new THREE.Float32BufferAttribute([...fuv(0, 0), ...fuv(Wmm, 0), ...fuv(Wmm, Hmm), ...fuv(0, Hmm)], 2));
-  floorGeo.setIndex([0, 1, 2, 0, 2, 3]); floorGeo.computeVertexNormals();
-  const floor = new THREE.Mesh(floorGeo); floor.name = 'context-apron-floor';
-  floor.userData = { inkId: APRON_INK_ID, context: true }; floor.visible = false;
-  root.add(floor);
-  let floorOn = false;
-  const showFloor = () => { floor.visible = floorOn && mesh.visible; };
-  function setFloor(on) { floorOn = !!on; showFloor(); }
-
   // Ground height on the apron (mm): bilinear on the context grid, the model's mapping.
   const kz = relief.zExag * mmPerM;
   const zAt = (x, y) => {
@@ -107,6 +90,12 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
   const CW = spanX >= spanY ? long : Math.round(long * spanX / spanY), CH = spanX >= spanY ? Math.round(long * spanY / spanX) : long;
   const canvas = document.createElement('canvas'); canvas.width = CW; canvas.height = CH;
   const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  // The same painting mapped onto the model's own UVs (x / Wmm, y / Hmm): the
+  // model's land in the apron's colours when its terrain layer is off, so the
+  // ground runs on under the model with no hole (JC 26 Nov 2026).
+  const modelTex = tex.clone();
+  modelTex.repeat.set(Wmm / spanX, Hmm / spanY); modelTex.offset.set(-ext.x0 / spanX, -ext.y0 / spanY);
+  const touch = () => { tex.needsUpdate = true; modelTex.needsUpdate = true; };
   const ppm = CW / spanX;                                      // canvas px per model mm
   // the land at low resolution (smooth: colour and fade only), enlarged
   const LW = 768, LH = Math.max(8, Math.round(LW * CH / CW));
@@ -177,7 +166,7 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
     g0.putImageData(img, 0, 0);
     const g = canvas.getContext('2d');
     g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingQuality = 'high'; g.drawImage(land, 0, 0, CW, CH);
-    if (bare) { tex.needsUpdate = true; painted = key; return { ms: Math.round(performance.now() - t1), size: [CW, CH] }; }
+    if (bare) { touch(); painted = key; return { ms: Math.round(performance.now() - t1), size: [CW, CH] }; }
     // 2. infrastructure on a layer: drawn as on the model, cut at the model edge, faded (weaker)
     const L = layer.getContext('2d');
     L.setTransform(1, 0, 0, 1, 0, 0); L.clearRect(0, 0, CW, CH);
@@ -209,7 +198,7 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
     L.globalCompositeOperation = 'destination-out'; L.imageSmoothingQuality = 'high'; L.drawImage(fadeMask, 0, 0, CW, CH);
     L.globalCompositeOperation = 'source-over';
     g.drawImage(layer, 0, 0);
-    tex.needsUpdate = true;
+    touch();
     painted = key;
     return { ms: Math.round(performance.now() - t1), size: [CW, CH] };
   }
@@ -220,6 +209,14 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
     look = `${look}|${lit ? 'lit' : 'flat'}`;
     if (!mats[look]) mats[look] = lit ? new THREE.MeshToonMaterial({ map: tex, gradientMap: ramp?.() }) : new THREE.MeshBasicMaterial({ map: tex });
     return mats[look];
+  }
+  // The model's land as the apron: the apron's current material, on modelTex.
+  const modelMats = new Map();
+  function modelMaterial() {
+    const src = mesh.material;
+    if (!src) return null;
+    if (!modelMats.has(src)) { const mt = src.clone(); mt.map = modelTex; modelMats.set(src, mt); }
+    return modelMats.get(src);
   }
 
   // ---- pylons and poles (3D, Field and Guthrie) and their wires ----
@@ -340,7 +337,6 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
     // so only the model's edge fade shows, not the shape of the land
     mesh.material = material(look, lit && !bare);
     mesh.visible = land || bare; labelGroup.visible = land && labelsOn; landShown = land;
-    floor.material = mesh.material; showFloor();
     // power lines painted on the land belong to the Energy Context
     const stats = land || bare ? paint({ P, carto: useGlyphs ? C : null, bgHex, drapeW, show: { ...show, power: energy && show.power !== false }, edge, bare }) : null;
     border.material.color.set(P.ink);
@@ -358,8 +354,8 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
   function setLabels(on) { labelsOn = !!on; labelGroup.visible = landShown && labelsOn; lastKey = ''; }
   function dispose() {
     root.traverse(o => { o.geometry?.dispose(); if (o.material && o.isSprite) { o.material.map?.dispose(); o.material.dispose(); } });
-    for (const mt of [...Object.values(mats), ...Object.values(supMats), border.material, threadMat, wires?.material]) mt?.dispose();
-    tex.dispose(); glyphs?.dispose(); root.removeFromParent();
+    for (const mt of [...Object.values(mats), ...modelMats.values(), ...Object.values(supMats), border.material, threadMat, wires?.material]) mt?.dispose();
+    tex.dispose(); modelTex.dispose(); glyphs?.dispose(); root.removeFromParent();
   }
   const stats = {
     triangles: m.stats.triangles, vertices: m.stats.vertices, clampedVertices: m.stats.clamped, edgeVertices: m.stats.edgeVertices,
@@ -367,7 +363,7 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
     supports: sup.length, wireSegments: wirePos.length / 6, labels: labels.length, features: Object.fromEntries(Object.entries(V).map(([k, a]) => [k, a.length])),
   };
   const inkHide = [labelGroup, ...(wires ? [wires] : [])];
-  return { root, mesh, border, inkHide, setLook, setVisible, setFloor, setLabels, setEdge, layout, dispose, stats, zAt,
+  return { root, mesh, border, inkHide, setLook, setVisible, modelMaterial, setLabels, setEdge, layout, dispose, stats, zAt,
     get glyphs() { return glyphs; }, get layoutItems() { return lastItems; }, pad_m: context.pad_m, source: E.source, attribution: E.attribution, osmAttribution: context.osm?.attribution,
     offset_m: E.offset_m, names: labels.map(L => L.n.name) };
 }

@@ -23,6 +23,7 @@ import { paintCarto, paintWater, recolourData, heightMetres, seaCanvas, hazeRang
 import { reliefCanvas } from './contours.js';
 import { createGlyphs } from './glyphs.js';
 import { createApron } from './apron.js';
+import { desaturate } from './apron-math.js';
 import { metresPerPx, niceBar } from './scalebar.js';
 import { heightSampler } from './props-math.js';
 import { decodeTrees } from '../data/props.js';
@@ -445,6 +446,7 @@ export function createScene(container) {
         && !(k === 'genPegs' && props?.counts?.turbines && propShown.turbines !== false);
       else if (SCREEN_OF[k]) m.visible = p && shown[SCREEN_OF[k]] !== false;     // screen-only stand-ins
       else if (k === 'power' && splitPower()) m.visible = false;           // the print's Power mesh: the groups stand in on screen
+      else if (LAND.has(k)) m.visible = true;                             // Terrain off: drawn as land cover (applyLand)
       else m.visible = shown[k] !== false && !(p && PAINTED_MESHES.has(k));
     }
     // Geology walls stand in for the plain slab walls (not with print colours).
@@ -499,12 +501,11 @@ export function createScene(container) {
     return ['print', groundAt];
   }
   function refreshApron() {
-    if (!apron) return;
+    if (!apron) { applyLand(); return; }
     const on = contextActive();
     apron.setVisible(on);
-    apron.setFloor(shown.terrain === false);     // terrain hidden: the apron's floor under the model, not the sky
     applyCameraLimits();
-    if (!on) return;
+    if (!on) { applyLand(); return; }
     const [mode, fn] = displayedEdge();
     if (mode !== apronEdge && fn) { apron.setEdge(fn); apronEdge = mode; }
     const P = PALETTES[view.look], C = P.carto || null, carto = cartoActive();
@@ -516,6 +517,7 @@ export function createScene(container) {
     const st = apron.setLook(view.look, { P, C, lit: !carto, useGlyphs: carto, bgHex: horizonColour(), drapeW,
       anisotropy: renderer.capabilities.getMaxAnisotropy(), show, parts: { land: apronOn, energy: energyOn }, edge: apronEdgeSource(carto) });
     if (st) apron.stats.paint = st;
+    applyLand();
   }
   // The model's land colours for the apron to run on from: the look's drape
   // base (land cover or imagery, without routes), or Anthropogenic's painted land.
@@ -549,7 +551,7 @@ export function createScene(container) {
     if (meshes['terrain-sides']) meshes['terrain-sides'].visible = sides && !geo;
     if (geology) geology.mesh.visible = geo && sides;
     setWallsLifted(true);                           // walls (and geology walls) meet the smoothed land
-    screenT.mesh.visible = shown.terrain !== false;
+    screenT.mesh.visible = true;                  // Terrain off: the land in the apron's colours (applyLand)
     screenT.border.visible = sides;
     if (props) props.group.visible = false;         // glyphs and painted crowns replace the 3D props
     ensureGlyphs(); if (glyphs) glyphs.group.visible = true;
@@ -595,7 +597,7 @@ export function createScene(container) {
     const border = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: PALETTES[view.look].ink, fog: false }));
     border.name = 'slab-border'; border.visible = false;
     inner.add(mesh, border);
-    screenT = { T, mesh, border, wallOrig, wallLift, lifted: false,
+    screenT = { T, mesh, mat: mesh.material, border, wallOrig, wallLift, lifted: false,
       stats: { ...T.stats, wallTriangles: kept, borderSegments: seg.length / 6, ms: Math.round(performance.now() - t0) } };
     if (recut) dcRecut();
     if (dcCut) cutScreenTerrain();
@@ -652,13 +654,13 @@ export function createScene(container) {
   function uploadCarto() {
     if (!carto) return;
     if (carto.tex) carto.tex.needsUpdate = true; else carto.tex = canvasTexture(carto.canvas, renderer);
-    if (screenT.mesh.material.map !== carto.tex) { screenT.mesh.material.map = carto.tex; screenT.mesh.material.needsUpdate = true; }
+    if (screenT.mat.map !== carto.tex) { screenT.mat.map = carto.tex; screenT.mat.needsUpdate = true; }
   }
   function disposeCarto() {
     if (screenT) {
       setWallsLifted(false);
       inner.remove(screenT.mesh, screenT.border);
-      screenT.mesh.geometry.dispose(); screenT.mesh.material.dispose(); screenT.border.geometry.dispose(); screenT.border.material.dispose();
+      screenT.mesh.geometry.dispose(); screenT.mat.dispose(); screenT.border.geometry.dispose(); screenT.border.material.dispose();
       screenT = null;
     }
     carto?.tex?.dispose(); carto = null; cartoCache = {};
@@ -729,7 +731,28 @@ export function createScene(container) {
   }
   // What a mesh shows: its print colour when print colours are on, else its look.
   function applyMaterial(mesh) {
+    if (LAND.has(mesh.userData.id) && shown.terrain === false) { mesh.material = landAsApron(); return; }
     mesh.material = view.print && mesh.userData.printMaterial ? mesh.userData.printMaterial : lookMaterial(mesh);
+  }
+  // Terrain off: the model's land is not removed but drawn as land cover in the
+  // apron's colours (the apron's own painting, mapped onto the model), so the
+  // ground runs on with no hole; with no apron shown, the apron's land colour,
+  // flat (JC 26 Nov 2026). Screen only.
+  const LAND = new Set(['terrain', 'terrain-steep']);
+  const flatLand = {};
+  function landAsApron() {
+    const m = apron && contextActive() ? apron.modelMaterial() : null;
+    if (m) return m;
+    const P = PALETTES[view.look], hex = P.carto?.landBase || P.landBase;
+    if (!flatLand[hex]) {
+      const [r, g, b] = desaturate(hex);
+      flatLand[hex] = new THREE.MeshToonMaterial({ color: new THREE.Color().setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace), gradientMap: toonRamp() });
+    }
+    return flatLand[hex];
+  }
+  function applyLand() {
+    for (const k of LAND) if (meshes[k]) applyMaterial(meshes[k]);
+    if (screenT) screenT.mesh.material = shown.terrain === false ? landAsApron() : screenT.mat;
   }
   function disposeMesh(mesh) {
     mesh.geometry.dispose();
@@ -906,7 +929,7 @@ export function createScene(container) {
     if (!LOOKS[look] || look === view.look) return;
     view.look = look;
     INK.colour = PALETTES[look].ink;
-    if (carto && !lookDef(look).carto) { carto.tex?.dispose(); carto.tex = null; screenT && (screenT.mesh.material.map = null); }   // free the GPU copy
+    if (carto && !lookDef(look).carto) { carto.tex?.dispose(); carto.tex = null; screenT && (screenT.mat.map = null); }   // free the GPU copy
     for (const m of Object.values(meshes)) applyMaterial(m);
     props?.setLook(look); geology?.setLook(look); dc?.setLook(PALETTES[look]);
     refreshVisibility();

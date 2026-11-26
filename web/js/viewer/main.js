@@ -79,14 +79,34 @@ if (heights && (propsData || subsurface || contextData)) {
   studio.refreshGeology();
 }
 mountScaleRow(ul, scene, { text });
-// The proposed data centre, if the web app packed one (screen only; off unless it was on).
+// The proposed data centre and its application boundary, if the web app packed
+// them (screen only): layer rows after Buildings, as in the web app, with the
+// note under the layers.
 const dcData = json('datacentre');
-if (dcData?.plan) {
-  scene.setDatacentre(dcData.plan, { on: !!(v0.dc ?? dcData.on) });
-  const row = document.createElement('div');
-  row.innerHTML = `<label class="check"><input type="checkbox" name="dc"${scene.datacentreOn ? ' checked' : ''}> ${dcData.text.toggle}</label><p class="hint">${dcData.text.why}</p>`;
-  studio.part('modelSet').append(row);
-  row.querySelector('input').onchange = e => { scene.showDatacentre(e.target.checked); refreshDcCaption(); writeUrl(); };
+if (dcData) {
+  const esc = v => String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let at = ul.querySelector('input[data-layer="buildings"]')?.closest('li') || null;
+  const row = (name, why, swatchCSS, checked) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<label class="check"><input type="checkbox"${checked ? ' checked' : ''}><span class="swatch" style="${swatchCSS}"></span>${esc(name)}${whyButton(D.text?.['preview.why'] ?? 'Why this matters')}</label>
+      ${whyBox(`<p>${esc(why)}</p>`)}`;
+    if (at) at.after(li); else ul.append(li);
+    at = li; wireWhy(li);
+    return li.querySelector('input');
+  };
+  if (dcData.plan) {
+    scene.setDatacentre(dcData.plan, { on: !!(v0.dc ?? dcData.on) });
+    const on = row(dcData.text.toggle, dcData.text.toggleWhy || dcData.text.why, 'background:#d9d1bd;border:1.5px solid #2b2115;box-sizing:border-box', scene.datacentreOn);
+    on.name = 'dc';
+    on.onchange = () => { scene.showDatacentre(on.checked); refreshDcCaption(); writeUrl(); };
+  }
+  if (vectors?.boundary && dcData.text.boundary) {
+    scene.showBoundary(dcData.boundaryOn !== false);
+    const b = row(dcData.text.boundary, dcData.text.boundaryWhy, 'background:transparent;border:2.5px solid #e8452c;box-sizing:border-box', scene.boundaryOn);
+    b.name = 'boundary';
+    b.onchange = () => scene.showBoundary(b.checked);
+  }
+  if (dcData.plan && dcData.text.toggleWhy) ul.insertAdjacentElement('afterend', Object.assign(document.createElement('p'), { className: 'hint', textContent: dcData.text.why }));
 }
 function refreshDcCaption() {
   const el = $('dc-caption') || $('caption').insertAdjacentElement('afterend', Object.assign(document.createElement('p'), { id: 'dc-caption', className: 'hint' }));
