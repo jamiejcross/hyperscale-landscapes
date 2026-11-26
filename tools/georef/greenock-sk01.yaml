@@ -14,4 +14,7 @@ shapes:
      height_m: 18, height_basis: "max 18 m (Planning Statement 4.16)"}
   - {colours: [[248, 216, 176]], tol: 30, close_m: 12, open_m: 1, min_area_m2: 10000, merge: true, count: 1,
      name: "Potential developable area 2 (7.25 ha)", kind: developable area, evidence: indicative,
-     height_m: 18, height_basis: "max 18 m (Planning Statement 4.16)"}
+     height_m: 18, height_basis: "max 18 m (Planning Statement 4.16)",
+     # the cross-hatched "area to be raised" overlapping area 2 is not read by colour, so the
+     # trace comes out 2.6 % small; the earlier outline (72,606 m², stated 7.25 ha) is kept (JC, 26 Nov 2026)
+     keep_current: true}

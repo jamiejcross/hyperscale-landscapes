@@ -78,11 +78,11 @@
           "height_m": 28,
           "height_basis": "28 m above FFL (EIAR App. 9-2, via AECOM review)",
           "source": "P/26/0237/FUL, EIAR Fig. 3-1a General Arrangement Layout (WSP rev P06): data-centre block (data halls, galleries, generators); office wing excluded",
-          "area_m2": 33056,
-          "georeference": "fitted to council red line: 0.8 m RMS, rotation 0.0°, scale ×1.00",
+          "area_m2": 33224,
+          "georeference": "fitted to council red line: 0.6 m RMS, rotation -0.1°, scale ×1.00",
           "geometry": {
             "type": "MultiPolygon",
-            "coordinates": [[[[-3.8396339,56.0330147],[-3.8429911,56.0325569],[-3.843574,56.0338965],[-3.8402167,56.0343544],[-3.8396339,56.0330147]]]]
+            "coordinates": [[[[-3.8435582,56.0338993],[-3.8401909,56.0343551],[-3.8396108,56.0330114],[-3.8429779,56.0325557],[-3.8435582,56.0338993]]]]
           }
         },
         {
@@ -92,11 +92,11 @@
           "height_m": 28,
           "height_basis": "28 m above FFL (EIAR App. 9-2, via AECOM review)",
           "source": "P/26/0237/FUL, EIAR Fig. 3-1a General Arrangement Layout (WSP rev P06): data-centre block (data halls, galleries, generators); office wing excluded",
-          "area_m2": 14899,
-          "georeference": "fitted to council red line: 0.8 m RMS, rotation 0.0°, scale ×1.00",
+          "area_m2": 14974,
+          "georeference": "fitted to council red line: 0.6 m RMS, rotation -0.1°, scale ×1.00",
           "geometry": {
             "type": "MultiPolygon",
-            "coordinates": [[[[-3.8444135,56.0319211],[-3.842559,56.0309368],[-3.8435915,56.0303269],[-3.845446,56.0313113],[-3.8444135,56.0319211]]]]
+            "coordinates": [[[[-3.8435869,56.0303208],[-3.845443,56.0313095],[-3.8444059,56.0319198],[-3.8425499,56.0309312],[-3.8435869,56.0303208]]]]
           }
         }
       ],

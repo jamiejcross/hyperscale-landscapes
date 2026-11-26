@@ -201,20 +201,43 @@ def colour_mask(img: np.ndarray, colours, tol: int) -> np.ndarray:
     return mask
 
 
-def absorb_enclosed(img: np.ndarray, mask: np.ndarray, max_px: float, touch_px: int = 3) -> np.ndarray:
-    """Add to the mask the small white regions, enclosed by drawn lines, that touch it.
+def label_points(page, text: str, zoom: float) -> list[tuple[np.ndarray, float]]:
+    """Centres (rendered pixels) and heights (pt) of every occurrence of `text` on the page."""
+    import pymupdf
+    M = page.rotation_matrix
+    out = []
+    for r in page.search_for(text):
+        q = [pymupdf.Point(p) * M for p in (r.tl, r.br)]
+        c = np.array([(q[0].x + q[1].x) / 2, (q[0].y + q[1].y) / 2]) * zoom
+        out.append((c, min(abs(q[1].x - q[0].x), abs(q[1].y - q[0].y))))
+    return out
 
-    Chapelcross's outer plant-zone strips are unfilled (white) areas outlined beside each
-    building; they belong to the building's extent. Roads and open ground are large
-    connected white regions and are left out by the size limit.
+
+def absorb_labelled(img: np.ndarray, mask: np.ndarray, labels, max_px: float, seal_px: int = 0) -> np.ndarray:
+    """Add to the mask the unfilled (white) regions, enclosed by drawn lines, that carry a label.
+
+    Chapelcross's outer plant-zone strips are outlined but not filled; the drawing says what
+    they are by labelling them "PLANT ZONE". A white region is taken only when a label sits
+    in it and it is small (roads and open ground are large connected regions).
     """
     import cv2
     white = (img.min(-1) >= 244).astype(np.uint8)
-    n, lab, stats, _ = cv2.connectedComponentsWithStats(white, connectivity=4)
-    near = cv2.dilate(mask.astype(np.uint8), np.ones((2 * touch_px + 1,) * 2, np.uint8)) > 0
-    hit = np.unique(lab[near & (white > 0)])
-    small = [i for i in hit if i > 0 and stats[i, cv2.CC_STAT_AREA] <= max_px]
-    return mask | np.isin(lab, small)
+    if seal_px:   # close small gaps in the drawn lines so regions don't leak into each other
+        white = cv2.erode(white, np.ones((2 * seal_px + 1,) * 2, np.uint8))
+    _, lab, stats, _ = cv2.connectedComponentsWithStats(white, connectivity=4)
+    take = set()
+    h, w = white.shape
+    for (cx, cy), size in labels:
+        r = max(2, int(size * 1.5))                       # look just around the glyphs
+        y0, y1, x0, x1 = max(0, int(cy) - r), min(h, int(cy) + r), max(0, int(cx) - r), min(w, int(cx) + r)
+        ids, n = np.unique(lab[y0:y1, x0:x1], return_counts=True)
+        cand = [(c, i) for i, c in zip(ids, n) if i > 0 and stats[i, cv2.CC_STAT_AREA] <= max_px]
+        if cand:
+            take.add(max(cand)[1])
+    got = np.isin(lab, sorted(take)).astype(np.uint8)
+    if seal_px:
+        got = cv2.dilate(got, np.ones((2 * seal_px + 1,) * 2, np.uint8))
+    return mask | (got > 0)
 
 
 def mask_polygons(mask: np.ndarray, px_per_m: float, close_m: float, open_m: float = 0.0) -> list:
@@ -282,8 +305,10 @@ def run(conf: dict, zones_by_id: dict | None = None, zoom: float | None = None, 
     feats, shapes = [], []
     for spec in conf["shapes"]:
         mask = colour_mask(img, spec["colours"], spec.get("tol", 6))
-        if spec.get("absorb_enclosed_m2"):
-            mask = absorb_enclosed(img, mask, spec["absorb_enclosed_m2"] * px_per_m ** 2)
+        if spec.get("absorb_labelled"):
+            a = spec["absorb_labelled"]
+            mask = absorb_labelled(img, mask, label_points(page, a["text"], zoom), a["max_m2"] * px_per_m ** 2,
+                                   seal_px=a.get("seal_px", 0))
         polys = []
         for c in mask_polygons(mask, px_per_m, spec.get("close_m", 2.0), spec.get("open_m", 0.0)):
             g = Polygon(fit.page_to_world(c / zoom))
@@ -391,6 +416,11 @@ def write_features(new_by_conf: dict[str, list], confs: dict[str, dict]) -> None
     """Replace, in datacentre-sites.geojson, the features each drawing produces (same site and source)."""
     doc = json.loads(SITES.read_text())
     for cid, feats in new_by_conf.items():
+        # shapes marked keep_current keep the feature already in the file (same site and name)
+        kept = {(confs[cid]["site"], s["name"]) for s in confs[cid]["shapes"] if s.get("keep_current")}
+        old = {(f["properties"]["site"], f["properties"].get("name")): f for f in doc["features"]}
+        feats = [old.get((f["properties"]["site"], f["properties"].get("name")), f)
+                 if (f["properties"]["site"], f["properties"].get("name")) in kept else f for f in feats]
         srcs = {f["properties"]["source"] for f in feats} | \
                {s.get("source", confs[cid]["source"]) for s in confs[cid]["shapes"]}
         site = confs[cid]["site"]

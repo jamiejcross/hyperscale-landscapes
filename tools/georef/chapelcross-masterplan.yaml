@@ -11,6 +11,8 @@ source: "26/1649/PIP Indicative Masterplan CX-ARC-XX-ZZ-DR-A-1001 P01 (1:2500)"
 shapes:
   - colours: [[200, 200, 200], [240, 232, 224]]
     tol: 6
+    # outer plant-zone strips are outlined but unfilled; take those the drawing labels
+    absorb_labelled: {text: PLANT ZONE, max_m2: 8000, seal_px: 2}
     close_m: 4
     min_area_m2: 4000
     order: west_to_east
