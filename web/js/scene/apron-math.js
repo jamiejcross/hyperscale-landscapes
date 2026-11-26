@@ -21,12 +21,12 @@ export const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - 
 // Distance (same units as the arguments) from (x, y) to the model rectangle; 0 inside.
 export const distOutside = (x, y, Wmm, Hmm) => Math.hypot(Math.max(0, -x, x - Wmm), Math.max(0, -y, y - Hmm));
 // How far the land has faded toward the background at distance d outside the
-// model: none at the edge (the land runs on from the model), 88% at the pad.
-export const LAND_FADE_MAX = 0.88;
+// model: none at the edge (the land runs on from the model), 50% at the pad.
+export const LAND_FADE_MAX = 0.5;      // JC, 26 Nov 2026: much lighter haze (was 0.88); the land stays legible
 export const landFade = (d, pad) => LAND_FADE_MAX * smoothstep(0, pad, d);
 // The first stretch of the apron blends from the model's own land colour at
 // its edge into the apron's landscape colour (a fraction of the pad).
-export const EDGE_BLEND = 0.2;
+export const EDGE_BLEND = 0.04;        // JC, 26 Nov 2026: only enough to hide the seam (was 0.2: it carried the model's land cover ~300 m out)
 export const edgeBlend = (d, pad) => smoothstep(0, EDGE_BLEND * pad, d);
 // Lines and symbols fade more weakly (at most 45%).
 export const LINE_FADE_MAX = 0.45;

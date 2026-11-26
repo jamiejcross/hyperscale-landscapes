@@ -112,7 +112,11 @@ export function createPits({ sub, grid, heights, terrain, coal = '#15110e' }) {
 
   // Draw one class (coal, unknown, quarry) or not.
   function setShown(cls, on) { if (cls in show && show[cls] !== !!on) { show[cls] = !!on; build(); } }
-  function setVisible(on) { group.visible = !!on; lastKey = ''; }
+  // The pits' name labels and threads (the squares are painted on the drape) follow
+  // the pits layer and the Labels layer.
+  let shownOn = true, labelsOn = false;
+  function setVisible(on) { shownOn = !!on; group.visible = shownOn && labelsOn; lastKey = ''; }
+  function setLabels(on) { labelsOn = !!on; group.visible = shownOn && labelsOn; lastKey = ''; }
   function dispose() {
     for (const L of labels) { L.sp.material.map.dispose(); L.sp.material.dispose(); L.lines.geometry.dispose(); }
     threadMat.dispose(); group.removeFromParent();
@@ -122,7 +126,7 @@ export function createPits({ sub, grid, heights, terrain, coal = '#15110e' }) {
     coal: all.filter(p => displayClass(p) === 'coal').length, unknown: all.filter(p => displayClass(p) === 'unknown').length,
     quarry: all.filter(p => displayClass(p) === 'quarry').length,
   };
-  return { group, paint, layout, setShown, setVisible, dispose, counts,
+  return { group, paint, layout, setShown, setVisible, setLabels, dispose, counts,
     get labels() { return labels.length; }, get shown() { return { ...show }; },
     get anyShown() { return Object.entries(show).some(([k, v]) => v && counts[k]); } };
 }

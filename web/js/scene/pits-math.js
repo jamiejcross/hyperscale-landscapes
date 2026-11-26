@@ -24,7 +24,7 @@ export function pitNote(cls, year, sharedName = false, byName = false) {
   if (cls === 'coal' && !year && byName) return 'colliery · no mine plan matched';
   if (cls === 'coal') return year ? `coal mine · abandoned ${year}` : 'coal mine';
   if (cls === 'quarry') return sharedName ? 'quarry · name also on a coal mine plan' : 'quarry';
-  return 'mine or quarry · type unknown';
+  return 'quarry · type not recorded';
 }
 
 // Which classes are drawn by default: coal mines and pits of unknown type on,

@@ -52,7 +52,8 @@ a:hover { color: var(--spot); }
 header.site, main, footer.site { max-width: 1280px; margin: 0 auto; padding: 0 var(--gutter); }
 
 header.site { padding-top: 2.5rem; padding-bottom: 2rem; border-bottom: 1px solid var(--rule); }
-header.site .logo { display: block; width: 100%; max-width: 20rem; height: auto; margin: 1.5rem 0 0; }   /* half size, below the subtitle */
+header.site .header-logos { display: flex; align-items: center; gap: 1rem; margin-top: 1.5rem; }   /* CC licence, then the logo, on one line below the subtitle */
+header.site .logo { display: block; width: 100%; max-width: 20rem; min-width: 0; height: auto; margin: 0; }   /* half size */
 header.site h1 { font-size: clamp(1.5rem, 7vw, 5.5rem); font-weight: 700; line-height: .95; letter-spacing: -0.035em; margin: 0; white-space: nowrap; }   /* one line */
 header.site p { font-size: clamp(1.05rem, 1.8vw, 1.35rem); line-height: 1.3; margin: 1.25rem 0 0; }
 @media (min-width: 48rem) { header.site p { white-space: nowrap; } }   /* one line; phones may wrap */
@@ -148,6 +149,14 @@ label.file input { display: block; margin-top: .25rem; }
 .studio .range { display: grid; grid-template-columns: 6.5rem 1fr 3.4rem; align-items: center; gap: .5rem; }
 .studio .range output { color: var(--grey); font-variant-numeric: tabular-nums; text-align: right; font-size: .85rem; }
 .studio input[type=range] { width: 100%; }
+/* Style (moved from the studio to the layers panel) and the context views */
+#style-slot fieldset { border: 0; padding: 0; margin: 1rem 0 0; min-width: 0; }
+#style-slot legend { font-weight: 700; font-size: 1rem; padding: 0; margin-bottom: .35rem; }
+#style-slot .range { display: grid; grid-template-columns: 4.5rem 1fr 3.4rem; align-items: center; gap: .5rem; }
+#style-slot .range output { color: var(--grey); font-variant-numeric: tabular-nums; text-align: right; font-size: .85rem; }
+#style-slot input[type=range], #style-slot select { width: 100%; }
+#context-slot h3 { margin-top: 0; }
+.layers-note { margin-top: .5rem; }
 .section-figure { margin: 1rem 0 0; overflow-x: auto; }
 .section-figure svg { width: 100%; height: auto; display: block; border: 1px solid var(--ink); }
 .before-after { margin: 1rem 0 0; }
@@ -159,7 +168,7 @@ label.file input { display: block; margin-top: .25rem; }
 
 footer.site { padding-top: 1.5rem; padding-bottom: 3rem; font-size: .85rem; color: var(--grey); }
 footer.site p { margin: 0; max-width: none; }
-header.site .cc { display: inline-block; margin-top: .75rem; }
+header.site .cc { display: block; flex: none; }
 header.site .cc img, footer.site .logos a img { display: block; width: 88px; height: 31px; }
 footer.site .logos { display: flex; flex-wrap: wrap; align-items: center; gap: 1.25rem; margin-bottom: 1rem; }
 footer.site .logos > img { width: 100%; max-width: 14rem; height: auto; }

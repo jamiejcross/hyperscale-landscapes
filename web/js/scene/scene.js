@@ -176,7 +176,7 @@ export function createScene(container) {
       [scene.fog.near, scene.fog.far] = hazeRange(camera.position.distanceTo(controls.target), PALETTES.anthropogenic.carto);
     }
     renderer.render(scene, camera);
-    if (stylisedLook(view.look) && view.ink && lookDef(view.look).inkPass !== false) ink.render(scene, camera, { hide: [ground, ...INKLESS.map(id => meshes[id]).filter(Boolean), ...(props?.parts.lines || []), ...(props?.parts.trees || []), ...(pits ? [pits.group] : []), ...(apron ? apron.inkHide : [])], joinApron: !!apron && apronOn && apron.root.visible });
+    if (stylisedLook(view.look) && view.ink && lookDef(view.look).inkPass !== false) ink.render(scene, camera, { hide: [ground, ...INKLESS.map(id => meshes[id]).filter(Boolean), ...(props?.parts.lines || []), ...(props?.parts.trees || []), ...(pits ? [pits.group] : []), ...(apron ? apron.inkHide : [])], joinApron: !!apron && (apronOn || energyOn) && apron.root.visible });
   }
 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.28 }));
@@ -442,12 +442,16 @@ export function createScene(container) {
     const at = heightSampler(grid, heights);
     apron = createApron({ context, bbox, grid, relief, edgeZ: at, maxTexture: renderer.capabilities.maxTextureSize, ramp: toonRamp });
     ctxInner.add(apron.root);
+    apron.setLabels(labelsOn);
     apronEdge = 'print';
     refreshApron();
     return apron.stats;
   }
   function showContext(on) { apronOn = !!on; refreshApron(); }          // Landscape Context
   function showEnergy(on) { energyOn = !!on; refreshApron(); }          // Energy Context: pylons, poles and lines only
+  // The Labels layer: the pits' name labels and the context's place names (screen and saved images).
+  let labelsOn = false;                     // off by default (JC, 26 Nov 2026)
+  function showLabels(on) { labelsOn = !!on; pits?.setLabels(labelsOn); apron?.setLabels(labelsOn); }
   const contextActive = () => !!apron && (apronOn || energyOn) && stylised();
   // The camera's lowest elevation follows the context: above the terrain while it is shown.
   function applyCameraLimits() {
@@ -637,8 +641,8 @@ export function createScene(container) {
   }
   // Caption small print for the look, generated from what is drawn.
   function lookNotes() {
-    const ctx = apron && apronOn && stylised() ? [`landscape context round the model (not printed): ${apron.attribution.replace(/^Elevation: /, '')}; ${apron.osmAttribution}`]
-      : apron && energyOn && stylised() && apron.stats.supports ? [`energy context round the model (not printed): pylons, poles and lines, ${apron.osmAttribution}`] : [];
+    const ctx = apron && apronOn && stylised() ? [`terrain round the model (context, not printed): ${apron.attribution.replace(/^Elevation: /, '')}; ${apron.osmAttribution}`]
+      : apron && energyOn && stylised() && apron.stats.supports ? [`electricity grid round the model (context, not printed): pylons, poles and lines, ${apron.osmAttribution}`] : [];
     if (!cartoActive()) {
       const cl = view.contours && drapeKind !== 'contours' && stylised() && waterCache.contours;
       return [...(cl ? [`contours every ${cl.interval} m (heavier every ${cl.indexInterval} m) from the elevation data`] : []), ...ctx];
@@ -879,7 +883,7 @@ export function createScene(container) {
       pits = createPits({ sub, grid, heights, terrain: terr.geometry.attributes.position.array, coal: EVIDENCE.coal });
       if (pits) inner.add(pits.group);
     }
-    pitsOn = on; pits?.setVisible(on);
+    pitsOn = on; pits?.setVisible(on); pits?.setLabels(labelsOn);
     repaintDrapes();
     return pits ? { ...pits.counts, labels: pits.labels } : null;
   }
@@ -1073,7 +1077,7 @@ export function createScene(container) {
   }
   function orbitEnd() { if (orbitBase) camera.position.copy(orbitBase.pos); camera.lookAt(controls.target); orbitBase = null; }
 
-  return { renderer, scene, camera, controls, view, meshes, focalMm, setContext, showContext, showEnergy, contextInfo, showScaleBar, get scaleBarOn() { return scaleOn; }, get apron() { return apron; }, setModel, setDrape, setLook, setVisible, setView, setSpin,
+  return { renderer, scene, camera, controls, view, meshes, focalMm, setContext, showContext, showEnergy, showLabels, get labelsOn() { return labelsOn; }, contextInfo, showScaleBar, get scaleBarOn() { return scaleOn; }, get apron() { return apron; }, setModel, setDrape, setLook, setVisible, setView, setSpin,
     cameraAngles, setCameraAngles, setInkWidth, setBrushwork,
     setSun, setFov, setHeightScale, setBackground, setPrintColours, setScreenColours, setShadow, grab,
     pause, resume, renderAt, orbitStart, orbitTo, orbitEnd, setCarto, setMist, setContours, lookNotes, cartoInfo, electricity, setGeology, showGeology, setGeologyLabels, setPits, showPits, showPitClass, get geology() { return (geology || pits) && { walls: !!geology, panel: geology?.panel, on: geologyOn, shown: !!geology?.mesh.visible || (!!pits && pitsOn && pits.anyShown), attribution: geology?.attribution ?? pitsMeta.attribution, sub: geology?.sub ?? pitsMeta.sub, instance: geology, nonCommercial: geology ? geology.nonCommercial : pitsMeta.nonCommercial }; }, setProps, setPropsVisible, setTreeFactor, get props() { return props; }, get pits() { return pits; } };

@@ -43,3 +43,10 @@ test('guthrie style round-trips through the URL', () => {
   assert.deepEqual(parseView(s), { site: 'auchtertool-cato', style: 'guthrie', az: 225, el: 30 });
 });
 
+
+test('context view and labels round-trip; defaults stay out of the URL', () => {
+  assert.deepEqual(parseView('?ctx=energy&labels=1'), { ctx: 'energy', labels: true });
+  assert.deepEqual(parseView('?ctx=off&labels=2'), {});
+  assert.equal(viewSearch('', { ctx: 'geology', labels: true }), '?ctx=geology&labels=1');
+  assert.equal(viewSearch('?ctx=energy&labels=1', { ctx: null, labels: false }), '');
+});

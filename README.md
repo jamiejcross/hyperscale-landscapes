@@ -38,15 +38,17 @@ draw an area, and preview it in 3D. From there you can:
   browser, works offline, and can be emailed;
 - download a **print file** for a 3D printer.
 
-Round each curated site the preview can show about 1.6 km beyond the model.
-**Landscape Context** is the land, with the main roads, railways, water,
-buildings and place names, running on from the model's edge and fading with
-distance. **Energy Context** is the electricity network: pylons, poles and
-overhead lines. Both are on screen only and never part of the print. While
-either is on, the camera stays above the ground and the model's soil sides and
-geology walls are switched off; turn both off to see the block and its geology.
+The **Context views** at the top of the layers panel show one view at a time,
+on screen only and never in the print. **Terrain** (the default) is the land
+about 1.6 km beyond the model, with the main roads, railways, water, buildings
+and place names, running on from the model's edge with a light fade.
+**Electricity Grid** is the electricity network: pylons, poles and overhead
+lines, with the model's edge fading into the background in the same way. With
+either, the camera stays above the ground and the soil sides and geology walls
+are off. **Geological** shows the model as a block of ground, with its soil
+sides and geology walls. Labels are a separate layer, off by default.
 
-![Auchtertool with the Landscape and Energy Context on](docs/img/auchtertool-context.png)
+![Auchtertool in the Terrain view](docs/img/auchtertool-context.png)
 
 The preview offers a land-cover map or open satellite imagery (Sentinel-2,
 10 m) as the surface. It all runs in

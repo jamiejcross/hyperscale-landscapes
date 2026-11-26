@@ -190,8 +190,8 @@ export function legendItems({ geology, look, pitsShown = { coal: true, unknown: 
     site.push(deepest.depth >= 10 ? tx('geology.note.boreholes.deepest', { n: LG.boreholes.length, ref: deepest.ref, depth: +deepest.depth.toFixed(1) })
       : tx('geology.note.boreholes', { n: LG.boreholes.length }));
   }
-  // historic coal mines, historic quarries, then type unknown (the layer list's order)
-  const PIT = { coal: 'Historic coal mine (BritPits)', quarry: 'Historic quarry (BritPits)', unknown: 'Mine or quarry, type unknown (BritPits)' };
+  // coal mines, then quarries, then quarries whose type is not recorded (the layer list's order)
+  const PIT = { coal: 'Coal mine (BritPits)', quarry: 'Quarry (BritPits)', unknown: 'Quarry, type not recorded (BritPits)' };
   for (const [cls, label] of Object.entries(PIT)) {
     const names = LG.pits[cls]; if (!names.length) continue;
     items.push({ mark: cls, text: label });

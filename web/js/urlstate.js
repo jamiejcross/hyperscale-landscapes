@@ -1,5 +1,6 @@
 // Shareable view state in the page URL:
-//   ?site=<id>&style=guthrie|field|anthropogenic&az=<deg>&el=<deg>
+//   ?site=<id>&style=guthrie|field|anthropogenic&az=<deg>&el=<deg>&ctx=landscape|energy|geology&labels=1
+// (ctx: the context view; labels=1: labels shown, off by default)
 // (style=mossmorran, from links made before that look was retired, opens as guthrie)
 // az and el are the CAMERA's angles as seen from the model's centre: az is
 // the compass bearing the camera stands at (clockwise from north, so 135 is
@@ -9,6 +10,7 @@
 // test this file directly.
 
 export const STYLES = ['guthrie', 'field', 'anthropogenic'];
+export const CONTEXT_VIEWS = ['landscape', 'energy', 'geology'];
 const RETIRED = { mossmorran: 'guthrie' };
 export const EL_MIN = 0, EL_MAX = 90;
 const SITE_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
@@ -27,6 +29,10 @@ export function parseView(search) {
   if (Number.isFinite(az)) out.az = round1(((az % 360) + 360) % 360);
   const el = num(p.get('el'));
   if (Number.isFinite(el)) out.el = round1(Math.min(EL_MAX, Math.max(EL_MIN, el)));
+  const ctx = p.get('ctx');
+  if (CONTEXT_VIEWS.includes(ctx)) out.ctx = ctx;
+  if (p.get('labels') === '1') out.labels = true;
+  else if (p.get('labels') === '0') out.labels = false;
   return out;
 }
 
@@ -34,9 +40,10 @@ export function parseView(search) {
 // A key set to null or undefined is removed.
 export function viewSearch(search, view) {
   const p = new URLSearchParams(search);
-  for (const k of ['site', 'style', 'az', 'el']) {
+  for (const k of ['site', 'style', 'az', 'el', 'ctx', 'labels']) {
     if (!(k in view)) continue;
     const v = view[k];
+    if (k === 'labels') { if (v === true) p.set(k, '1'); else p.delete(k); continue; }
     if (v === null || v === undefined || (typeof v === 'number' && !Number.isFinite(v))) { p.delete(k); continue; }
     if (k === 'az') p.set(k, String(Math.round(((v % 360) + 360) % 360)));
     else if (k === 'el') p.set(k, String(Math.round(Math.min(EL_MAX, Math.max(EL_MIN, v)))));

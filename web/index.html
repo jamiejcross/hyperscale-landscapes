@@ -23,8 +23,10 @@
 <header class="site">
   <h1 data-i18n="app.title">Hyperscale Landscapes</h1>
   <p data-i18n="app.tagline"></p>
-  <img class="logo" src="img/ai-planetary-resources.webp" width="2000" height="281" alt="AI uses Human Labour and Planetary Resources">
-  <a class="cc" href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="license"><img src="img/cc-by-nc-sa.svg" width="88" height="31" alt="Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International licence"></a>
+  <div class="header-logos">
+    <a class="cc" href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="license"><img src="img/cc-by-nc-sa.svg" width="88" height="31" alt="Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International licence"></a>
+    <img class="logo" src="img/ai-planetary-resources.webp" width="2000" height="281" alt="AI uses Human Labour and Planetary Resources">
+  </div>
 </header>
 
 <main id="main">
@@ -93,15 +95,18 @@
     <div id="view" class="view"></div>
     <details class="studio-wrap" id="layers-panel" open>
       <summary>Layers, surface and background</summary>
+      <p class="hint layers-note">Options to change how the model is drawn on screen as well as in exported or download images. Files for 3D printing are not affected.</p>
       <div class="layers layers-panel">
         <div>
           <h3 data-i18n="preview.layers"></h3>
           <ul id="layer-list"></ul>
         </div>
         <div>
+          <div id="context-slot"></div>
           <h3><label for="surface">Surface</label></h3>
           <select id="surface"></select>
           <p id="surface-note" class="hint" aria-live="polite"></p>
+          <div id="style-slot"></div>
         </div>
       </div>
     </details>
@@ -114,7 +119,7 @@
       <p id="caption" class="caption"></p>
     </details>
     <details class="studio-wrap" open>
-      <summary>Studio: style, camera, light and model</summary>
+      <summary>Studio: camera, light and model</summary>
       <div id="studio"></div>
     </details>
     <details class="studio-wrap" id="section-panel">

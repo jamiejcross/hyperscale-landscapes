@@ -73,10 +73,10 @@ test('heights follow the model mapping and are held above the ground plane', () 
   assert.ok(lo >= 0.3 - 1e-6 && m.stats.clamped > 0);
 });
 
-test('fades: land none at the edge to 0.88 at the pad; edge blend over the first 20%; lines at most 45%', () => {
+test('fades: land none at the edge to 0.5 at the pad; edge blend over the first 4%; lines at most 45%', () => {
   assert.equal(landFade(0, 100), 0);
-  assert.equal(edgeBlend(0, 100), 0); assert.equal(edgeBlend(20, 100), 1); assert.ok(edgeBlend(10, 100) > 0 && edgeBlend(10, 100) < 1);
-  assert.ok(Math.abs(landFade(100, 100) - 0.88) < 1e-9 && Math.abs(landFade(1e6, 100) - 0.88) < 1e-9);
+  assert.equal(edgeBlend(0, 100), 0); assert.equal(edgeBlend(4, 100), 1); assert.ok(edgeBlend(2, 100) > 0 && edgeBlend(2, 100) < 1);
+  assert.ok(Math.abs(landFade(100, 100) - 0.5) < 1e-9 && Math.abs(landFade(1e6, 100) - 0.5) < 1e-9);
   assert.equal(lineFade(0, 100), 0);
   assert.ok(Math.abs(lineFade(100, 100) - 0.45) < 1e-9);
   assert.equal(distOutside(5, 5, 10, 10), 0);

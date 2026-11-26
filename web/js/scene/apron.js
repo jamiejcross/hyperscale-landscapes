@@ -136,8 +136,10 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
   let painted = null;
   // look: the palette (PALETTES[look]); carto: Anthropogenic's carto palette or
   // null; bgHex: the colour the land fades toward (the background's horizon).
-  function paint({ P, carto: C = null, bgHex, drapeW, show = {}, edge = null }) {
-    const key = JSON.stringify([P.landBase, bgHex, !!C, drapeW, show, edge?.key || null]);
+  // bare: Energy Context on its own: no land, routes or water; the model's edge
+  // colour gives way to the background over the same distance as the land does.
+  function paint({ P, carto: C = null, bgHex, drapeW, show = {}, edge = null, bare = false }) {
+    const key = JSON.stringify([P.landBase, bgHex, !!C, drapeW, show, edge?.key || null, bare]);
     const fromEdge = edgeColour(edge);
     if (painted === key) return null;
     const t1 = performance.now();
@@ -150,8 +152,8 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
       const c = Math.round((x / mmPerM - E.x0_m) / E.dx_m), r = Math.round((E.y_top_m - y / mmPerM) / E.dy_m);
       const q = Math.min(E.h - 1, Math.max(0, r)) * E.w + Math.min(E.w - 1, Math.max(0, c));
       const dd = distOutside(x, y, Wmm, Hmm);
-      let col = z[q] <= 0.05 ? sea : base;
-      if (rAlpha) { const s = shade[q] / 255; col = col.map(v => v * (1 - rAlpha + rAlpha * s)); }   // the carto look's baked relief
+      let col = bare ? bgc : z[q] <= 0.05 ? sea : base;
+      if (rAlpha && !bare) { const s = shade[q] / 255; col = col.map(v => v * (1 - rAlpha + rAlpha * s)); }   // the carto look's baked relief
       if (fromEdge) col = mixRGB(fromEdge(x, y), col, edgeBlend(dd, padMm));      // the model's land runs on, then gives way
       col = mixRGB(col, bgc, landFade(dd, padMm));
       const o = 4 * (j * LW + i); d[o] = col[0]; d[o + 1] = col[1]; d[o + 2] = col[2]; d[o + 3] = 255;
@@ -159,6 +161,7 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
     g0.putImageData(img, 0, 0);
     const g = canvas.getContext('2d');
     g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingQuality = 'high'; g.drawImage(land, 0, 0, CW, CH);
+    if (bare) { tex.needsUpdate = true; painted = key; return { ms: Math.round(performance.now() - t1), size: [CW, CH] }; }
     // 2. infrastructure on a layer: drawn as on the model, cut at the model edge, faded (weaker)
     const L = layer.getContext('2d');
     L.setTransform(1, 0, 0, 1, 0, 0); L.clearRect(0, 0, CW, CH);
@@ -198,6 +201,7 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
   // ---- materials, per look ----
   const mats = {};
   function material(look, lit) {
+    look = `${look}|${lit ? 'lit' : 'flat'}`;
     if (!mats[look]) mats[look] = lit ? new THREE.MeshToonMaterial({ map: tex, gradientMap: ramp?.() }) : new THREE.MeshBasicMaterial({ map: tex });
     return mats[look];
   }
@@ -264,6 +268,7 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
 
   // ---- labels: place and landuse names, in the pit labels' style ----
   const labelGroup = new THREE.Group(); labelGroup.name = 'context-labels'; root.add(labelGroup);
+  let labelsOn = false, landShown = true;     // the Labels layer; Landscape Context shown
   const threadMat = new THREE.LineBasicMaterial({ color: '#15110e', transparent: true, opacity: 0.6, fog: false });
   const labels = names.map(n => {
     const note = NAME_NOTES[n.kind] || n.kind;
@@ -314,11 +319,13 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
   // parts: { land, energy }: Landscape Context (the land, routes, water, buildings
   // and names) and Energy Context (pylons, poles and lines, 3D or glyphs).
   function setLook(look, { P, C = null, lit = true, useGlyphs = false, bgHex, drapeW, anisotropy = 8, show = {}, parts = { land: true, energy: true }, edge = null }) {
-    const land = parts.land !== false, energy = parts.energy !== false;
-    mesh.material = material(look, lit);
-    mesh.visible = labelGroup.visible = land;
+    const land = parts.land !== false, energy = parts.energy !== false, bare = !land && energy;
+    // bare (Energy Context alone): a flat, unlit surface in the background colour,
+    // so only the model's edge fade shows, not the shape of the land
+    mesh.material = material(look, lit && !bare);
+    mesh.visible = land || bare; labelGroup.visible = land && labelsOn; landShown = land;
     // power lines painted on the land belong to the Energy Context
-    const stats = land ? paint({ P, carto: useGlyphs ? C : null, bgHex, drapeW, show: { ...show, power: energy && show.power !== false }, edge }) : null;
+    const stats = land || bare ? paint({ P, carto: useGlyphs ? C : null, bgHex, drapeW, show: { ...show, power: energy && show.power !== false }, edge, bare }) : null;
     border.material.color.set(P.ink);
     if (!supMats[look]) supMats[look] = new THREE.MeshToonMaterial({ color: P.props?.pylon || '#5a5a55', gradientMap: ramp?.() });
     for (const im of [towers, poles]) if (im) im.material = supMats[look];
@@ -330,6 +337,8 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
     return stats;
   }
   function setVisible(on) { root.visible = !!on; lastKey = ''; }
+  // The place and landuse name labels on or off (the Labels layer).
+  function setLabels(on) { labelsOn = !!on; labelGroup.visible = landShown && labelsOn; lastKey = ''; }
   function dispose() {
     root.traverse(o => { o.geometry?.dispose(); if (o.material && o.isSprite) { o.material.map?.dispose(); o.material.dispose(); } });
     for (const mt of [...Object.values(mats), ...Object.values(supMats), border.material, threadMat, wires?.material]) mt?.dispose();
@@ -341,7 +350,7 @@ export function createApron({ context, bbox, grid, relief, edgeZ, maxTexture = 4
     supports: sup.length, wireSegments: wirePos.length / 6, labels: labels.length, features: Object.fromEntries(Object.entries(V).map(([k, a]) => [k, a.length])),
   };
   const inkHide = [labelGroup, ...(wires ? [wires] : [])];
-  return { root, mesh, border, inkHide, setLook, setVisible, setEdge, layout, dispose, stats, zAt,
+  return { root, mesh, border, inkHide, setLook, setVisible, setLabels, setEdge, layout, dispose, stats, zAt,
     get glyphs() { return glyphs; }, get layoutItems() { return lastItems; }, pad_m: context.pad_m, source: E.source, attribution: E.attribution, osmAttribution: context.osm?.attribution,
     offset_m: E.offset_m, names: labels.map(L => L.n.name) };
 }

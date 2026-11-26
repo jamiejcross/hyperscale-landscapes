@@ -5,7 +5,8 @@
 import { EVIDENCE } from './palettes.js';
 
 // Strings the extras use (keys of data/i18n); the offline viewer carries them resolved.
-export const EXTRAS_KEYS = ['preview.why', 'context.layer', 'context.layer.why', 'energy.layer', 'energy.layer.why',  'layer.scale', 'layer.scale.why', 'layer.electricity', 'layer.electricity.why', 'props.trees', 'props.trees.why', 'props.trees.height', 'props.turbines', 'props.turbines.why',
+export const EXTRAS_KEYS = ['preview.why', 'context.layer', 'context.layer.why', 'energy.layer', 'energy.layer.why', 'geology.view',
+  'views.title', 'layer.labels', 'layer.labels.why', 'pits.quarries', 'pits.quarries.why', 'layer.scale', 'layer.scale.why', 'layer.electricity', 'layer.electricity.why', 'props.trees', 'props.trees.why', 'props.trees.height', 'props.turbines', 'props.turbines.why',
   'props.pylons', 'props.pylons.why', 'pits.coal', 'pits.coal.why', 'pits.unknown', 'pits.unknown.why', 'pits.quarry', 'pits.quarry.why'];
 
 // ul: the layer list; props / subsurface: the bundle's sections (or null);
@@ -26,10 +27,9 @@ export function wireWhy(root) {
   }
 }
 
-// Soil sides and Geology walls as they were before a context row switched them off (per layer list).
-const SAVED = new WeakMap();
 // treeSlot: where the tree-height slider goes (the studio's Model fieldset), else the Trees row.
-export function mountExtras(ul, scene, { props, subsurface, grid, heights, zExag, seed, text, onChange = () => {}, treeSlot = null, context = null, bbox = null, relief = null }) {
+export function mountExtras(ul, scene, { props, subsurface, grid, heights, zExag, seed, text, onChange = () => {}, treeSlot = null, context = null, bbox = null, relief = null,
+  contextSlot = null, contextView = null, onContextView = () => {}, labels = false, onLabels = () => {} }) {
   treeSlot?.querySelector('[data-tree-factor]')?.parentElement.remove();   // a rebuild: drop the last model's slider
   const pc = scene.setProps(props, { grid, heights, zExag, seed });
   // Turbines, pylons and lines have no rows of their own: the "Electricity
@@ -67,57 +67,68 @@ export function mountExtras(ul, scene, { props, subsurface, grid, heights, zExag
   if (tf) tf.oninput = () => { scene.setTreeFactor(+tf.value); const o = tf.parentElement.querySelector('output'); o.textContent = `${o.dataset.x || ''}${tf.value}`; };
 
   // Geology walls (on by default where there are samples), then the pits:
-  // one row per class (BGS BritPits), each with its own toggle; quarries start off.
+  // Coal mines, then Quarries (BritPits quarries and the records whose type is
+  // not given, each still drawn with its own square), each row with its own toggle.
   scene.setGeology(subsurface, { grid, zExag, on: true });
   const pitCounts = scene.setPits(subsurface, { grid, heights, on: true });
-  const PIT_SWATCH = {
-    coal: `background:${EVIDENCE.coal}`,
-    unknown: `background:#fffaec;outline:1.5px dashed ${EVIDENCE.coal};outline-offset:-1.5px`,
-    quarry: `background:#fffaec;outline:1.5px solid ${EVIDENCE.coal};outline-offset:-1.5px`,
-  };
-  for (const cls of ['coal', 'quarry', 'unknown']) {     // historic coal mines, historic quarries, then type unknown
-    if (!pitCounts?.[cls]) continue;
-    const on = scene.pits.shown[cls], li = document.createElement('li');
-    li.innerHTML = `<label class="check"><input type="checkbox"${on ? ' checked' : ''} data-pits="${cls}"><span class="swatch" style="${PIT_SWATCH[cls]}"></span>${text(`pits.${cls}`)} (${pitCounts[cls]})${whyButton(text('preview.why'))}</label>
-      ${whyBox(`<p>${text(`pits.${cls}.why`)}</p>`)}`;
+  const PIT_ROWS = [['coal', ['coal'], `background:${EVIDENCE.coal}`],
+    ['quarries', ['quarry', 'unknown'], `background:#fffaec;outline:1.5px solid ${EVIDENCE.coal};outline-offset:-1.5px`]];
+  for (const [row, classes, swatch] of PIT_ROWS) {
+    const n = classes.reduce((t, c) => t + (pitCounts?.[c] || 0), 0);
+    if (!n) continue;
+    const li = document.createElement('li');
+    li.innerHTML = `<label class="check"><input type="checkbox" checked data-pits="${row}"><span class="swatch" style="${swatch}"></span>${text(`pits.${row}`)} (${n})${whyButton(text('preview.why'))}</label>
+      ${whyBox(`<p>${text(`pits.${row}.why`)}</p>`)}`;
     ul.append(li);
-    li.querySelector('[data-pits]').onchange = e => { scene.showPitClass(cls, e.target.checked); onChange(); };
+    const set = on => { for (const c of classes) if (pitCounts[c]) scene.showPitClass(c, on); };
+    set(true);
+    li.querySelector('[data-pits]').onchange = e => { set(e.target.checked); onChange(); };
   }
-  // The context apron (CONTEXT, never printed): on by default where the bundle has it.
-  // Two rows: Landscape Context (the land, routes, water, buildings and names)
-  // and Energy Context (pylons, poles and lines only). With either on, the
-  // camera stays above the terrain, and Soil sides and Geology walls are
-  // switched off (their earlier state comes back when both are off).
+  // Context views (never printed): one at a time, all three options visible.
+  //   Terrain: the land, routes, water, buildings and names round the model;
+  //   Electricity Grid: pylons, poles and lines only, the model's edge giving way to the background;
+  //   both keep the camera above the terrain and switch Soil sides and Geology walls off.
+  //   Geological: Soil sides and Geology walls on, nothing beyond the model.
   const ctx = scene.setContext(context, { bbox, grid, heights, relief, on: true });
-  if (ctx) {
-    const km = (context.pad_m / 1000).toFixed(1);
-    const rows = [['context', 'background:linear-gradient(90deg,#bdb6a4,#ece8df)', 'context.layer', 'context.layer.why', on => scene.showContext(on)]];
-    if (ctx.supports) rows.push(['energy', 'background:linear-gradient(90deg,#5a5a55,#d9d4c8)', 'energy.layer', 'energy.layer.why', on => scene.showEnergy(on)]);
-    else scene.showEnergy(false);
+  const VIEWS = [];
+  if (ctx) VIEWS.push(['landscape', 'context.layer']);
+  if (ctx?.supports) VIEWS.push(['energy', 'energy.layer']);
+  if (ctx && scene.geology?.walls) VIEWS.push(['geology', 'geology.view']);
+  let setView = () => {};
+  if (VIEWS.length) {
     const soil = treeSlot?.querySelector('[name=sides]'), geo = treeSlot?.querySelector('[name=geology]');
-    const sync = () => {
-      const active = rows.some(([k]) => ul.querySelector(`[data-${k}]`)?.checked);
-      const saved = SAVED.get(ul);
-      if (active && !saved) {
-        SAVED.set(ul, { soil: soil?.checked, geo: geo?.checked });
-        if (soil) soil.checked = false; if (geo) geo.checked = false;
-      } else if (!active && saved) {
-        if (soil) soil.checked = saved.soil !== false; if (geo) geo.checked = saved.geo !== false;
-        SAVED.delete(ul);
-      } else return;
+    const host = contextSlot || ul.appendChild(document.createElement('li'));
+    host.innerHTML = `<h3>${text('views.title')}</h3>
+      <div class="context-views" role="radiogroup" aria-label="${text('views.title')}">${VIEWS.map(([v, k]) =>
+        `<label class="check"><input type="radio" name="context-view" value="${v}" data-context-view>${text(k)}</label>`).join('')}</div>`;
+    const radios = [...host.querySelectorAll('[data-context-view]')];
+    setView = (v, { notify = true } = {}) => {
+      if (!VIEWS.some(([k]) => k === v)) v = VIEWS[0][0];
+      for (const r of radios) r.checked = r.value === v;
+      scene.showContext(v === 'landscape'); scene.showEnergy(v === 'energy');
+      const on = v === 'geology';
+      if (soil) soil.checked = on; if (geo) geo.checked = on;
       soil?.dispatchEvent(new Event('change'));                 // the studio applies both
+      if (notify) { onContextView(v); onChange(); }
     };
-    for (const [k, sw, label, why, show] of rows) {
-      const li = document.createElement('li');
-      li.innerHTML = `<label class="check"><input type="checkbox" checked data-${k}><span class="swatch" style="${sw}"></span>${text(label)}${whyButton(text('preview.why'))}</label>
-        ${whyBox(`<p>${text(why, { km })}</p>`)}`;
-      ul.append(li);
-      li.querySelector(`[data-${k}]`).onchange = e => { show(e.target.checked); sync(); onChange(); };
-    }
-    sync();
+    for (const r of radios) r.onchange = () => r.checked && setView(r.value);
+    setView(contextView, { notify: false });
+  } else {
+    scene.showContext(false); scene.showEnergy(false);
+    if (contextSlot) contextSlot.textContent = '';
+  }
+  // Labels: the pits' names and the context's place names.
+  ul.querySelector('[data-labels]')?.closest('li').remove();
+  if ((pitCounts?.labels || 0) + (ctx?.labels || 0) > 0) {
+    const li = document.createElement('li');
+    li.innerHTML = `<label class="check"><input type="checkbox"${labels ? ' checked' : ''} data-labels>${text('layer.labels')}${whyButton(text('preview.why'))}</label>
+      ${whyBox(`<p>${text('layer.labels.why')}</p>`)}`;
+    ul.append(li);
+    scene.showLabels(labels);
+    li.querySelector('[data-labels]').onchange = e => { scene.showLabels(e.target.checked); onLabels(e.target.checked); onChange(); };
   }
   wireWhy(ul);
-  return { props: pc, pits: pitCounts, context: ctx };
+  return { props: pc, pits: pitCounts, context: ctx, setContextView: v => setView(v) };
 }
 
 // The scale bar's row in the layer list (on by default; screen only, as the bar).

@@ -17,7 +17,7 @@ test('classes, years and notes', () => {
   assert.equal(displayClass(PITS[2]), 'quarry');                // matched coal only by a stripped name
   assert.equal(pitNote('coal', '1932'), 'coal mine · abandoned 1932');
   assert.equal(pitNote('coal', null), 'coal mine');
-  assert.equal(pitNote('unknown'), 'mine or quarry · type unknown');
+  assert.equal(pitNote('unknown'), 'quarry · type not recorded');
   assert.equal(pitNote('quarry', null, true), 'quarry · name also on a coal mine plan');
 });
 

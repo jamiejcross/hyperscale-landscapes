@@ -31,7 +31,7 @@ export function mountStudio(el, scene, host) {
   //         layerList?(): the layer key <ul> (for the legend) }
   el.classList.add('studio');
   el.innerHTML = `
-    <fieldset><legend>Style</legend>
+    <fieldset name="styleSet"><legend>Style</legend>
       <select name="look" aria-label="Style">
         ${Object.entries(LOOKS).map(([k, label]) => `<option value="${k}"${k === scene.view.look ? ' selected' : ''}>${label}</option>`).join('')}
       </select>
@@ -39,9 +39,8 @@ export function mountStudio(el, scene, host) {
       <label class="check" name="brushRow"${PALETTES[scene.view.look]?.brushwork ? '' : ' hidden'}><input type="checkbox" name="brush"${scene.view.brushwork ? ' checked' : ''}> Brushwork (a texture, not data)</label>
       <label class="check" name="reliefRow"${LOOK_DEFS[scene.view.look]?.carto ? '' : ' hidden'}><input type="checkbox" name="relief"${scene.view.relief !== false ? ' checked' : ''}> Relief shading (from the model's heights)</label>
       <label class="check" name="crownRow"${LOOK_DEFS[scene.view.look]?.carto ? '' : ' hidden'}><input type="checkbox" name="crowns"${scene.view.crowns !== false ? ' checked' : ''}> Crown symbols (woodland drawn as symbols)</label>
-      <label class="check" name="contourRow"${LOOK_DEFS[scene.view.look]?.carto ? ' hidden' : ''}><input type="checkbox" name="contours"${scene.view.contours ? ' checked' : ''}> Contour lines (from the elevation data; over land cover or satellite)</label>
+      <label class="check" name="contourRow"${LOOK_DEFS[scene.view.look]?.carto ? ' hidden' : ''}><input type="checkbox" name="contours"${scene.view.contours ? ' checked' : ''}> Contour lines</label>
       <label class="check"><input type="checkbox" name="mist"${scene.view.mist?.[scene.view.look] ? ' checked' : ''}> Mist (distance haze)</label>
-      <p class="hint">Changes how the model is drawn on screen and in saved images. Print files are not affected.</p>
     </fieldset>
     <fieldset><legend>Camera</legend>
       <div class="inline">
@@ -183,7 +182,8 @@ export function mountStudio(el, scene, host) {
   // ---- the legend: the layers ticked in the layer key, then the geology ----
   function keyItems() {
     const G = scene.geology?.instance, c = host.caption();
-    const items = mapKeyItems(host.layerList?.(), { elec: scene.electricity?.() || {}, redLine: c.legend || null, geology: !!G });
+    const items = mapKeyItems(host.layerList?.(), { elec: scene.electricity?.() || {}, redLine: c.legend || null, geology: !!G,
+      context: document.querySelector('[data-context-view]:checked')?.value || null });
     if (G) items.push({ head: 'Geology legend', big: true },
       ...legendItems({ geology: G, look: scene.view.look, pitsShown: scene.pits?.shown }));
     return items;

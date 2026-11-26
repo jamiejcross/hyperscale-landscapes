@@ -36,7 +36,7 @@ const writeUrl = urlWriter(() => {
   const v = { site: state.site ? $('site-select').value || null : null };
   if (scene) {
     const a = scene.cameraAngles();
-    Object.assign(v, { style: scene.view.look, az: a.az, el: a.el});
+    Object.assign(v, { style: scene.view.look, az: a.az, el: a.el, ctx: state.ctxView, labels: scene.labelsOn });
   }
   return v;
 });
@@ -230,6 +230,7 @@ function showPreview() {
     $('export-media').append(studio.part('grabSet'), studio.part('animSet'));
     // Geology legend: its own section under the layers;
     // the legend and cross-section exports: step 4.
+    $('style-slot').append(studio.part('styleSet'));          // Style: in the layers panel, below Background
     $('geology-slot').append(studio.part('geoPanel'));
     $('export-legend').append(studio.part('keyExport'));
     $('export-geology').append(studio.part('geoExport'));
@@ -256,7 +257,10 @@ function showPreview() {
   // Site extras from the bundle: 3D props, geology walls, pits (screen only; shared with the offline viewer).
   mountExtras(ul, scene, { props: state.bundle?.props, subsurface: state.bundle?.subsurface, grid: model.grid, heights: model.heights,
     zExag: opts.zExag, seed: siteSeed(), text: t, treeSlot: studio.part('modelSet'), onChange: () => { refreshCaption(); studio.renderLegend(); },
-    context: state.bundle?.context || null, bbox: state.bundle?.bbox || null, relief: reliefOf(model, opts) });
+    context: state.bundle?.context || null, bbox: state.bundle?.bbox || null, relief: reliefOf(model, opts),
+    contextSlot: $('context-slot'), contextView: pendingView?.ctx ?? state.ctxView, onContextView: v => { state.ctxView = v; writeUrl(); },
+    labels: pendingView?.labels ?? scene.labelsOn, onLabels: () => writeUrl() });
+  state.ctxView = document.querySelector('[data-context-view]:checked')?.value || null;
   mountScaleRow(ul, scene, { text: t });
   studio.refreshGeology();
   const counts = model.report.counts;
@@ -416,7 +420,7 @@ $('dl-viewer').onclick = async () => {
     const caption = captionLines({ name: state.name, exaggeration: t('caption.exag', { x: opts.zExag }), sources: sourcesText(), legend: boundaryLegend() });
     const blob = await buildViewer({
       model, legend, colours, printColours: printColourMap(), caption, zExag: opts.zExag, slug: slug(),
-      seed: siteSeed(), view: { look: scene.view.look, brushwork: scene.view.brushwork, relief: scene.view.relief, crowns: scene.view.crowns, mist: { ...scene.view.mist }, contours: scene.view.contours },
+      seed: siteSeed(), view: { look: scene.view.look, brushwork: scene.view.brushwork, relief: scene.view.relief, crowns: scene.view.crowns, mist: { ...scene.view.mist }, contours: scene.view.contours, ctx: state.ctxView, labels: scene.labelsOn },
       relief: reliefOf(model, opts),
       props: state.bundle?.props || null, subsurface: state.bundle?.subsurface || null,
       context: state.bundle?.context ? { ...state.bundle.context, model_bbox: state.bundle.bbox } : null,

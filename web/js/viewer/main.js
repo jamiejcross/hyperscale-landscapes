@@ -55,7 +55,9 @@ const exag = () => {
 const caption = () => ({ ...D.caption, disclosure: exag(), top: D.caption.top.replace(D.caption.disclosure, exag()) });
 // Shareable view: ?style=&az=&el= (camera angles), read on load and kept up
 // to date as the view changes.
-const writeUrl = urlWriter(() => { const a = scene.cameraAngles(); return { style: scene.view.look, az: a.az, el: a.el }; });
+let ctxView = null;
+const writeUrl = urlWriter(() => { const a = scene.cameraAngles(); return { style: scene.view.look, az: a.az, el: a.el, ctx: ctxView, labels: scene.labelsOn }; });
+const v0 = parseView(location.search);
 const studio = mountStudio($('studio'), scene, {
   caption, filename: () => `${D.slug}-${new Date().toISOString().slice(0, 10)}`,
   printColours: () => D.printColours, alt: () => D.alt, layerList: () => $('layers'),
@@ -66,10 +68,14 @@ const studio = mountStudio($('studio'), scene, {
     document.querySelectorAll('.swatch[data-swatch]').forEach(s => { s.style.background = layerSwatch(s.dataset.swatch, scene.view.look, s.dataset.screen); });
   },
 });
+$('style-slot').append(studio.part('styleSet'));      // Style under the layers, as in the web app
 if (heights && (propsData || subsurface || contextData)) {
   mountExtras(ul, scene, { props: propsData, subsurface, grid: D.grid, heights, zExag: D.zExag, seed: D.seed ?? D.slug, text, treeSlot: studio.part('modelSet'),
     context: contextData, bbox: contextData?.model_bbox || null, relief: D.relief || null,
+    contextView: v0.ctx ?? D.view?.ctx ?? null, onContextView: v => { ctxView = v; writeUrl(); },
+    labels: v0.labels ?? D.view?.labels ?? false, onLabels: () => writeUrl(),
     onChange: () => { studio.renderLegend(); studio.update(); } });
+  ctxView = document.querySelector('[data-context-view]:checked')?.value || null;
   studio.refreshGeology();
 }
 mountScaleRow(ul, scene, { text });
@@ -79,8 +85,8 @@ mountScaleRow(ul, scene, { text });
   if (D.view && (D.view.relief === false || D.view.crowns === false)) scene.setCarto({ relief: D.view.relief, crowns: D.view.crowns });
   if (D.view?.mist) Object.assign(scene.view.mist, D.view.mist);        // per look, as packed
   if (v.style || D.view?.look) studio.setLook(v.style || D.view.look);
-  { const mist = document.querySelector('#studio [name=mist]'); mist.checked = !!scene.view.mist[scene.view.look]; scene.setMist(mist.checked); }
-  if (D.view?.contours) { const c = document.querySelector('#studio [name=contours]'); c.checked = true; scene.setContours(true); }
+  { const mist = document.querySelector('#style-slot [name=mist]'); mist.checked = !!scene.view.mist[scene.view.look]; scene.setMist(mist.checked); }
+  if (D.view?.contours) { const c = document.querySelector('#style-slot [name=contours]'); c.checked = true; scene.setContours(true); }
   if (v.az != null || v.el != null) { const a = scene.cameraAngles(); scene.setCameraAngles(v.az ?? a.az, v.el ?? a.el); }
   scene.controls.addEventListener('change', writeUrl);
 }
