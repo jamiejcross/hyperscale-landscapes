@@ -95,6 +95,16 @@ FACTS = {
 }
 
 
+# Model areas moved off the pin-centred default (same size), so a site's whole
+# application red line fits. (bbox, note)
+MODEL_BBOX_OVERRIDE = {
+    "chapelcross": ({"min_lat": 55.01395, "max_lat": 55.02833, "min_lon": -3.25206, "max_lon": -3.20193},
+                    "3.2 × 1.6 km (east–west × north–south), moved 0.7 km north of the APRS-pin default so the "
+                    "whole application red line and every drawn building fit (JC, 26 Nov 2026); the pin stays inside. "
+                    "A modelling extent, not a site boundary."),
+}
+
+
 def bbox_around(lon, lat, width_km=WIDTH_KM, height_km=HEIGHT_KM):
     d_lat = height_km / 2 / 111.32
     d_lon = width_km / 2 / 111.32 / math.cos(math.radians(lat))
@@ -148,9 +158,10 @@ def main(kml_path, la_path):
             "last_verified": None,
             "licence": "CC-BY-4.0",
             "notes": f["notes"],
-            "model_bbox": bbox_around(lon, lat),
-            "model_bbox_note": (f"{WIDTH_KM:g} × {HEIGHT_KM:g} km (east–west × north–south) centred on the APRS pin; "
-                                "a modelling extent, not a site boundary."),
+            "model_bbox": MODEL_BBOX_OVERRIDE.get(f["id"], (None, None))[0] or bbox_around(lon, lat),
+            "model_bbox_note": MODEL_BBOX_OVERRIDE.get(f["id"], (None, None))[1] or (
+                f"{WIDTH_KM:g} × {HEIGHT_KM:g} km (east–west × north–south) centred on the APRS pin; "
+                "a modelling extent, not a site boundary."),
         }
         path = SITES / f"{f['id']}.geojson"
         if f["id"] == "auchtertool-cato":
