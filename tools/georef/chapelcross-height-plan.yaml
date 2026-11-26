@@ -1,0 +1,16 @@
+# Dumfries & Galloway 26/1649/PIP, Building Height Parameter Plan CX-ARC-XX-ZZ-DR-A-1003 P01, 1:2500.
+# Zones are rectangles clipped by a mask, so they are read from the rendered page.
+site: chapelcross
+file: chapelcross/26_1649_PIP__Building_Height_Parameter_Plan.pdf
+scale: 2500
+red_line:
+  ref: 26/1649/PIP
+  match: {type: s, color: [1, 0, 0], width: 3.96}
+source: "26/1649/PIP Building Height Parameter Plan CX-ARC-XX-ZZ-DR-A-1003 P01 (1:2500), read from the rendered drawing"
+shapes:
+  - {colours: [[248, 248, 200]], tol: 8, close_m: 4, min_area_m2: 2000, merge: true, single: true, count: 1,
+     name: "height zone up to 40 m", kind: height parameter zone, evidence: documented, height_m: 40}
+  - {colours: [[248, 192, 136]], tol: 8, close_m: 4, min_area_m2: 2000, merge: true, count: 1,
+     name: "height zone up to 15 m", kind: height parameter zone, evidence: documented, height_m: 15}
+  - {colours: [[216, 176, 248]], tol: 8, close_m: 4, min_area_m2: 2000, merge: true, count: 1,
+     name: "height zone up to 9 m", kind: height parameter zone, evidence: documented, height_m: 9}

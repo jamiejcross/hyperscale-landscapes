@@ -1,0 +1,17 @@
+# Inverclyde 26/0136/IC, drawing 26749-SK-01 Potential Developable Areas and SuDS Footprints
+# (DBA, preliminary), 1:1000. Translucent fills over the base map, read from the rendered page.
+site: greenock
+file: greenock/drawings/01_22_Jul_2026_Drawing_26749_SK_01_able_Areas_and_SUDS_Footprint-670477.pdf
+scale: 1000
+zoom: 1.5
+red_line:
+  ref: 26/0136/IC
+  match: {type: f, fill: [1, 0, 0]}
+source: "26/0136/IC drawing 26749-SK-01 (DBA, preliminary, 1:1000)"
+shapes:
+  - {colours: [[248, 176, 232]], tol: 28, close_m: 6, open_m: 1, min_area_m2: 10000, merge: true, count: 1,
+     name: "Potential developable area 1 (4.47 ha)", kind: developable area, evidence: indicative,
+     height_m: 18, height_basis: "max 18 m (Planning Statement 4.16)"}
+  - {colours: [[248, 216, 176]], tol: 30, close_m: 12, open_m: 1, min_area_m2: 10000, merge: true, count: 1,
+     name: "Potential developable area 2 (7.25 ha)", kind: developable area, evidence: indicative,
+     height_m: 18, height_basis: "max 18 m (Planning Statement 4.16)"}

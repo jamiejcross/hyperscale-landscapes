@@ -1,0 +1,20 @@
+# Edinburgh 25/04239/PPP, Plan showing Siting of Buildings and Park, EDIN-NWA-S1-ZZ-DR-A-FS172 rev 02, 1:1250.
+site: south-gyle
+file: south-gyle/drawings/03_27_Aug_2025_Drawing__ISSION_IN_PRINCIPLE_-_SITING-6856419.pdf
+scale: 1250
+red_line:
+  ref: 25/04239/PPP
+  match: {type: s, color: [0.98, 0, 0]}
+source: "25/04239/PPP drawing EDIN-NWA-S1-ZZ-DR-A-FS172 rev 02, Plan showing Siting of Buildings and Park (1:1250); refused Feb 2026, appeal PPA-230-2794"
+shapes:
+  - colours: [[88, 88, 72], [92, 92, 76]]
+    tol: 12
+    close_m: 3
+    min_area_m2: 5000
+    count: 1
+    name: "Siting of Data Centre (zone)"
+    kind: siting zone
+    evidence: documented
+    height_m: 32
+    height_min_m: 18
+    height_basis: "PPP parameter range ~18-32 m (planning statement); siting sought for full approval"

@@ -1,0 +1,24 @@
+# Falkirk P/26/0237/FUL, EIAR Figure 3-1a General Arrangement Layout (WSP rev P06), 1:1000 at A1.
+# Vector drawing; the page is rotated 90 degrees.
+site: larbert
+file: larbert/drawings/02_29_May_2026_Supporting_documents_Eia_report_figure_3_1a_general_arrang_-_General_Arrangement_Layout-1644547.pdf
+scale: 1000
+red_line:
+  ref: P/26/0237/FUL
+  match: {type: s, color: [1, 0, 0], width: 7.08}
+source: "P/26/0237/FUL, EIAR Fig. 3-1a General Arrangement Layout (WSP rev P06): data-centre block (data halls, galleries, generators); office wing excluded"
+shapes:
+  # data centre (incl. generator) yellow + mechanical gallery lavender; the white rack rows
+  # between them are closed over; the uncoloured office wing is left out
+  - colours: [[248, 248, 176], [192, 192, 224], [196, 196, 228]]
+    tol: 10
+    close_m: 14
+    min_area_m2: 5000
+    mrr: true
+    order: north_to_south
+    count: 2
+    names: ["DC1 (north)", "DC2 (south)"]
+    kind: building
+    evidence: documented
+    height_m: 28
+    height_basis: "28 m above FFL (EIAR App. 9-2, via AECOM review)"
