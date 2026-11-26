@@ -55,9 +55,11 @@ test('context view and labels round-trip; defaults stay out of the URL', () => {
   assert.deepEqual(parseView('?ctx=geology,energy'), {});
 });
 
-test('dc=1 (the proposed data centre shown) round-trips; anything else is left out', () => {
-  assert.equal(parseView('?site=larbert&dc=1').dc, true);
+test('the proposed data centre is on by default: dc=0 hides it and round-trips; anything else is left out', () => {
+  assert.equal(parseView('?site=larbert&dc=0').dc, false);
+  assert.equal(parseView('?site=larbert&dc=1').dc, true);     // older links
   assert.equal('dc' in parseView('?dc=yes'), false);
-  assert.equal(viewSearch('', { dc: true }), '?dc=1');
-  assert.equal(viewSearch('?dc=1', { dc: false }), '');
+  assert.equal(viewSearch('', { dc: false }), '?dc=0');
+  assert.equal(viewSearch('?dc=0', { dc: true }), '');
+  assert.equal(viewSearch('?dc=1', { dc: undefined }), '');
 });

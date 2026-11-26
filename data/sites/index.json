@@ -53,7 +53,7 @@
     },
     {
       "id": "hurlford",
-      "name": "Hurlford, East Ayrshire",
+      "name": "Hurlford (Rufus), East Ayrshire",
       "local_authority": "East Ayrshire",
       "status": "pre-application",
       "site_role": "data centre",
@@ -193,7 +193,7 @@
     },
     {
       "id": "newhouse",
-      "name": "Newhouse, North Lanarkshire",
+      "name": "Newhouse (Aurelius), North Lanarkshire",
       "local_authority": "North Lanarkshire",
       "status": "pre-application",
       "site_role": "data centre",

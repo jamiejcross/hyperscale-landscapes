@@ -35,14 +35,16 @@ let scene = null, studio = null;
 // Shareable view URL (?site=&style=&az=&el=). A view in the address bar on
 // load is applied once the first model is built.
 let pendingView = parseView(location.search);
-// Proposed data centre: shown on screen (dcOn) and added to the print files (dcPrint), both off by default.
-state.dcOn = !!pendingView.dc; state.dcPrint = false; state.dcPlan = null; state.massing = null;
+// Proposed data centre: shown on screen where the planning record has it (dcOn, on by
+// default: JC, 26 Nov 2026; dc=0 in the URL turns it off) and added to the print files
+// (dcPrint, off by default).
+state.dcOn = pendingView.dc ?? true; state.dcPrint = false; state.dcPlan = null; state.massing = null;
 state.boundaryOn = true;     // the red line: the "Data Centre Application Boundary" layer row
 const writeUrl = urlWriter(() => {
   const v = { site: state.site ? $('site-select').value || null : null };
   if (scene) {
     const a = scene.cameraAngles();
-    Object.assign(v, { style: scene.view.look, az: a.az, el: a.el, ctx: state.ctxView, labels: scene.labelsOn, dc: !!(state.dcOn && state.dcPlan) });
+    Object.assign(v, { style: scene.view.look, az: a.az, el: a.el, ctx: state.ctxView, labels: scene.labelsOn, dc: state.dcPlan ? !!state.dcOn : undefined });
   }
   return v;
 });

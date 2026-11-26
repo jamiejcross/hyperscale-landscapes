@@ -1,6 +1,6 @@
 // Shareable view state in the page URL:
-//   ?site=<id>&style=guthrie|field|anthropogenic&az=<deg>&el=<deg>&ctx=landscape|energy|geology&labels=1&dc=1
-// (ctx: the context view; labels=1: labels shown, off by default; dc=1: the proposed data centre shown, off by default)
+//   ?site=<id>&style=guthrie|field|anthropogenic&az=<deg>&el=<deg>&ctx=landscape|energy|landscape,energy|geology&labels=1&dc=0
+// (ctx: the context view; labels=1: labels shown, off by default; dc=0: the proposed data centre hidden; it is shown by default where the planning record has it)
 // (style=mossmorran, from links made before that look was retired, opens as guthrie)
 // az and el are the CAMERA's angles as seen from the model's centre: az is
 // the compass bearing the camera stands at (clockwise from north, so 135 is
@@ -35,6 +35,7 @@ export function parseView(search) {
   if (p.get('labels') === '1') out.labels = true;
   else if (p.get('labels') === '0') out.labels = false;
   if (p.get('dc') === '1') out.dc = true;
+  else if (p.get('dc') === '0') out.dc = false;
   return out;
 }
 
@@ -45,7 +46,8 @@ export function viewSearch(search, view) {
   for (const k of ['site', 'style', 'az', 'el', 'ctx', 'labels', 'dc']) {
     if (!(k in view)) continue;
     const v = view[k];
-    if (k === 'labels' || k === 'dc') { if (v === true) p.set(k, '1'); else p.delete(k); continue; }
+    if (k === 'labels') { if (v === true) p.set(k, '1'); else p.delete(k); continue; }
+    if (k === 'dc') { if (v === false) p.set(k, '0'); else p.delete(k); continue; }   // on by default: only dc=0 is written
     if (v === null || v === undefined || (typeof v === 'number' && !Number.isFinite(v))) { p.delete(k); continue; }
     if (k === 'az') p.set(k, String(Math.round(((v % 360) + 360) % 360)));
     else if (k === 'el') p.set(k, String(Math.round(Math.min(EL_MAX, Math.max(EL_MIN, v)))));

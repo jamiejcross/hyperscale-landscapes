@@ -59,11 +59,11 @@ everywhere).
 | `greenock` | Greenock, Inverclyde | Inverclyde | developer, status, stated_capacity_mw, stated_height_m, stated_floor_area_m2 |
 | `haspielaw` | Haspielaw, Hamilton | South Lanarkshire | status, stated_capacity_mw, stated_height_m, stated_floor_area_m2 |
 | `hunterston` | Hunterston, North Ayrshire | North Ayrshire | stated_capacity_mw, stated_height_m, stated_floor_area_m2 |
-| `hurlford` | Hurlford, East Ayrshire | East Ayrshire | stated_height_m, stated_floor_area_m2 |
+| `hurlford` | Hurlford (Rufus), East Ayrshire | East Ayrshire | stated_height_m, stated_floor_area_m2 |
 | `irvine-i3` | Irvine (i3 Business Park) | North Ayrshire | status, stated_height_m, stated_floor_area_m2 |
 | `killean-cowal` | Killean, Cowal (Argyll) | Argyll and Bute | developer, status, stated_height_m, stated_floor_area_m2 |
 | `larbert` | Glenbervie, Larbert | Falkirk | stated_height_m, stated_floor_area_m2 |
-| `newhouse` | Newhouse, North Lanarkshire | North Lanarkshire | stated_height_m, stated_floor_area_m2 |
+| `newhouse` | Newhouse (Aurelius), North Lanarkshire | North Lanarkshire | stated_height_m, stated_floor_area_m2 |
 | `ochiltree` | Ochiltree (Killoch), East Ayrshire | East Ayrshire | status, stated_height_m, stated_floor_area_m2 |
 | `plean` | Plean (grid connection for Larbert) | Stirling | status, stated_capacity_mw, stated_height_m, stated_floor_area_m2 |
 | `ravenscraig` | Ravenscraig, Motherwell | North Lanarkshire | status, stated_height_m, stated_floor_area_m2 |

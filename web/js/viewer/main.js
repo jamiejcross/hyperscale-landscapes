@@ -56,7 +56,7 @@ const caption = () => ({ ...D.caption, disclosure: exag(), top: D.caption.top.re
 // Shareable view: ?style=&az=&el= (camera angles), read on load and kept up
 // to date as the view changes.
 let ctxView = null;
-const writeUrl = urlWriter(() => { const a = scene.cameraAngles(); return { style: scene.view.look, az: a.az, el: a.el, ctx: ctxView, labels: scene.labelsOn, dc: !!scene.datacentreOn }; });
+const writeUrl = urlWriter(() => { const a = scene.cameraAngles(); return { style: scene.view.look, az: a.az, el: a.el, ctx: ctxView, labels: scene.labelsOn, dc: scene.datacentreInfo?.() ? !!scene.datacentreOn : undefined }; });
 const v0 = parseView(location.search);
 const studio = mountStudio($('studio'), scene, {
   caption, filename: () => `${D.slug}-${new Date().toISOString().slice(0, 10)}`,
