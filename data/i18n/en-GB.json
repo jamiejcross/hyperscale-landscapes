@@ -1,7 +1,7 @@
 {
   "app.title": "Hyperscale Landscapes",
-  "app.tagline": "An Open Tool for Making and Printing Landscape Data Visualisations around Hyperscale Data Centres",
-  "app.tagline2": "Designed by humans, responsibly built with AI for use in campaigning, communications, and research.",
+  "app.tagline": "An Open Tool for Making and Printing Landscape Data Visualisations around Hyperscale Data Centres.",
+  "app.tagline2": "Designed by humans, responsibly coded with AI for use in campaigning, communications, and research.",
   "step.pick": "Choose an area",
   "step.size": "Size and style",
   "step.preview": "Preview",
@@ -25,7 +25,7 @@
   "pick.sites.aprs": "APRS map of proposed data centres in Scotland",
   "pick.search": "Search for a place",
   "pick.search.button": "Search",
-  "pick.search.privacy": "Searching sends your words to OpenStreetMap's Nominatim service.",
+  "pick.search.privacy": "Searching sends your words to OpenStreetMap.",
   "pick.draw": "Or draw on the map",
   "pick.draw.box": "Draw a box",
   "pick.draw.polygon": "Draw a polygon",
