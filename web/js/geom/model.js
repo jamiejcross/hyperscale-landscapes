@@ -47,6 +47,13 @@ export const ROAD_PROFILES = {
 };
 const WATERWAY_WIDTHS = { river: 30, canal: 15, stream: 4, drain: 2, ditch: 2 };
 const POWER_AREAS = new Set(['substation', 'plant', 'generator', 'battery', 'switch', 'transformer', 'converter', 'compensator']);
+// The screen's three electricity groups (JC 26 Nov 2026), from a power
+// feature's kind (overpass.js classify): generation (generators and plants
+// by source: wind, solar, nuclear, hydro, ...), storage (batteries) and
+// transmission (lines, cables, pylons, poles, substations and the rest).
+// Screen only: the print keeps one Power layer.
+export const POWER_GROUPS = ['generation', 'storage', 'transmission'];
+export const powerGroup = kind => (kind === 'battery' ? 'storage' : /^(generator|plant)\b/.test(kind || '') ? 'generation' : 'transmission');
 
 // ---------------------------------------------------------------------------
 // Grid
@@ -555,12 +562,15 @@ export function buildModel({ bbox, elev, osm, opts }) {
         strokeLine(cv('powerLine'), grid, g, Math.max((f.kind === 'line' ? 10 : 6) * mmPerM, f.kind === 'line' ? 1.0 : minW));
         vectors.powerLines.push({ k: f.kind, p: toMm(g.coordinates) });
       } else if (g.type === 'Polygon' || g.type === 'MultiPolygon') {
-        if (f.status === 'proposed' || f.status === 'construction') strokeLine(cv('power'), grid, g, MM.outline);
-        else fillPolys(cv('power'), grid, g);
+        // the same shape again on its group's canvas (screen only: which group each power cell belongs to)
+        for (const c of [cv('power'), cv(`power:${powerGroup(f.kind)}`)]) {
+          if (f.status === 'proposed' || f.status === 'construction') strokeLine(c, grid, g, MM.outline);
+          else fillPolys(c, grid, g);
+        }
       } else if (g.type === 'Point') {
-        if (POWER_AREAS.has(f.kind)) square(cv('power'), grid, g.coordinates, Math.max(25 * mmPerM, 2));
-        else if (opts.pegs && f.kind === 'tower') pegs.push({ at: g.coordinates, side: MM.peg, h: clamp((parseFloat(f.tags.height) || 30) * opts.buildingExag * mmPerM, 1.5, 4) });
-        else if (opts.pegs && f.kind.startsWith('generator:wind')) pegs.push({ at: g.coordinates, side: MM.turbinePeg, h: clamp((parseFloat(f.tags.height) || 80) * opts.buildingExag * mmPerM, 2, 6) });
+        if (POWER_AREAS.has(f.kind)) for (const c of [cv('power'), cv(`power:${powerGroup(f.kind)}`)]) square(c, grid, g.coordinates, Math.max(25 * mmPerM, 2));
+        else if (opts.pegs && f.kind === 'tower') pegs.push({ at: g.coordinates, group: 'transmission', side: MM.peg, h: clamp((parseFloat(f.tags.height) || 30) * opts.buildingExag * mmPerM, 1.5, 4) });
+        else if (opts.pegs && f.kind.startsWith('generator:wind')) pegs.push({ at: g.coordinates, group: 'generation', side: MM.turbinePeg, h: clamp((parseFloat(f.tags.height) || 80) * opts.buildingExag * mmPerM, 2, 6) });
       }
     } else if (f.layer === 'rail' && g.type === 'LineString') {
       if (['tram', 'subway'].includes(f.kind) || f.status === 'proposed') continue;
@@ -587,10 +597,11 @@ export function buildModel({ bbox, elev, osm, opts }) {
       for (const rings of ringsMm(g)) vectors.woods.push({ rings, leaf: f.tags?.leaf_type || null });
     } else if (f.layer === 'trees' && g.type === 'LineString') vectors.treeRows.push({ p: toMm(g.coordinates) });
     else if (f.layer === 'power' && f.status === 'existing') {
-      if (g.type === 'Polygon' || g.type === 'MultiPolygon') { if (POWER_AREAS.has(f.kind)) for (const rings of ringsMm(g)) vectors.powerAreas.push({ rings }); }
+      const grp = powerGroup(f.kind);
+      if (g.type === 'Polygon' || g.type === 'MultiPolygon') { if (POWER_AREAS.has(f.kind)) for (const rings of ringsMm(g)) vectors.powerAreas.push({ rings, g: grp }); }
       else if (g.type === 'Point') {
         const [x, y] = toMm([g.coordinates]), h = parseFloat(f.tags?.height);
-        if (POWER_AREAS.has(f.kind) && !f.kind.startsWith('generator')) vectors.powerAreas.push({ sq: [x, y, Math.max(25 * mmPerM, 2)] });
+        if (POWER_AREAS.has(f.kind) && !f.kind.startsWith('generator')) vectors.powerAreas.push({ sq: [x, y, Math.max(25 * mmPerM, 2)], g: grp });
         const k = f.kind === 'tower' ? 'tower' : f.kind === 'pole' ? 'pole' : f.kind.startsWith('generator:wind') || f.tags?.['generator:source'] === 'wind' ? 'wind' : null;
         if (k) vectors.powerPoints.push({ k, x, y, h: Number.isFinite(h) ? h : null });
       }
@@ -677,12 +688,12 @@ export function buildModel({ bbox, elev, osm, opts }) {
 
   // ---- Overlay slabs ----
   const slab = (id, raise) => masks[id] ? slabFromMask(grid, masks[id], v => H.z[v] + raise, v => H.z[v] - MM.bury) : null;
-  const powerAreas = slab('power', MM.raise.power);
+  const powerAreas = slab('power', MM.raise.power), powerLineSlab = slab('powerLine', MM.raise.powerLine);
   const layers = {
     terrain: land,
     water: masks.water ? slabFromMask(grid, masks.water, v => W[v], v => W[v] - MM.waterDepth - 0.3) : null,
     roads: slab('roads', MM.raise.roads),
-    power: concat([powerAreas, slab('powerLine', MM.raise.powerLine)]),
+    power: concat([powerAreas, powerLineSlab]),
     rail: slab('rail', MM.raise.rail),
     railDisused: slab('railDisused', MM.raise.railDisused),   // printed with 'rail', drawn in its own colour
     residues: slab('residues', MM.raise.residues),
@@ -726,7 +737,31 @@ export function buildModel({ bbox, elev, osm, opts }) {
   }
   // Pegs apart from substations, so the 3D pylons and turbines (when the site
   // bundle has them) can stand in for them on screen.
-  const screen = { powerPoints: powerAreas, powerPegs: concat(pegMeshes), ...waterSplit };
+  // Power split into the screen's three groups: each power cell goes to the
+  // group whose shape drew it (generation, then storage, then transmission;
+  // the few cells added to close diagonal gaps go to transmission); the line
+  // strips are transmission; pegs go with their pylon or turbine. The same
+  // cells as the print's Power layer, in separate meshes.
+  const groupOf = {};
+  for (const id of POWER_GROUPS) groupOf[id] = layerCanvas[`power:${id}`] ? maskOf(layerCanvas[`power:${id}`]) : null;
+  const split = Object.fromEntries(POWER_GROUPS.map(id => [id, new Uint8Array(cx * cy)]));
+  let anyPower = false;
+  if (masks.power) for (let k = 0; k < masks.power.length; k++) {
+    if (!masks.power[k]) continue;
+    anyPower = true;
+    const id = groupOf.generation?.[k] ? 'generation' : groupOf.storage?.[k] ? 'storage' : 'transmission';
+    split[id][k] = 1;
+  }
+  const pslab = m => m.some(Boolean) ? slabFromMask(grid, m, v => H.z[v] + MM.raise.power, v => H.z[v] - MM.bury) : null;
+  const pegsOf = id => concat(pegMeshes.filter((m, i) => m && pegs[i].group === id));
+  const screen = {
+    ...(anyPower ? { powerGen: pslab(split.generation), powerStore: pslab(split.storage), powerGrid: pslab(split.transmission) } : {}),
+    powerLines: powerLineSlab,
+    genPegs: pegsOf('generation'), gridPegs: pegsOf('transmission'), ...waterSplit,
+  };
+  // what each group holds, for the layer rows (features in the model, by group)
+  report.powerGroups = Object.fromEntries(POWER_GROUPS.map(id => [id, 0]));
+  for (const f of osm.features) if (f.layer === 'power') report.powerGroups[powerGroup(f.kind)]++;
 
   report.counts = { buildings: bl.length, receptors: rl.length, roads: nRoads, pegs: pegMeshes.filter(Boolean).length };
   report.grid = { cols: nx, rows: grid.ny, cellMm: +grid.dx.toFixed(3) };

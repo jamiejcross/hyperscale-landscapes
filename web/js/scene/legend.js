@@ -68,11 +68,11 @@ export function mapKeyItems(list, { elec = {}, redLine = null, geology = false, 
     if (input.dataset.layer) {
       const sw = li.querySelector('.swatch');
       items.push({ swatch: sw ? getComputedStyle(sw).backgroundColor : INK, text: label });
-      if (input.dataset.layer === 'power') {
+      if (input.dataset.layer === 'transmission' || input.dataset.layer === 'power') {
         if (elec.pylons) items.push({ mark: 'pylon', text: 'Pylon or pole (at recorded height where known)' });
         if (elec.wires) items.push({ mark: 'wire', text: 'Overhead line between supports (sag drawn, not measured)' });
-        if (elec.turbines) items.push({ mark: 'turbine', text: 'Wind turbine' });
       }
+      if ((input.dataset.layer === 'generation' || input.dataset.layer === 'power') && elec.turbines) items.push({ mark: 'turbine', text: 'Wind turbine' });
     } else if (input.dataset.pits === 'quarries' && !geology) {      // quarries, and records whose type is not given
       items.push({ mark: 'quarry', text: label }, { mark: 'unknown', text: 'Quarries, type not recorded (BritPits)' });
     } else if (input.dataset.pits && !geology) items.push({ mark: input.dataset.pits, text: label });

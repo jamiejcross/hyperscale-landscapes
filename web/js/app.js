@@ -260,11 +260,11 @@ function showPreview() {
   scene.setModel({ layers: model.layers, colours, grid: model.grid, landcover: state.drape, drapeKind: 'landcover', vectors: model.vectors, screen: model.screen, seed: siteSeed(),
     heights: model.heights, relief: reliefOf(model, opts), waterFill: model.waterFill });
   const ul = $('layer-list'); ul.textContent = '';
-  const shown = ['terrain', 'water', 'buildings', 'roads', 'rail', 'power', 'residues', 'receptors'];
+  const shown = ['terrain', 'water', 'buildings', 'roads', 'rail', ...electricityRows(model), 'residues', 'receptors'];
   for (const id of shown) {
-    const L = screenLayer(id);
+    const L = screenLayer(id), sw = L.swatch || id;
     const li = document.createElement('li');
-    li.innerHTML = `<label class="check"><input type="checkbox" checked data-layer="${id}"><span class="swatch" data-swatch="${id}" data-screen="${L.colour_screen}" style="background:${layerSwatch(id, scene.view.look, L.colour_screen)}"></span>${L.name}${whyButton(t('preview.why'))}</label>
+    li.innerHTML = `<label class="check"><input type="checkbox" checked data-layer="${id}"><span class="swatch" data-swatch="${sw}" data-screen="${L.colour_screen}" style="background:${layerSwatch(sw, scene.view.look, L.colour_screen)}"></span>${L.name}${whyButton(t('preview.why'))}</label>
       ${whyBox(`<p>${L.why}</p>`)}`;
     ul.append(li);
   }
@@ -320,11 +320,22 @@ function mountDatacentre(model, opts) {
   pr.onchange = () => { state.dcPrint = pr.checked; refreshCaption(); };
 }
 
-// A layer as the screen names it. The power layer is "Electricity infrastructure"
-// on screen (with turbines and pylons); layers.json keeps "Power" for the print files.
+// A layer as the screen names it. The print's Power layer is three rows on
+// screen (JC 26 Nov 2026): Electricity Generation, Storage and Transmission,
+// each in the power colour; layers.json keeps "Power" for the print files.
+const ELECTRICITY = ['generation', 'storage', 'transmission'];
 function screenLayer(id) {
-  const L = state.layers[id];
-  return id === 'power' ? { ...L, name: t('layer.electricity'), why: `${L.why} ${t('layer.electricity.why')}` } : L;
+  if (ELECTRICITY.includes(id)) {
+    const P = state.layers.power;
+    return { ...P, id, swatch: 'power', name: t(`layer.${id}`), why: `${t(`layer.${id}.why`)} ${t('layer.power.print')}` };
+  }
+  return state.layers[id];
+}
+// The electricity rows a model has: a group with features in the model, or
+// (generation, transmission) with turbines or pylons among the site's 3D props.
+function electricityRows(model) {
+  const n = model.report.powerGroups || {}, P = state.bundle?.props;
+  return ELECTRICITY.filter(g => n[g] > 0 || (g === 'generation' && P?.turbines?.length) || (g === 'transmission' && P?.supports?.length));
 }
 
 // What the Anthropogenic relief needs to turn the height grid back into metres.
@@ -465,9 +476,9 @@ $('dl-viewer').onclick = async () => {
     const colours = Object.fromEntries(Object.values(state.layers).map(l => [l.id, l.colour_screen]));
     colours.railDisused = state.layers.rail.colour_screen_disused;
     const hasProps = !!(state.bundle?.props?.turbines?.length || state.bundle?.props?.supports?.length);
-    const shown = ['terrain', 'water', 'buildings', 'roads', 'rail', 'power', 'residues', 'receptors']
-      .filter(id => model.layers[id]?.indices.length || (id === 'power' && hasProps));
-    const legend = shown.map(id => { const L = screenLayer(id); return { id, name: L.name, colour: L.colour_screen, why: L.why }; });
+    const shown = ['terrain', 'water', 'buildings', 'roads', 'rail', ...electricityRows(model), 'residues', 'receptors']
+      .filter(id => ELECTRICITY.includes(id) || model.layers[id]?.indices.length);
+    const legend = shown.map(id => { const L = screenLayer(id); return { id, swatch: L.swatch, name: L.name, colour: L.colour_screen, why: L.why }; });
     const { w, h } = bboxSizeKm(state.bbox);
     const caption = captionLines({ name: state.name, exaggeration: t('caption.exag', { x: opts.zExag }), sources: sourcesText(), legend: boundaryLegend() });
     const blob = await buildViewer({

@@ -40,7 +40,7 @@ setGeologyText(D.text);      // the geology legend's closing note (packed with t
 const ul = $('layers');
 for (const L of D.legend) {
   const li = document.createElement('li');
-  li.innerHTML = `<label class="check"><input type="checkbox" checked data-layer="${L.id}"><span class="swatch" data-swatch="${L.id}" data-screen="${L.colour}" style="background:${L.colour}"></span>${L.name}${whyButton(D.text?.['preview.why'] ?? 'Why this matters')}</label>
+  li.innerHTML = `<label class="check"><input type="checkbox" checked data-layer="${L.id}"><span class="swatch" data-swatch="${L.swatch || L.id}" data-screen="${L.colour}" style="background:${L.colour}"></span>${L.name}${whyButton(D.text?.['preview.why'] ?? 'Why this matters')}</label>
     ${whyBox(`<p>${L.why}</p>`)}`;
   ul.append(li);
 }

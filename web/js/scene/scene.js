@@ -57,11 +57,16 @@ const stylisedLook = look => !!PALETTES[look];
 export const FIELD_LANDCOVER_COLOURS = PALETTES.field.landcover;
 export const FIELD_LAYER_COLOURS = { terrain: PALETTES.field.landBase, ...PALETTES.field.layers };
 // Screen-only meshes from buildModel, and the layer whose colour they take.
-const SCREEN_OF = { powerPoints: 'power', powerPegs: 'power', waterAreas: 'water', waterLines: 'water' };
+const SCREEN_OF = { powerGen: 'power', powerStore: 'power', powerGrid: 'power', powerLines: 'power', genPegs: 'power', gridPegs: 'power',
+  waterAreas: 'water', waterLines: 'water' };
+// The power meshes on screen, by electricity group (JC 26 Nov 2026): each
+// group has its own layer row. They stand in for the print's single Power mesh.
+const POWER_GROUP_OF = { powerGen: 'generation', powerStore: 'storage', powerGrid: 'transmission', powerLines: 'transmission', genPegs: 'generation', gridPegs: 'transmission' };
+const POWER_AREA_MESHES = ['powerGen', 'powerStore', 'powerGrid', 'genPegs', 'gridPegs'];
 // Object IDs for the ink pass (1-15): a change of ID between neighbouring pixels is an edge.
 // Narrow waterways share the terrain's ID, so their stepped edges get no ink.
 const INK_IDS = { terrain: 1, 'terrain-steep': 1, 'terrain-sides': 2, 'terrain-base': 3, water: 4, waterAreas: 4, waterLines: 1, buildings: 5,
-  receptors: 6, powerPoints: 7, powerPegs: 7, roads: 8, power: 9, rail: 10, railDisused: 11, residues: 12 };
+  receptors: 6, powerGen: 7, powerStore: 7, powerGrid: 7, genPegs: 7, gridPegs: 7, roads: 8, power: 9, powerLines: 9, rail: 10, railDisused: 11, residues: 12 };
 // Shared by the stylised looks (colours are per palette).
 const FIELD = {
   groundShadow: 0.08,
@@ -147,7 +152,7 @@ export function createScene(container) {
   // left out of the outline pass: at grid resolution their edges are
   // stepped, and ink would trace every step. Water stays in, so shorelines
   // are inked by the change of object.
-  const INKLESS = ['roads', 'power', 'rail', 'railDisused', 'residues'];
+  const INKLESS = ['roads', 'power', 'powerLines', 'rail', 'railDisused', 'residues'];
   const drawSize = new THREE.Vector2();
   // Scale bar (screen only: it is an element over the canvas, so grabs leave it out).
   const scaleEl = document.createElement('div');
@@ -179,7 +184,7 @@ export function createScene(container) {
       [scene.fog.near, scene.fog.far] = hazeRange(camera.position.distanceTo(controls.target), PALETTES.anthropogenic.carto);
     }
     renderer.render(scene, camera);
-    if (stylisedLook(view.look) && view.ink && lookDef(view.look).inkPass !== false) ink.render(scene, camera, { hide: [ground, ...INKLESS.map(id => meshes[id]).filter(Boolean), ...(props?.parts.lines || []), ...(props?.parts.trees || []), ...(pits ? [pits.group] : []), ...(dc ? [dc.group] : []), ...(apron ? apron.inkHide : [])], joinApron: !!apron && (apronOn || energyOn) && apron.root.visible });
+    if (stylisedLook(view.look) && view.ink && lookDef(view.look).inkPass !== false) ink.render(scene, camera, { hide: [ground, ...[...INKLESS, ...(painted() ? [] : POWER_AREA_MESHES)].map(id => meshes[id]).filter(Boolean), ...(props?.parts.lines || []), ...(props?.parts.trees || []), ...(pits ? [pits.group] : []), ...(dc ? [dc.group] : []), ...(apron ? apron.inkHide : [])], joinApron: !!apron && (apronOn || energyOn) && apron.root.visible });
   }
 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.28 }));
@@ -405,7 +410,7 @@ export function createScene(container) {
     }
     if (painted() && look === view.look) {
       paintOverlays(g, vectors, { Wmm: modelSize.Wmm, Hmm: modelSize.Hmm, residueColour: P.layers.residues, colours: P.overlays,
-        show: { roads: shown.roads !== false, rail: shown.rail !== false, power: shown.power !== false, residues: shown.residues !== false } });
+        show: { roads: shown.roads !== false, rail: shown.rail !== false, power: shown.transmission !== false, residues: shown.residues !== false } });
     }
     if (pits && pitsOn && !view.print) pits.paint(g, modelSize);   // pit symbols (BGS BritPits)
     if (dc && dcOn) dc.paint(g, modelSize, P);                // data-centre parameter zones
@@ -416,6 +421,7 @@ export function createScene(container) {
   // Route strips hidden while they are painted; power keeps its substations
   // and pegs as a screen-only mesh (powerPoints) so they still cast shadows.
   const PAINTED_MESHES = new Set(['roads', 'rail', 'railDisused', 'power', 'residues', 'water']);
+  const splitPower = () => Object.keys(POWER_GROUP_OF).some(k => meshes[k]);
   // Mist: distance haze in the look's haze colour, on or off per look (on by
   // default where the look asks for it: Anthropogenic). Screen and saved images only.
   function applyMist() {
@@ -432,8 +438,12 @@ export function createScene(container) {
     setWaterFilled(wp);
     for (const [k, m] of Object.entries(meshes)) {
       if (SCREEN_OF[k] === 'water' && wp) m.visible = false;              // painted on the drape instead
-      else if (SCREEN_OF[k]) m.visible = p && shown[SCREEN_OF[k]] !== false     // screen-only stand-ins
-        && !(k === 'powerPegs' && props && (propShown.pylons || propShown.turbines));   // the 3D props replace the pegs
+      else if (POWER_GROUP_OF[k]) m.visible = shown[POWER_GROUP_OF[k]] !== false   // power, by group, in every look
+        && !(k === 'powerLines' && p)                                     // lines are painted (and strung between the 3D pylons)
+        && !(k === 'gridPegs' && (props?.counts?.towers || props?.counts?.poles) && propShown.pylons !== false)     // the 3D props replace the pegs
+        && !(k === 'genPegs' && props?.counts?.turbines && propShown.turbines !== false);
+      else if (SCREEN_OF[k]) m.visible = p && shown[SCREEN_OF[k]] !== false;     // screen-only stand-ins
+      else if (k === 'power' && splitPower()) m.visible = false;           // the print's Power mesh: the groups stand in on screen
       else m.visible = shown[k] !== false && !(p && PAINTED_MESHES.has(k));
     }
     // Geology walls stand in for the plain slab walls (not with print colours).
@@ -500,7 +510,7 @@ export function createScene(container) {
     const drapeW = carto ? (Wmm >= Hmm ? long : Math.round(long * Wmm / Hmm)) : Math.min(4096, renderer.capabilities.maxTextureSize);
     const show = {};
     for (const k of ['water', 'roads', 'rail', 'power', 'buildings']) show[k] = shown[k] !== false;
-    if (propShown.pylons === false) show.power = false;
+    show.power = shown.transmission !== false && propShown.pylons !== false;     // the grid round the model is transmission
     const st = apron.setLook(view.look, { P, C, lit: !carto, useGlyphs: carto, bgHex: horizonColour(), drapeW,
       anisotropy: renderer.capabilities.getMaxAnisotropy(), show, parts: { land: apronOn, energy: energyOn }, edge: apronEdgeSource(carto) });
     if (st) apron.stats.paint = st;
@@ -520,7 +530,7 @@ export function createScene(container) {
   // on the ordinary meshes.
   const cartoActive = () => !!lookDef(view.look).carto && !view.print && !!vectors && !!meshes.terrain;
   const CARTO_HIDDEN = new Set(['terrain', 'terrain-steep', 'terrain-base', 'water', 'waterAreas', 'waterLines', 'roads', 'power',
-    'rail', 'railDisused', 'residues', 'buildings', 'receptors', 'powerPoints', 'powerPegs']);
+    'rail', 'railDisused', 'residues', 'buildings', 'receptors', ...Object.keys(POWER_GROUP_OF)]);
   let drapeVersion = 0;
   // Visibility for a carto look; returns false (and undoes it) for any other.
   function refreshCarto() {
@@ -608,7 +618,7 @@ export function createScene(container) {
     const long = Math.min(C.drapePx, renderer.capabilities.maxTextureSize);
     const W = Wmm >= Hmm ? long : Math.round(long * Wmm / Hmm), H = Wmm >= Hmm ? Math.round(long * Hmm / Wmm) : long;
     const show = { brushwork: view.brushwork, relief: view.relief, crowns: view.crowns && propShown.trees !== false };
-    for (const k of ['water', 'roads', 'rail', 'power', 'residues', 'buildings', 'receptors']) show[k] = shown[k] !== false;
+    for (const k of ['water', 'roads', 'rail', 'residues', 'buildings', 'receptors', 'generation', 'storage', 'transmission']) show[k] = shown[k] !== false;
     const key = JSON.stringify([view.look, W, H, drapeVersion, show, pits && pitsOn ? pits.shown : null, !!(dc && dcOn)]);
     if (carto?.key === key) { if (!carto.tex) uploadCarto(); return carto.stats; }
     if (!carto || carto.canvas.width !== W || carto.canvas.height !== H) {
@@ -977,14 +987,17 @@ export function createScene(container) {
 
   function setVisible(id, on) {
     for (const k of [id, `${id}Disused`, `${id}-sides`, `${id}-base`]) shown[k] = on;
-    // "Electricity infrastructure": substations and lines (power) with the turbines,
-    // pylons, poles and overhead lines (3D props and the Anthropogenic glyphs)
-    if (id === 'power') for (const k of ['turbines', 'pylons', 'lines']) { propShown[k] = on; props?.setVisible(k, on); glyphs?.setVisible(k, on); }
+    // Electricity, in three groups: Generation (with the wind turbines),
+    // Storage, and Transmission (with the pylons, poles and overhead lines:
+    // 3D props and the Anthropogenic glyphs). 'power' sets all three.
+    if (id === 'power') for (const g of ['generation', 'storage', 'transmission']) shown[g] = on;
+    const propsOf = { generation: ['turbines'], transmission: ['pylons', 'lines'], power: ['turbines', 'pylons', 'lines'] }[id] || [];
+    for (const k of propsOf) { propShown[k] = on; props?.setVisible(k, on); glyphs?.setVisible(k, on); }
     // "Soil sides" hides the side walls and the flat base. The steep faces are
     // ground (hiding them left holes in the land), so they stay.
     if (id === 'terrain-sides') shown['terrain-base'] = on;
     refreshVisibility();
-    if (['roads', 'rail', 'power', 'residues'].includes(id) && painted()) paintField();
+    if (['roads', 'rail', 'power', 'residues', 'generation', 'storage', 'transmission'].includes(id) && painted()) paintField();
     else if (id === 'water' && waterPainted()) paintField();
     else if (['water', 'buildings', 'receptors'].includes(id) && cartoActive()) paintField();
   }

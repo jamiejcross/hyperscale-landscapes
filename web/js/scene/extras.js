@@ -6,7 +6,7 @@ import { EVIDENCE } from './palettes.js';
 
 // Strings the extras use (keys of data/i18n); the offline viewer carries them resolved.
 export const EXTRAS_KEYS = ['preview.why', 'context.layer', 'context.layer.why', 'energy.layer', 'energy.layer.why', 'geology.view',
-  'views.title', 'layer.labels', 'layer.labels.why', 'pits.quarries', 'pits.quarries.why', 'layer.scale', 'layer.scale.why', 'layer.electricity', 'layer.electricity.why', 'props.trees', 'props.trees.why', 'props.trees.height', 'props.turbines', 'props.turbines.why',
+  'views.title', 'layer.labels', 'layer.labels.why', 'pits.quarries', 'pits.quarries.why', 'layer.scale', 'layer.scale.why', 'layer.generation', 'layer.generation.why', 'layer.transmission', 'layer.transmission.why', 'layer.power.print', 'props.trees', 'props.trees.why', 'props.trees.height', 'props.turbines', 'props.turbines.why',
   'props.pylons', 'props.pylons.why', 'pits.coal', 'pits.coal.why', 'pits.unknown', 'pits.unknown.why', 'pits.quarry', 'pits.quarry.why'];
 
 // ul: the layer list; props / subsurface: the bundle's sections (or null);
@@ -32,21 +32,24 @@ export function mountExtras(ul, scene, { props, subsurface, grid, heights, zExag
   contextSlot = null, contextView = null, onContextView = () => {}, labels = false, onLabels = () => {} }) {
   treeSlot?.querySelector('[data-tree-factor]')?.parentElement.remove();   // a rebuild: drop the last model's slider
   const pc = scene.setProps(props, { grid, heights, zExag, seed });
-  // Turbines, pylons and lines have no rows of their own: the "Electricity
-  // infrastructure" layer row switches them (scene.setVisible('power')), and
-  // their notes are added to that row's explanation.
-  const elec = [['turbines', pc?.turbines], ['pylons', (pc?.towers || 0) + (pc?.poles || 0) + (pc?.lineSegments || 0)]].filter(([, n]) => n);
-  if (elec.length) {
-    let row = ul.querySelector('input[data-layer="power"]')?.closest('li');
-    if (!row) {          // a site with props but no power features in the model
+  // Turbines, pylons and lines have no rows of their own: the electricity
+  // rows switch them (scene.setVisible: turbines with Generation; pylons,
+  // poles and lines with Transmission), and their notes are added to that
+  // row's explanation.
+  const elec = [['turbines', 'generation', pc?.turbines], ['pylons', 'transmission', (pc?.towers || 0) + (pc?.poles || 0) + (pc?.lineSegments || 0)]].filter(([, , n]) => n);
+  for (const [kind, group] of elec) {
+    let row = ul.querySelector(`input[data-layer="${group}"]`)?.closest('li');
+    if (!row) {          // a site with props but no such features in the model
       row = document.createElement('li');
-      row.innerHTML = `<label class="check"><input type="checkbox" checked data-layer="power"><span class="swatch" data-swatch="power" data-screen="#E69F00" style="background:#E69F00"></span>${text('layer.electricity')}${whyButton(text('preview.why'))}</label>
-        ${whyBox(`<p>${text('layer.electricity.why')}</p>`)}`;
-      ul.append(row);
-      row.querySelector('input').onchange = e => scene.setVisible('power', e.target.checked);
+      row.innerHTML = `<label class="check"><input type="checkbox" checked data-layer="${group}"><span class="swatch" data-swatch="power" data-screen="#E69F00" style="background:#E69F00"></span>${text(`layer.${group}`)}${whyButton(text('preview.why'))}</label>
+        ${whyBox(`<p>${text(`layer.${group}.why`)} ${text('layer.power.print')}</p>`)}`;
+      const after = group === 'generation' ? null : ul.querySelector('input[data-layer="storage"], input[data-layer="generation"]')?.closest('li');
+      const before = ul.querySelector('input[data-layer="storage"], input[data-layer="transmission"], input[data-layer="residues"]')?.closest('li');
+      if (after) after.after(row); else if (before) before.before(row); else ul.append(row);
+      row.querySelector('input').onchange = e => scene.setVisible(group, e.target.checked);
     }
     const det = row.querySelector('.why');
-    for (const [kind] of elec) { const p = document.createElement('p'); p.textContent = `${text(`props.${kind}`)}: ${text(`props.${kind}.why`)}`; det.append(p); }
+    const p = document.createElement('p'); p.textContent = `${text(`props.${kind}`)}: ${text(`props.${kind}.why`)}`; det.append(p);
   }
   const propRows = [['trees', pc?.trees]];
   for (const [kind, n] of propRows) {

@@ -130,7 +130,7 @@ export function crownPlan({ woods = [], rows = [], trees = null, C, mmPerM, Wmm,
 //   recolours it), recolourMap (for landcover), relief: canvas or null,
 //   sea: canvas (alpha mask, north up) or null, vectors, Wmm, Hmm, mmPerM,
 //   C: the carto palette, ink, trees (decoded) or null, seed,
-//   show: { brushwork, relief, crowns, water, roads, rail, power, residues, buildings, receptors } }
+//   show: { brushwork, relief, crowns, water, roads, rail, residues, buildings, receptors, generation, storage, transmission } }
 export function paintCarto(canvas, o) {
   const t0 = performance.now();
   const { C, vectors: V = {}, Wmm, Hmm, mmPerM, ink, show = {} } = o;
@@ -195,7 +195,7 @@ export function paintCarto(canvas, o) {
   }
   // 8. buildings, receptors and substations in plan: contact shadows, then fills with an ink edge
   const feet = (V.footprints || []).filter(f => (f.r ? on('receptors') : on('buildings')));
-  const subs = on('power') ? (V.powerAreas || []) : [];
+  const subs = (V.powerAreas || []).filter(f => (f.g ? on(f.g) : on('transmission')) && on('power'));   // by electricity group
   const shape = f => { g.beginPath(); if (f.sq) { const [x, y, a] = f.sq; g.rect(X(x - a / 2), Y(y + a / 2), a * k, a * k); } else ringPath(f.rings); };
   const off = C.footShadowM * pxPerM;
   g.save(); g.translate(off, -off); g.fillStyle = C.footShadow;
