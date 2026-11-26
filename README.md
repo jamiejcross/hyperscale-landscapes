@@ -1,9 +1,11 @@
 # Hyperscale Landscapes
 
-**See, hold and share the landscape that a proposed data centre would be fused to.**
+An Open Tool for Making and Printing Landscape Data Visualisations around Hyperscale Data Centres
+Designed by humans, responsibly built with AI for use in campaigning, communications, and research.
 
-Planning documents reduce proposed data-centre sites to red lines and grid
-references. This toolkit turns a site into evidence people can hold and share:
+Planning documents reduce proposed data-centre sites to red lines and grid references. Many people and organisations are resorting to the use of AI as they try to visualise the impacts of hyperscale data centres on landscapes.  
+
+This toolkit uses open data sets and traditions of landscape visualisation in data science, architecture, art and design to turn a site into evidence people can hold and share.
 
 - **3D-printable models.** These are multi-colour terrain models showing rivers,
   power lines and substations, old mines and bings (spoil heaps), homes and
