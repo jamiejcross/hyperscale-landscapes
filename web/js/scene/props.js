@@ -36,6 +36,12 @@ function merge(geoms) {
   return out;
 }
 
+// Pylon and pole at unit height (base at z = 0), shared with the context apron.
+export function supportGeometries() {
+  return { tower: merge([cyl(0.03, 0.12, 1, 0, 4), box(0.5, 0.02, 0.02, 0.62), box(0.62, 0.02, 0.02, 0.78), box(0.42, 0.02, 0.02, 0.93)]),
+           pole: merge([cyl(0.012, 0.016, 1, 0, 5), box(0.2, 0.015, 0.015, 0.93)]) };
+}
+
 // Archetypes: parts as [geometry, colour role]; unitR = crown radius at unit scale.
 // Order matches trees.ARCHETYPES in the pipeline (bundle codes 0..4).
 const ARCHETYPES = {
@@ -137,8 +143,7 @@ export function createProps({ props, grid, heights, zExag = 2, seed = 1, ramp })
 
   // ---- pylons, poles (true height), and lines ----
   const sup = props?.supports || [];
-  const towerGeo = merge([cyl(0.03, 0.12, 1, 0, 4), box(0.5, 0.02, 0.02, 0.62), box(0.62, 0.02, 0.02, 0.78), box(0.42, 0.02, 0.02, 0.93)]);
-  const poleGeo = merge([cyl(0.012, 0.016, 1, 0, 5), box(0.2, 0.015, 0.015, 0.93)]);
+  const { tower: towerGeo, pole: poleGeo } = supportGeometries();
   const onPlate = o => o.x >= 0 && o.y >= 0 && o.x * mmPerM <= grid.Wmm && o.y * mmPerM <= grid.Hmm;
   const towers = sup.filter(o => o.kind !== 'pole' && onPlate(o)), poles = sup.filter(o => o.kind === 'pole' && onPlate(o));
   const supportMesh = (geo, list, name) => {

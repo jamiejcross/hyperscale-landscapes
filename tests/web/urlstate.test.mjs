@@ -8,9 +8,9 @@ test('parseView reads valid parameters', () => {
     { site: 'south-gyle', style: 'field', az: 135, el: 30 });
 });
 
-test('parseView clamps elevation to 12–70 and wraps azimuth', () => {
-  assert.equal(parseView('?el=5').el, EL_MIN);
-  assert.equal(parseView('?el=90').el, EL_MAX);
+test('parseView clamps elevation to 0–90 and wraps azimuth', () => {
+  assert.equal(parseView('?el=5').el, 5);
+  assert.equal(parseView('?el=95').el, EL_MAX);
   assert.equal(parseView('?el=-40').el, EL_MIN);
   assert.equal(parseView('?az=370').az, 10);
   assert.equal(parseView('?az=-90').az, 270);
@@ -25,8 +25,8 @@ test('parseView drops anything invalid', () => {
 });
 
 test('viewSearch writes, rounds, clamps and keeps other parameters', () => {
-  assert.equal(viewSearch('?lang=en', { site: 'plean', style: 'field', az: 134.6, el: 85 }),
-    '?lang=en&site=plean&style=field&az=135&el=70');
+  assert.equal(viewSearch('?lang=en', { site: 'plean', style: 'field', az: 134.6, el: 95 }),
+    '?lang=en&site=plean&style=field&az=135&el=90');
   assert.equal(parseView('?style=mossmorran').style, 'guthrie');   // retired look
   assert.equal(viewSearch('?site=plean&az=10', { site: null }), '?az=10');
   assert.equal(viewSearch('', {}), '');
@@ -42,3 +42,4 @@ test('guthrie style round-trips through the URL', () => {
   assert.equal(s, '?site=auchtertool-cato&style=guthrie&az=225&el=30');
   assert.deepEqual(parseView(s), { site: 'auchtertool-cato', style: 'guthrie', az: 225, el: 30 });
 });
+

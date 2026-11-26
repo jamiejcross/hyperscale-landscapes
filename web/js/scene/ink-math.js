@@ -34,6 +34,10 @@ export function edgeStrength({ idChange = false, depth2 = 0, cosAngle = 1, onTer
   return Math.max(a, b, c);
 }
 export const TERRAIN_ID = 1;
+// The context apron (screen only): never edged against the background or
+// itself (its far edge and hills fade, unoutlined), nor where the land and
+// water meet it (ink.js joinApron).
+export const APRON_ID = 0;
 
 // Width handling: the ring of samples sits at half the line width (in CSS
 // px) times the render's pixel ratio; the outline target is drawn at a scale

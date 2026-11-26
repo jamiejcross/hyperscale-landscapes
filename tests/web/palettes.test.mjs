@@ -22,7 +22,7 @@ test('brushwork is deterministic for a seed and differs between seeds', () => {
   assert.equal(a.length, 16000);
   assert.deepEqual(a, b);
   assert.notDeepEqual(a.slice(0, 10), c.slice(0, 10));
-  assert.ok(a.every(s => Math.abs(s.angle) <= 0.45 && s.len >= 4 && s.len <= 18 && s.width >= 1.5 && s.width <= 5));
+  assert.ok(a.every(s => Math.abs(s.angle) <= 0.45 && s.len >= 8 && s.len <= 36 && s.width >= 3 && s.width <= 10));
 });
 
 test('brushwork count scales with drape area', () => {

@@ -4,9 +4,10 @@
 // scene, studio and caption code as the web app.
 import { createScene, layerSwatch } from 'hl/scene';
 import { mountStudio, geologyNote, lookNote } from 'hl/studio';
-import { mountExtras } from 'hl/extras';
+import { mountExtras, mountScaleRow, whyButton, whyBox, wireWhy } from 'hl/extras';
 import { parseView, urlWriter } from 'hl/urlstate';
 import { PALETTES } from 'hl/palettes';
+import { setGeologyText } from 'hl/export/walls';
 
 const D = JSON.parse(document.getElementById('terrain-data').textContent);
 const $ = id => document.getElementById(id);
@@ -22,27 +23,29 @@ for (const id of D.screen || []) screen[id] = { positions: arr(`screen:${id}_p`)
 const json = k => (D.layout[k] ? JSON.parse(new TextDecoder().decode(new Uint8Array(buf, D.layout[k][0], D.layout[k][1]))) : null);
 const vectors = json('vectors');
 // site extras (props, geology walls, pits), as in the web app
-const heights = D.layout.heights ? arr('heights') : null, propsData = json('props'), subsurface = json('subsurface');
+const heights = D.layout.heights ? arr('heights') : null, waterFill = D.layout.waterFill ? arr('waterFill') : null, propsData = json('props'), subsurface = json('subsurface'), contextData = json('context');
 
 // ---- scene
 const scene = createScene($('view'));
 const drape = D.drape ? await new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = D.drape; }) : null;
 scene.setModel({ layers, colours: D.colours, grid: D.grid, landcover: drape && toCanvas(drape), drapeKind: D.drapeKind, vectors, screen, seed: D.seed ?? D.slug,
-  heights, relief: D.relief || null });
+  heights, relief: D.relief || null, waterFill });
 function toCanvas(img) { const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0); return c; }
 
 // ---- panel: title, layers, studio, caption
 document.title = D.caption.title;
 $('title').textContent = D.caption.title;
 $('sub').textContent = D.sub;
+setGeologyText(D.text);      // the geology legend's closing note (packed with the other strings)
 const ul = $('layers');
 for (const L of D.legend) {
   const li = document.createElement('li');
-  li.innerHTML = `<label class="check"><input type="checkbox" checked data-layer="${L.id}"><span class="swatch" data-swatch="${L.id}" data-screen="${L.colour}" style="background:${L.colour}"></span>${L.name}</label>
-    <details><summary>Why this matters</summary><p>${L.why}</p></details>`;
+  li.innerHTML = `<label class="check"><input type="checkbox" checked data-layer="${L.id}"><span class="swatch" data-swatch="${L.id}" data-screen="${L.colour}" style="background:${L.colour}"></span>${L.name}${whyButton(D.text?.['preview.why'] ?? 'Why this matters')}</label>
+    ${whyBox(`<p>${L.why}</p>`)}`;
   ul.append(li);
 }
 ul.querySelectorAll('input').forEach(i => { i.onchange = () => scene.setVisible(i.dataset.layer, i.checked); });
+wireWhy(ul);
 const text = (k, vars = {}) => Object.entries(vars).reduce((s, [a, v]) => s.replaceAll(`{${a}}`, v), D.text?.[k] ?? k);
 
 const exag = () => {
@@ -55,7 +58,7 @@ const caption = () => ({ ...D.caption, disclosure: exag(), top: D.caption.top.re
 const writeUrl = urlWriter(() => { const a = scene.cameraAngles(); return { style: scene.view.look, az: a.az, el: a.el }; });
 const studio = mountStudio($('studio'), scene, {
   caption, filename: () => `${D.slug}-${new Date().toISOString().slice(0, 10)}`,
-  printColours: () => D.printColours, alt: () => D.alt,
+  printColours: () => D.printColours, alt: () => D.alt, layerList: () => $('layers'),
   fontCSS: () => [...document.querySelectorAll('style')].map(s => s.textContent).filter(t => t.includes('@font-face')).join(''),
   onChange: () => {
     const notes = [lookNote(scene), geologyNote(scene)].filter(Boolean).join(' · ');
@@ -63,16 +66,21 @@ const studio = mountStudio($('studio'), scene, {
     document.querySelectorAll('.swatch[data-swatch]').forEach(s => { s.style.background = layerSwatch(s.dataset.swatch, scene.view.look, s.dataset.screen); });
   },
 });
-if (heights && (propsData || subsurface)) {
-  mountExtras(ul, scene, { props: propsData, subsurface, grid: D.grid, heights, zExag: D.zExag, seed: D.seed ?? D.slug, text,
+if (heights && (propsData || subsurface || contextData)) {
+  mountExtras(ul, scene, { props: propsData, subsurface, grid: D.grid, heights, zExag: D.zExag, seed: D.seed ?? D.slug, text, treeSlot: studio.part('modelSet'),
+    context: contextData, bbox: contextData?.model_bbox || null, relief: D.relief || null,
     onChange: () => { studio.renderLegend(); studio.update(); } });
   studio.refreshGeology();
 }
+mountScaleRow(ul, scene, { text });
 {
   const v = parseView(location.search);
   if (typeof D.view?.brushwork === 'boolean') studio.setBrushwork(D.view.brushwork);
   if (D.view && (D.view.relief === false || D.view.crowns === false)) scene.setCarto({ relief: D.view.relief, crowns: D.view.crowns });
+  if (D.view?.mist) Object.assign(scene.view.mist, D.view.mist);        // per look, as packed
   if (v.style || D.view?.look) studio.setLook(v.style || D.view.look);
+  { const mist = document.querySelector('#studio [name=mist]'); mist.checked = !!scene.view.mist[scene.view.look]; scene.setMist(mist.checked); }
+  if (D.view?.contours) { const c = document.querySelector('#studio [name=contours]'); c.checked = true; scene.setContours(true); }
   if (v.az != null || v.el != null) { const a = scene.cameraAngles(); scene.setCameraAngles(v.az ?? a.az, v.el ?? a.el); }
   scene.controls.addEventListener('change', writeUrl);
 }

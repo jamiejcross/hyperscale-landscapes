@@ -22,8 +22,9 @@ export function contourCanvas(grid, elev, widthPx = 2048) {
 
 // The same drawing from any height sampler: sampleM(xM, yM) gives metres at
 // a point (x east, y north, from the SW corner) of a wM x hM metre area.
-// `aspect` (height / width) sets the canvas height.
-export function reliefCanvas(sampleM, wM, hM, widthPx = 2048, aspect = hM / wM) {
+// `aspect` (height / width) sets the canvas height. shade: false leaves out the
+// hillshade (contour lines on white, for multiplying over land cover).
+export function reliefCanvas(sampleM, wM, hM, widthPx = 2048, aspect = hM / wM, { shade = true } = {}) {
   const W = widthPx, Hc = Math.round(widthPx * aspect);
   const px = wM / W;   // metres per pixel
 
@@ -53,7 +54,7 @@ export function reliefCanvas(sampleM, wM, hM, widthPx = 2048, aspect = hM / wM) 
     const n = norm([-gx * ex / px, -gy * ex / px, 1]);
     const lambert = Math.max(0, n[0] * L[0] + n[1] * L[1] + n[2] * L[2]);
     let g = HILLSHADE.flat + 22 * (lambert - L[2]) / (1 - L[2] + 1e-6);   // flat ground stays at 236
-    g = Math.min(HILLSHADE.max, Math.max(HILLSHADE.min, g));
+    g = shade ? Math.min(HILLSHADE.max, Math.max(HILLSHADE.min, g)) : 255;
     // Contour line: distance (in pixels) from this pixel to the nearest level.
     const slope = Math.hypot(gx, gy);
     if (v > 0 && slope > 1e-4) {

@@ -11,6 +11,9 @@ export function createPicker(el, { onBBox, onSection = () => {}, onBoundary = ()
     maxZoom: 19,
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map);
+  // The map box stretches with the controls beside it (a site's facts make
+  // that column taller); tell Leaflet, or the new space stays without tiles.
+  if (window.ResizeObserver) new ResizeObserver(() => map.invalidateSize({ pan: false })).observe(el);
 
   let rect = null, mode = null, start = null, poly = [], polyLine = null;
   // Swiss palette: black and white only: the model area

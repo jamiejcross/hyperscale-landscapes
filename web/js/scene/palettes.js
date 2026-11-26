@@ -48,6 +48,7 @@ export const PALETTES = {
       turbine: '#f2f0ea', pylon: '#5a5a55',
     },
     brushwork: false,
+    haze: '#ebe8e0',               // mist (not in the brief: a pale warm grey near the white background)
   },
 
   guthrie: {
@@ -90,6 +91,7 @@ export const PALETTES = {
       turf: '#5a5034', seams: '#1d1610', coalTint: 'rgba(60,40,22,0.25)',
     },
     brushwork: true,
+    haze: '#d3cdbf',               // mist: Anthropogenic's haze (that palette is Guthrie's)
     captionNote: 'Colours after Sir James Guthrie',
   },
 };
@@ -105,7 +107,7 @@ PALETTES.anthropogenic = {
   carto: {
     drapePx: 6144,                     // long side, capped by the GPU's texture size
     reliefPx: 3072, reliefAlpha: 0.62, // contour helper's canvas, multiplied in
-    brushScale: 1.5,                   // Guthrie's strokes x 1.5 (6-27 px long, 2-7.5 px wide)
+    brushScale: 1.5,                   // Guthrie's strokes x 1.5 (12-54 px long, 4.5-15 px wide)
     woodShadow: 'rgba(38,30,16,0.42)', woodShadowM: 7, woodBlurM: 5,
     woodBase: '#6a6845',
     crownSpacingM: 8.5, crownJitter: 0.25,
@@ -116,7 +118,7 @@ PALETTES.anthropogenic = {
     rowR: 2.6, rowStepM: 6,
     water: '#8a98a0', riverM: 6, streamM: 3.2,
     roadFill: '#e4dbc6', roadCasing: [9, 6], roadWidth: [6.5, 3.8],
-    rail: [12, 9], railWidth: 2.6, powerAlpha: 0.8, powerWidth: [2.2, 1.4],
+    rail: [12, 9], railWidth: 2.6,
     // brief: #a65a44; it failed the colour-blind check (against the red line, and grass
     // under the darkest relief), so a darker rust that passes every pair (approved by JC, 25 Nov 2026)
     residueFill: 'rgba(143,90,82,0.25)', residue: '#8f5a52', residueHatch: [2, 10], residueEdge: 2.5,
@@ -132,8 +134,9 @@ PALETTES.anthropogenic = {
 // (so a seed always gives the same strokes and GIF frames do not shimmer).
 export const BRUSHWORK = {
   perArea: 16000 / (4096 * 4096 * 0.5),     // strokes per px^2 (16,000 on a 4096 x 2048 drape)
-  length: [4, 18], width: [1.5, 5], angle: 0.45,
-  tones: ['rgba(255,246,222,0.07)', 'rgba(52,40,22,0.06)', 'rgba(120,128,80,0.06)', 'rgba(150,95,60,0.05)'],
+  // strengthened 25 Nov 2026 (JC: it did not show): twice the size, about twice the opacity
+  length: [8, 36], width: [3, 10], angle: 0.45,
+  tones: ['rgba(255,246,222,0.15)', 'rgba(52,40,22,0.13)', 'rgba(120,128,80,0.13)', 'rgba(150,95,60,0.11)'],
 };
 
 // Small seeded PRNG (mulberry32) and a string hash for the seed.

@@ -88,10 +88,8 @@ export function paintOverlays(g, vectors, { Wmm, Hmm, show = {}, residueColour =
     }
   }
 
-  if (show.power !== false && vectors.powerLines?.length) {
-    g.strokeStyle = C.power; g.lineWidth = overlayWidth('powerLine', W);
-    for (const r of vectors.powerLines) { g.beginPath(); trace(r.p); g.stroke(); }
-  }
+  // Power lines are no longer painted along the ground (25 Nov 2026, JC): the
+  // 3D lines between pylons (site bundles) draw them where they are known.
   g.restore();
 }
 

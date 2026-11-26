@@ -4,13 +4,13 @@
 // az and el are the CAMERA's angles as seen from the model's centre: az is
 // the compass bearing the camera stands at (clockwise from north, so 135 is
 // looking from the south-east), el its height above the horizon, held to
-// 12–70°. (The sun's angles are not in the URL.)
+// 0–90° (level with the base edge to straight down). (The sun's angles are not in the URL.)
 // Pure functions, plus a throttled writer; no other imports, so Node can
 // test this file directly.
 
 export const STYLES = ['guthrie', 'field', 'anthropogenic'];
 const RETIRED = { mossmorran: 'guthrie' };
-export const EL_MIN = 12, EL_MAX = 70;
+export const EL_MIN = 0, EL_MAX = 90;
 const SITE_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
 const num = v => (v === null || v.trim() === '' ? NaN : Number(v));

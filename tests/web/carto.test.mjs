@@ -2,7 +2,7 @@
 // the painting itself needs a canvas and is checked in tools/shoot.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { recolourData, crownPlan, heightMetres, hazeRange, glyphPoints } from '../../web/js/scene/carto.js';
+import { recolourData, crownPlan, heightMetres, hazeRange, glyphPoints, glyphWires } from '../../web/js/scene/carto.js';
 import { PALETTES } from '../../web/js/scene/palettes.js';
 import { parseView, STYLES } from '../../web/js/urlstate.js';
 
@@ -60,4 +60,11 @@ test('glyphs: recorded heights x1.3, defaults flagged as assumed', () => {
 test('URL: ?style=anthropogenic round-trips', () => {
   assert.ok(STYLES.includes('anthropogenic'));
   assert.equal(parseView('?style=anthropogenic').style, 'anthropogenic');
+});
+
+test('glyphWires joins consecutive supports along a line, once each', () => {
+  const pts = [{ kind: 'pylon', x: 0, y: 0 }, { kind: 'pylon', x: 10, y: 0 }, { kind: 'turbine', x: 20, y: 0 }, { kind: 'pole', x: 30, y: 0 }];
+  // vertex at 5,0 has no support: breaks the line; the turbine is not a support
+  const w = glyphWires(pts, [[[0, 0.01], [10, 0], [20, 0], [30, 0]], [[10, 0], [0, 0]], [[0, 0], [5, 0], [30, 0]]], 0.1);
+  assert.deepEqual(w, [[0, 1]]);
 });

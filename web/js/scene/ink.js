@@ -12,7 +12,7 @@
 // target is drawn at 2 samples per CSS pixel and read bilinearly, which
 // smooths the steps along long diagonal slab edges.
 import * as THREE from 'three';
-import { EDGE, TERRAIN_ID, ringRadius, outlineScale } from './ink-math.js';
+import { EDGE, TERRAIN_ID, APRON_ID, ringRadius, outlineScale } from './ink-math.js';
 
 export const INK = { colour: '#221d18', strength: 1.0, lineWidth: 1.8 };
 
@@ -60,6 +60,12 @@ float invZ(vec2 uv) {
   return (far - d * (far - near)) / (near * far);    // 1 / view z
 }
 vec4 S(vec2 uv) { return texture2D(tOutline, uv); }
+// background (0) or the context apron: no edges between these
+bool quietId(float a) { float id = a * 255.0 / 16.0; return id < 0.5 || abs(id - ${APRON_ID}.0) < 0.5; }
+// With the Landscape Context on, the land and water run on into the apron:
+// no edge where they meet it (the apron shares the model's edge vertices).
+uniform float joinApron;
+bool joinable(float a) { float id = a * 255.0 / 16.0; return abs(id - ${TERRAIN_ID}.0) < 0.5 || abs(id - 4.0) < 0.5; }
 
 // Edge strength seen from the centre with the ring at radius r.
 float edgeAt(float r) {
@@ -67,19 +73,21 @@ float edgeAt(float r) {
   vec3 nc = c.xyz * 2.0 - 1.0;
   float wc = invZ(vUv);
   bool onTerrain = abs(c.a * 255.0 / 16.0 - ${TERRAIN_ID}.0) < 0.5;
+  bool quiet = quietId(c.a);
   float e = 0.0;
   for (int i = 0; i < 8; i++) {
     float a = float(i) * 0.7853982;
     vec2 o = vec2(cos(a), sin(a)) * r * texel;
     vec4 s = S(vUv + o);
     // a. object change (IDs, incl. background = 0)
-    if (abs(s.a - c.a) > 8.0 / 255.0) e = 1.0;
+    bool joined = joinApron > 0.5 && ((joinable(c.a) && quietId(s.a)) || (quiet && joinable(s.a)));
+    if (abs(s.a - c.a) > 8.0 / 255.0 && !(quiet && quietId(s.a)) && !joined) e = 1.0;
     // c. crease
     vec3 ns = s.xyz * 2.0 - 1.0;
     float crease = smoothstep(${f(EDGE.creaseLow)}, ${f(EDGE.creaseHigh)}, 1.0 - dot(nc, ns)) * ${f(EDGE.creaseStrength)};
-    if (!onTerrain) e = max(e, crease);
+    if (!onTerrain && !quiet) e = max(e, crease);
     // b. depth discontinuity, from the opposite pair (4 pairs in all)
-    if (i < 4) {
+    if (i < 4 && !(quiet && quietId(S(vUv + o).a) && quietId(S(vUv - o).a))) {
       float wa = invZ(vUv + o), wb = invZ(vUv - o);
       float m = max(max(wa, wb), wc);
       if (m > 0.0) e = max(e, smoothstep(${f(EDGE.depthLow)}, ${f(EDGE.depthHigh)}, abs(wa + wb - 2.0 * wc) / m));
@@ -117,7 +125,7 @@ export function createInk(renderer) {
       tOutline: { value: target.texture }, tDepth: { value: target.depthTexture },
       texel: { value: new THREE.Vector2() }, radius: { value: 1 }, soft: { value: 1 }, near: { value: 1 }, far: { value: 1000 },
       ink: { value: new THREE.Vector3() },   // sRGB, written straight to the output
-      strength: { value: 1 },
+      strength: { value: 1 }, joinApron: { value: 0 },
     },
   });
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), quadMat);
@@ -127,7 +135,9 @@ export function createInk(renderer) {
 
   // Draw ink over whatever was just rendered to the current target.
   // `hide`: objects left out of the outline pass (the shadow-catcher ground).
-  function render(scene, camera, { hide = [] } = {}) {
+  // joinApron: no edge where the land meets the context apron.
+  function render(scene, camera, { hide = [], joinApron = false } = {}) {
+    quadMat.uniforms.joinApron.value = joinApron ? 1 : 0;
     const out = renderer.getRenderTarget();
     const pr = out ? 1 : renderer.getPixelRatio();
     if (out) size.set(out.width, out.height); else renderer.getDrawingBufferSize(size);

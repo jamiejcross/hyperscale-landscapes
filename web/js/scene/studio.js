@@ -6,7 +6,8 @@ import { LOOKS, LOOK_DEFS } from './scene.js';
 import { PALETTES } from './palettes.js';
 import { SIZES, makeGIF, makeVideo, videoType } from './turntable.js';
 import { captionNote, subsurfaceManifest } from './subsurface-info.js';
-import { wallsSVG, wallsPNG, legendItems, markSVG, diagramVex } from '../export/walls.js';
+import { wallsSVG, wallsPNG, legendItems, dataNote, markSVG, diagramVex } from '../export/walls.js';
+import { mapKeyItems, legendCanvas, legendSVG } from './legend.js';
 
 const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'N'];
 
@@ -26,17 +27,20 @@ const escHTML = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<
 
 export function mountStudio(el, scene, host) {
   // host: { caption(): {title, disclosure, sources, footer, top}, filename(): string,
-  //         printColours(): {layerId: hex}, onChange?(view), alt?(): string }
+  //         printColours(): {layerId: hex}, onChange?(view), alt?(): string,
+  //         layerList?(): the layer key <ul> (for the legend) }
   el.classList.add('studio');
   el.innerHTML = `
     <fieldset><legend>Style</legend>
       <select name="look" aria-label="Style">
         ${Object.entries(LOOKS).map(([k, label]) => `<option value="${k}"${k === scene.view.look ? ' selected' : ''}>${label}</option>`).join('')}
       </select>
-      <label class="range" name="inkRow"${LOOK_DEFS[scene.view.look]?.inkPass === false ? ' hidden' : ''}>Outline <input type="range" name="ink" min="1" max="3" step="0.1" value="1.8"><output name="inkV"></output></label>
+      <label class="range" name="inkRow"${LOOK_DEFS[scene.view.look]?.inkPass === false ? ' hidden' : ''}>Outline <input type="range" name="ink" min="0.5" max="3" step="0.1" value="1.8"><output name="inkV"></output></label>
       <label class="check" name="brushRow"${PALETTES[scene.view.look]?.brushwork ? '' : ' hidden'}><input type="checkbox" name="brush"${scene.view.brushwork ? ' checked' : ''}> Brushwork (a texture, not data)</label>
       <label class="check" name="reliefRow"${LOOK_DEFS[scene.view.look]?.carto ? '' : ' hidden'}><input type="checkbox" name="relief"${scene.view.relief !== false ? ' checked' : ''}> Relief shading (from the model's heights)</label>
       <label class="check" name="crownRow"${LOOK_DEFS[scene.view.look]?.carto ? '' : ' hidden'}><input type="checkbox" name="crowns"${scene.view.crowns !== false ? ' checked' : ''}> Crown symbols (woodland drawn as symbols)</label>
+      <label class="check" name="contourRow"${LOOK_DEFS[scene.view.look]?.carto ? ' hidden' : ''}><input type="checkbox" name="contours"${scene.view.contours ? ' checked' : ''}> Contour lines (from the elevation data; over land cover or satellite)</label>
+      <label class="check"><input type="checkbox" name="mist"${scene.view.mist?.[scene.view.look] ? ' checked' : ''}> Mist (distance haze)</label>
       <p class="hint">Changes how the model is drawn on screen and in saved images. Print files are not affected.</p>
     </fieldset>
     <fieldset><legend>Camera</legend>
@@ -55,31 +59,45 @@ export function mountStudio(el, scene, host) {
       <label class="range">Strength <input type="range" name="sun" min="0" max="60" value="30"><output name="sunV"></output></label>
       <label class="range">Fill light <input type="range" name="fill" min="0" max="30" value="10"><output name="fillV"></output></label>
     </fieldset>
-    <fieldset><legend>Model</legend>
+    <fieldset name="modelSet"><legend>Model</legend>
       <label class="range">Extra height <input type="range" name="zex" min="50" max="300" step="25" value="100"><output name="zexV"></output></label>
       <label class="check"><input type="checkbox" name="sides" checked> Soil sides</label>
-      <label class="check" name="geoRow" hidden><input type="checkbox" name="geology" checked> Geology walls (BGS; screen only)</label>
+      <label class="check" name="geoRow" hidden><input type="checkbox" name="geology" checked> Geology walls</label>
       <label class="check"><input type="checkbox" name="shadow"> Ground shadow</label>
       <label class="check"><input type="checkbox" name="print"> Print colours</label>
     </fieldset>
-    <fieldset name="geoPanel" hidden><legend>Geology legend (BGS)</legend>
+    <fieldset name="geoPanel" hidden><legend>Geology legend</legend>
+      <label class="check"><input type="checkbox" name="geoLabels"> Labels on the walls (coal-bearing ground, deeper boreholes)</label>
       <div name="geoLegend" class="geo-legend"></div>
-      <div class="inline">
-        <button type="button" name="wallsPng">Unfolded walls (PNG)</button>
-        <button type="button" name="wallsSvg">SVG</button>
-        <button type="button" name="geoManifest">Sources (JSON)</button>
+      <div name="geoExport">
+        <div class="inline">
+          <button type="button" name="wallsPng">Geology cross sections (PNG)</button>
+          <button type="button" name="wallsSvg">SVG</button>
+          <button type="button" name="geoManifest">Sources (JSON)</button>
+        </div>
+        <p class="hint">The four walls of the model laid out flat at true horizontal scale, with the geology legend and the BGS notice. Non-commercial use only. The JSON lists the sources and the data notes.</p>
+        <p class="hint" name="geoInfo" aria-live="polite"></p>
       </div>
-      <p class="hint">The four walls laid out flat at true horizontal scale, with this legend and the BGS notice. Non-commercial use only.</p>
-      <p class="hint" name="geoInfo" aria-live="polite"></p>
     </fieldset>
-    <fieldset><legend>Background</legend>
+    <fieldset name="keySet"><legend>Legend</legend>
+      <label class="check"><input type="checkbox" name="keyOn"> Add a legend to saved images and animations</label>
+      <div name="keyExport">
+        <div class="inline">
+          <button type="button" name="keyPng">Export legend (PNG)</button>
+          <button type="button" name="keySvg">SVG</button>
+        </div>
+        <p class="hint">Symbols and colours for the layers shown, in the current look, and the subsurface geology where the site has it.</p>
+        <p class="hint" name="keyInfo" aria-live="polite"></p>
+      </div>
+    </fieldset>
+    <fieldset name="bgSet"><legend>Background</legend>
       <select name="bg" aria-label="Background">
         <option value="sky">Sky</option><option value="studio">Studio grey</option>
         <option value="white">White</option><option value="guthrie">Guthrie sky</option><option value="dark">Charcoal</option>
         <option value="clear">Transparent</option>
       </select>
     </fieldset>
-    <fieldset><legend>Animation</legend>
+    <fieldset name="animSet"><legend>Animation</legend>
       <label>Size <select name="animSize">${Object.entries(SIZES).map(([k, s]) => `<option value="${k}">${s.label}</option>`).join('')}</select></label>
       <label class="range">Length <input type="range" name="secs" min="4" max="16" step="2" value="8"><output name="secsV"></output></label>
       <label class="check"><input type="checkbox" name="half"> Half a turn only</label>
@@ -91,7 +109,7 @@ export function mountStudio(el, scene, host) {
       <p class="hint">Starts from the view on screen: point the camera at the site first. GIFs are kept under 8 MB. ${videoType()?.includes('mp4') ? 'Videos are MP4.' : 'Videos are WebM; WhatsApp needs MP4 (use Safari or a recent Chrome).'}</p>
       <p class="hint" name="animInfo" aria-live="polite"></p>
     </fieldset>
-    <fieldset><legend>Save an image</legend>
+    <fieldset name="grabSet"><legend>Save an image</legend>
       <div class="inline">
         <select name="res" aria-label="Image size">
           <option value="1">Screen size</option><option value="2" selected>2 × screen</option>
@@ -102,7 +120,12 @@ export function mountStudio(el, scene, host) {
       <p class="hint">Every image carries a caption with the sources, the height exaggeration and the date, so it can be shared safely.</p>
       <p class="hint" name="grabInfo" aria-live="polite"></p>
     </fieldset>`;
-  const q = n => el.querySelector(`[name="${n}"]`);
+  // Named controls, kept by reference: a host may move a fieldset elsewhere on
+  // the page (the app puts the background beside Surface, and the image and
+  // animation controls in its download section), and they keep working.
+  const named = {};
+  el.querySelectorAll('[name]').forEach(n => { named[n.getAttribute('name')] ||= n; });
+  const q = n => named[n] || el.querySelector(`[name="${n}"]`);
 
   function update() {
     scene.setSun(+q('az').value, +q('el').value, +q('sun').value / 10, +q('fill').value / 10);
@@ -131,12 +154,17 @@ export function mountStudio(el, scene, host) {
   q('brush').addEventListener('change', e => scene.setBrushwork(e.target.checked));
   q('relief').addEventListener('change', e => { scene.setCarto?.({ relief: e.target.checked }); host.onChange?.(scene.view); });
   q('crowns').addEventListener('change', e => { scene.setCarto?.({ crowns: e.target.checked }); host.onChange?.(scene.view); });
+  q('contours').addEventListener('change', e => { scene.setContours?.(e.target.checked); host.onChange?.(scene.view); });
+  q('geoLabels').addEventListener('change', e => { scene.setGeologyLabels?.(e.target.checked); host.onChange?.(scene.view); });
+  q('mist').addEventListener('change', e => { scene.setMist?.(e.target.checked); host.onChange?.(scene.view); });
   q('look').addEventListener('change', e => {
     const to = e.target.value;
     scene.setLook(to);
     renderLegend();
     q('brushRow').hidden = !PALETTES[to]?.brushwork;    // Guthrie and Anthropogenic
     q('reliefRow').hidden = q('crownRow').hidden = !LOOK_DEFS[to]?.carto;
+    q('contourRow').hidden = !!LOOK_DEFS[to]?.carto;     // Anthropogenic has its contours in the relief
+    q('mist').checked = !!scene.view.mist?.[to];          // mist is remembered per look
     q('inkRow').hidden = LOOK_DEFS[to]?.inkPass === false;
     // controls elsewhere that a look makes meaningless (e.g. the 3D tree height in Anthropogenic)
     document.querySelectorAll('[data-hide-looks]').forEach(n => { n.hidden = n.dataset.hideLooks.split(' ').includes(to); });
@@ -148,7 +176,42 @@ export function mountStudio(el, scene, host) {
   // The caption for saved images and animations, with the look's note (Guthrie) in the small print.
   function caption() {
     const c = host.caption(), notes = [lookNote(scene), geologyNote(scene)].filter(Boolean);
-    return notes.length ? { ...c, footer: [c.footer, ...notes].join(' · ') } : c;
+    const out = notes.length ? { ...c, footer: [c.footer, ...notes].join(' · ') } : { ...c };
+    if (q('keyOn').checked) out.key = keyItems();
+    return out;
+  }
+  // ---- the legend: the layers ticked in the layer key, then the geology ----
+  function keyItems() {
+    const G = scene.geology?.instance, c = host.caption();
+    const items = mapKeyItems(host.layerList?.(), { elec: scene.electricity?.() || {}, redLine: c.legend || null, geology: !!G });
+    if (G) items.push({ head: 'Geology legend', big: true },
+      ...legendItems({ geology: G, look: scene.view.look, pitsShown: scene.pits?.shown }));
+    return items;
+  }
+  function keyNotice() {
+    const g = scene.geology;
+    if (!g?.sub && !g?.attribution) return null;
+    return `${g.sub?.attribution ?? g.attribution}.${g.nonCommercial ? ' BGS 1:50 000 geology is licensed for non-commercial use only; commercial reuse needs a BGS licence.' : ''}`;
+  }
+  async function exportKey(kind) {
+    const info = q('keyInfo'), items = keyItems();
+    if (!items.length) { info.textContent = 'Nothing is shown, so there is no legend to export.'; return null; }
+    const c = caption(), look = PALETTES[scene.view.look]?.name || scene.view.look;
+    const title = `${c.title}: legend (${look} look)`;
+    let blob;
+    if (kind === 'svg') {
+      const lines = [[`${c.title}  ·  ${c.disclosure}`, true], ...(keyNotice() ? [[keyNotice(), true]] : []),
+        [`Sources: ${[scene.geology?.sub ? captionNote(scene.geology.sub) : null, c.sources].filter(Boolean).join('. ')}.`, false], [c.footer, false]];
+      blob = new Blob([legendSVG(items, { title, lines, fontCSS: (await host.fontCSS?.()) || '' })], { type: 'image/svg+xml' });
+    } else {
+      // the legend sheet with the ordinary caption bands (title, sources, date)
+      const notice = keyNotice(), cap = { ...c, title, key: undefined, legend: [c.legend, notice].filter(Boolean).join(' ') || undefined };
+      const out = withCaption(legendCanvas(items, 1600), cap, {});
+      blob = await new Promise(r => out.toBlob(r, 'image/png'));
+    }
+    download(blob, `${host.filename()}-legend.${kind}`);
+    info.textContent = `Legend (${kind.toUpperCase()}): ${(blob.size / 1e3).toFixed(0)} kB.`;
+    return { blob, items };
   }
   // The captioned image, without downloading it (also used by artefact exports).
   function compose(mult = +q('res').value) {
@@ -208,19 +271,32 @@ export function mountStudio(el, scene, host) {
   }
   function setBrushwork(on) { q('brush').checked = !!on; scene.setBrushwork(!!on); }
   // Geology walls: the toggle and the legend show only when the site has wall samples.
-  function refreshGeology() { q('geoRow').hidden = q('geoPanel').hidden = !scene.geology?.walls; renderLegend(); update(); }
+  // host.onGeology(shown) lets a host that has moved these parts show or hide them too.
+  function refreshGeology() {
+    const on = !!scene.geology?.walls;
+    q('geoRow').hidden = q('geoPanel').hidden = q('geoExport').hidden = !on;
+    host.onGeology?.(on); renderLegend(); update();
+  }
 
   // ---- geology legend and the unfolded-walls export ----
   function renderLegend() {
     const G = scene.geology?.instance, box = q('geoLegend');
     if (!G) { box.innerHTML = ''; return; }
-    box.innerHTML = legendItems({ geology: G, look: scene.view.look, pitsShown: scene.pits?.shown }).map(it => {
+    const opts = { geology: G, look: scene.view.look, pitsShown: scene.pits?.shown };
+    const items = legendItems(opts);
+    const html = it => {
       if (it.head) return `<h3>${escHTML(it.head)}</h3>`;
       if (it.note) return `<p class="hint">${escHTML(it.note)}</p>`;
       const icon = it.swatch ? `<img alt="" src="${it.swatch.toDataURL('image/png')}" width="26" height="16">`
         : `<svg width="26" height="18" viewBox="0 -2 26 20" aria-hidden="true">${markSVG(it.mark, 0, 0)}</svg>`;
       return `<div class="geo-row">${icon}<span>${escHTML(it.text)}</span></div>`;
-    }).join('');
+    };
+    // two columns, breaking at the superficial deposits (else at coal and records)
+    let cut = items.findIndex(it => it.head === 'Superficial and artificial deposits');
+    if (cut < 1) cut = items.findIndex(it => it.head === 'Coal and records');
+    const cols = cut > 0 ? [items.slice(0, cut), items.slice(cut)] : [items];
+    box.innerHTML = `<div class="geo-cols">${cols.map(c => `<div>${c.map(html).join('')}</div>`).join('')}</div>`;
+    // (the note on what is data and what is drawn goes only in the Sources JSON: manifest())
   }
   function wallsCaption() { const c = host.caption(), note = lookNote(scene); return note ? { ...c, footer: `${c.footer} · ${note}` } : c; }
   // (the BGS sources go in the export's own caption, so the plain caption is used)
@@ -231,7 +307,7 @@ export function mountStudio(el, scene, host) {
       const svg = wallsSVG({ geology: G, look: scene.view.look, caption: wallsCaption(), pitsShown: scene.pits?.shown, fontCSS: (await host.fontCSS?.()) || '' });
       const blob = kind === 'svg' ? new Blob([svg], { type: 'image/svg+xml' }) : await wallsPNG(svg, 2);
       download(blob, `${host.filename()}-walls.${kind}`);
-      info.textContent = `Unfolded walls (${kind.toUpperCase()}): ${(blob.size / 1e6).toFixed(1)} MB.`;
+      info.textContent = `Geology cross sections (${kind.toUpperCase()}): ${(blob.size / 1e6).toFixed(1)} MB.`;
       return { svg, blob };
     } catch (e) { info.textContent = `Could not draw the walls: ${e.message}`; throw e; }
   }
@@ -240,11 +316,20 @@ export function mountStudio(el, scene, host) {
     const c = host.caption();
     const m = subsurfaceManifest(sub, { name: c.title, Wm: G?.Wm, Hm: G?.Hm, zExag: G?.zExag,
       vex: G ? diagramVex({ dzTrueM: (G.zmax - G.zmin) / (G.mmPerM * G.zExag), kx: 1720 / (G.Wm + G.Hm), zExag: G.zExag }) : null });
+    if (G) m.what_is_data_and_what_is_drawn = dataNote({ geology: G, look: scene.view.look, pitsShown: scene.pits?.shown });
+    const cx = scene.contextInfo?.();
+    if (cx) m.context = { label: 'CONTEXT', printed: false, shown: cx.on, pad_m: cx.pad_m,
+      terrain: { source: cx.source, attribution: cx.attribution, offset_m: cx.offset_m, triangles: cx.triangles,
+        vertices_held_above_ground_plane: cx.clampedVertices },
+      infrastructure: { attribution: cx.osmAttribution, features: cx.features, pylons_and_poles: cx.supports, labels: cx.names },
+      drawn: 'land colour desaturated 35% and faded toward the background with distance (22% at the model edge to 88% at the pad); lines fade at most 45%; nothing drawn inside the model area' };
     download(new Blob([JSON.stringify(m, null, 2)], { type: 'application/json' }), `${host.filename()}-subsurface.json`);
     return m;
   }
+  q('keyPng').addEventListener('click', () => exportKey('png'));
+  q('keySvg').addEventListener('click', () => exportKey('svg'));
   q('wallsPng').addEventListener('click', () => walls('png'));
   q('wallsSvg').addEventListener('click', () => walls('svg'));
   q('geoManifest').addEventListener('click', manifest);
-  return { refreshGeology, renderLegend, walls, wallsCaption, manifest, update, grab, compose, caption, runAnim, animOpts, setLook, setBrushwork, reset: update };
+  return { part: q, refreshGeology, renderLegend, keyItems, exportKey, walls, wallsCaption, manifest, update, grab, compose, caption, runAnim, animOpts, setLook, setBrushwork, reset: update };
 }

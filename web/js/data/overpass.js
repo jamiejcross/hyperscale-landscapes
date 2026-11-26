@@ -28,10 +28,11 @@ export async function fetchOSM(bbox, onStatus = () => {}) {
       if (wait) await new Promise(r => setTimeout(r, wait));
       lastRequest = Date.now();
       try {
-        onStatus(new URL(url).host);
+        const host = new URL(url).host;
+        onStatus({ host, phase: 'waiting' });
         const r = await fetch(url, { method: 'POST', body: new URLSearchParams({ data: query }) });
         if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-        const json = await r.json();
+        const json = JSON.parse(await readWithProgress(r, p => onStatus({ host, phase: 'downloading', ...p })));
         await cacheSet(key, json);
         return json;
       } catch (e) { lastErr = e; }
@@ -39,6 +40,33 @@ export async function fetchOSM(bbox, onStatus = () => {}) {
     await new Promise(r => setTimeout(r, 8000));
   }
   throw new Error(`OpenStreetMap servers are busy (${lastErr?.message}). Please try again in a minute.`);
+}
+
+// Read a response body, reporting {received, total, fraction}. Overpass often
+// sends no Content-Length (a chunked reply); then total and fraction are null
+// and only the bytes received are known.
+export async function readWithProgress(r, onProgress = () => {}) {
+  const len = Number(r.headers.get('Content-Length')) || null;
+  // a compressed reply's Content-Length counts compressed bytes, not what we read
+  const enc = r.headers.get('Content-Encoding');
+  const total = len && (!enc || enc === 'identity') ? len : null;
+  if (!r.body?.getReader) return r.text();
+  const reader = r.body.getReader(), chunks = [];
+  let received = 0, last = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value); received += value.byteLength;
+    const now = Date.now();
+    if (now - last > 120) { last = now; onProgress(progressOf(received, total)); }
+  }
+  onProgress(progressOf(received, total));
+  const all = new Uint8Array(received); let o = 0;
+  for (const c of chunks) { all.set(c, o); o += c.byteLength; }
+  return new TextDecoder().decode(all);
+}
+export function progressOf(received, total) {
+  return { received, total, fraction: total ? Math.min(1, received / total) : null };
 }
 
 // ---------------------------------------------------------------------------

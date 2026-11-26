@@ -77,8 +77,8 @@
       "name": "Industrial residues",
       "colour_screen": "#CC79A7",
       "print_default": "#6E4B6B",
-      "why": "Mines, bings (spoil heaps), quarries, landfill and old works are what earlier industries left behind. They are part of the landscape and can affect ground stability and contamination.",
-      "why_status": "reviewed by JC, 23 Nov 2026",
+      "why": "Spoil heaps (bings), landfill and old industrial sites mark earlier eras of extraction. They are part of the landscape and can affect ground stability and contamination.",
+      "why_status": "wording by JC, 25 Nov 2026",
       "sources": [
         "features"
       ]

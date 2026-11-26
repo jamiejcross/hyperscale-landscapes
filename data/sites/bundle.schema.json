@@ -1,54 +1,267 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "hyperscale-landscapes/site-bundle@3",
-  "title": "Curated-site bundle (gzipped JSON), schema @3",
-  "description": "Written by pipeline/hyperscale_landscapes/bake.py. @2 bundles (no props or subsurface) remain valid input: the web app reads osm and elevation and treats the other sections as optional.",
+  "$id": "hyperscale-landscapes/site-bundle@4",
+  "title": "Curated-site bundle (gzipped JSON), schema @4",
+  "description": "Written by pipeline/hyperscale_landscapes/bake.py. @2 and @3 bundles (no props, subsurface or context) remain valid input: the web app reads osm and elevation and treats the other sections as optional.",
   "type": "object",
-  "required": ["schema", "site", "bbox", "osm", "elevation"],
+  "required": [
+    "schema",
+    "site",
+    "bbox",
+    "osm",
+    "elevation"
+  ],
   "properties": {
-    "schema": {"enum": ["hyperscale-landscapes/site-bundle@2", "hyperscale-landscapes/site-bundle@3"]},
-    "site": {"type": "string"},
-    "query": {"type": "string"},
-    "fetched": {"type": "string", "format": "date"},
-    "bbox": {"type": "object", "required": ["min_lat", "max_lat", "min_lon", "max_lon"]},
-    "attribution": {"type": "string"},
-    "osm": {"type": "object", "description": "Raw Overpass response for data/overpass/web.ql"},
-    "elevation": {"type": "object", "description": "lidar grid (int16-dm-rowdelta) or Terrarium tiles"},
+    "schema": {
+      "enum": [
+        "hyperscale-landscapes/site-bundle@2",
+        "hyperscale-landscapes/site-bundle@3",
+        "hyperscale-landscapes/site-bundle@4"
+      ]
+    },
+    "site": {
+      "type": "string"
+    },
+    "query": {
+      "type": "string"
+    },
+    "fetched": {
+      "type": "string",
+      "format": "date"
+    },
+    "bbox": {
+      "type": "object",
+      "required": [
+        "min_lat",
+        "max_lat",
+        "min_lon",
+        "max_lon"
+      ]
+    },
+    "attribution": {
+      "type": "string"
+    },
+    "osm": {
+      "type": "object",
+      "description": "Raw Overpass response for data/overpass/web.ql"
+    },
+    "elevation": {
+      "type": "object",
+      "description": "lidar grid (int16-dm-rowdelta) or Terrarium tiles"
+    },
     "props": {
       "type": "object",
       "description": "3D symbols. Positions are metres east and north of the bbox SW corner in the app frame (web/js/geo.js makeProjection); bearings are degrees clockwise from north in that frame.",
-      "required": ["trees", "turbines", "supports", "lines"],
+      "required": [
+        "trees",
+        "turbines",
+        "supports",
+        "lines"
+      ],
       "properties": {
         "trees": {
           "type": "object",
-          "required": ["record", "fields", "xy_unit_m", "h_unit_m", "crown_r_unit_m", "count", "data", "archetypes", "sources"],
+          "required": [
+            "record",
+            "fields",
+            "xy_unit_m",
+            "h_unit_m",
+            "crown_r_unit_m",
+            "count",
+            "data",
+            "archetypes",
+            "sources"
+          ],
           "properties": {
-            "record": {"const": "<HHHBBB"},
-            "fields": {"const": ["x", "y", "h_dm", "archetype", "source", "crown_r_dm"]},
-            "xy_unit_m": {"enum": [0.1, 0.5]},
-            "count": {"type": "integer", "minimum": 0},
-            "data": {"type": "string", "contentEncoding": "base64", "description": "count x 9-byte little-endian records"},
-            "archetypes": {"type": "array", "items": {"type": "string"}},
-            "sources": {"type": "array", "items": {"type": "string"}},
-            "thin_cell_m": {"type": "number"},
-            "chm": {"type": "object"},
-            "typing": {"type": "object"}
+            "record": {
+              "const": "<HHHBBB"
+            },
+            "fields": {
+              "const": [
+                "x",
+                "y",
+                "h_dm",
+                "archetype",
+                "source",
+                "crown_r_dm"
+              ]
+            },
+            "xy_unit_m": {
+              "enum": [
+                0.1,
+                0.5
+              ]
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "data": {
+              "type": "string",
+              "contentEncoding": "base64",
+              "description": "count x 9-byte little-endian records"
+            },
+            "archetypes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "sources": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "thin_cell_m": {
+              "type": "number"
+            },
+            "chm": {
+              "type": "object"
+            },
+            "typing": {
+              "type": "object"
+            }
           }
         },
-        "turbines": {"type": "array", "items": {"type": "object", "required": ["x", "y", "hub_height", "rotor_diameter", "source", "facing"]}},
-        "supports": {"type": "array", "items": {"type": "object", "required": ["x", "y", "kind", "height", "height_source", "bearing"]}},
-        "lines": {"type": "array", "items": {"type": "object", "required": ["kind", "xy"]}}
+        "turbines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "x",
+              "y",
+              "hub_height",
+              "rotor_diameter",
+              "source",
+              "facing"
+            ]
+          }
+        },
+        "supports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "x",
+              "y",
+              "kind",
+              "height",
+              "height_source",
+              "bearing"
+            ]
+          }
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "xy"
+            ]
+          }
+        }
       }
     },
     "subsurface": {
       "type": "object",
       "description": "BGS geology along the walls, boreholes, pits and mine plans (providers/subsurface.py). Non-commercial use only.",
-      "required": ["walls", "boreholes", "pits", "nominal_thickness_m", "sources", "nonCommercial", "attribution"],
+      "required": [
+        "walls",
+        "boreholes",
+        "pits",
+        "nominal_thickness_m",
+        "sources",
+        "nonCommercial",
+        "attribution"
+      ],
       "properties": {
-        "walls": {"type": "object", "required": ["step_m", "units", "sides"],
-                  "description": "units: distinct BGS units; sides.{south,east,north,west}: m (metres along), bedrock/superficial/artificial/mass_movement (index into units, -1 none), shallow_coal (0/1)"},
-        "nonCommercial": {"const": true},
-        "attribution": {"type": "string"}
+        "walls": {
+          "type": "object",
+          "required": [
+            "step_m",
+            "units",
+            "sides"
+          ],
+          "description": "units: distinct BGS units; sides.{south,east,north,west}: m (metres along), bedrock/superficial/artificial/mass_movement (index into units, -1 none), shallow_coal (0/1)"
+        },
+        "nonCommercial": {
+          "const": true
+        },
+        "attribution": {
+          "type": "string"
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "description": "CONTEXT (screen only): coarse terrain and main infrastructure in a band round the model area, for the context apron (pipeline/hyperscale_landscapes/context.py). Never used for the print.",
+      "required": [
+        "pad_m",
+        "elevation",
+        "osm"
+      ],
+      "properties": {
+        "pad_m": {
+          "type": "number",
+          "description": "requested pad in metres (default 1600; site properties.context_pad_m overrides); the grid pads by whole cells, at least this much"
+        },
+        "bbox": {
+          "type": "object",
+          "description": "the padded area the context OSM was fetched for"
+        },
+        "power": {
+          "type": "object",
+          "description": "pylons, poles (x, y m; height with its source; bearing) and overhead lines outside the model area, by the props section's rules; supports inside the model are in props",
+          "required": ["supports", "lines"]
+        },
+        "label": {
+          "const": "CONTEXT"
+        },
+        "elevation": {
+          "type": "object",
+          "required": [
+            "format",
+            "registration",
+            "w",
+            "h",
+            "dx_m",
+            "dy_m",
+            "x0_m",
+            "y_top_m",
+            "pad_cells_x",
+            "pad_cells_y",
+            "model_cells_x",
+            "model_cells_y",
+            "source",
+            "offset_m",
+            "data"
+          ],
+          "description": "Vertex-registered grid snapped to the model edges: dx = W/round(W/20), dy = H/round(H/20); vertex (c, r) is at x = x0_m + c*dx_m, y = y_top_m - r*dy_m (row 0 north). Model corners are vertices (pad_cells_x, pad_cells_y) to (pad_cells_x + model_cells_x, pad_cells_y + model_cells_y). Values: decimetres, int16, delta-coded along each row; offset_m (median of model terrain minus context along the model boundary) is already added.",
+          "properties": {
+            "format": {
+              "const": "int16-dm-rowdelta"
+            },
+            "registration": {
+              "const": "vertex"
+            },
+            "data": {
+              "type": "string",
+              "contentEncoding": "base64"
+            },
+            "offset_m": {
+              "type": "number"
+            }
+          }
+        },
+        "osm": {
+          "type": "object",
+          "required": [
+            "elements"
+          ],
+          "description": "data/overpass/context.ql over the padded area, stripped to geometry and the tags the app uses (context.KEEP_TAGS), coordinates to 5 decimals. Features wholly inside the model bbox are left out (the bundle's osm has them)."
+        }
       }
     }
   }

@@ -30,6 +30,10 @@ export const MODULES = {
   'hl/carto': 'js/scene/carto.js',
   'hl/contours': 'js/scene/contours.js',
   'hl/glyphs': 'js/scene/glyphs.js',
+  'hl/scalebar': 'js/scene/scalebar.js',
+  'hl/legend': 'js/scene/legend.js',
+  'hl/apron': 'js/scene/apron.js',
+  'hl/apron-math': 'js/scene/apron-math.js',
   gifenc: 'vendor/gifenc.js',
 };
 const KEY_OF = Object.fromEntries(Object.entries(MODULES).map(([k, p]) => [p, k]));
@@ -56,7 +60,7 @@ export function rewrite(text, from) {
 }
 
 export async function buildViewer({ model, legend, colours, printColours, caption, sub, drape, drapeKind = null, zExag, slug, alt, seed = null, view = null,
-  props = null, subsurface = null, text = {}, relief = null }) {
+  props = null, subsurface = null, context = null, text = {}, relief = null }) {
   // Pack every non-empty layer into one gzipped buffer.
   const parts = [], layout = {}, ids = [];
   let offset = 0;
@@ -86,8 +90,11 @@ export async function buildViewer({ model, legend, colours, printColours, captio
   // and the bundle's props and subsurface sections as they are.
   // (always packed: the Anthropogenic look's relief, sea and screen terrain need it too)
   if (model.heights) add('heights', model.heights, 'float32');
+  if (model.waterFill) add('waterFill', model.waterFill, 'float32');   // painted water's level channels
   if (props) add('props', new TextEncoder().encode(JSON.stringify(props)), 'json');
   if (subsurface) add('subsurface', new TextEncoder().encode(JSON.stringify(subsurface)), 'json');
+  // the context apron (screen only): the bundle's context section, with the model bbox it is framed on
+  if (context) add('context', new TextEncoder().encode(JSON.stringify(context)), 'json');
   const raw = new Uint8Array(offset);
   let o = 0; for (const p of parts) { raw.set(p, o); o += p.byteLength; }
   const geom = b64(gzipSync(raw, { level: 9 }));

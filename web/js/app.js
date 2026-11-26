@@ -1,5 +1,6 @@
 // App controller: pick -> size and style -> preview -> download.
 import { loadStrings, t } from './i18n.js';
+import { setGeologyText, GEOLOGY_TEXT_KEYS } from './export/walls.js';
 import { CELL_MM, LIMITS, MAX_COLS } from './config.js';
 import { allCoords, bboxOfCoords, bboxSizeKm, polygonsOf } from './geo.js';
 import { createPicker } from './picker.js';
@@ -9,7 +10,7 @@ import { loadElevation, ATTRIBUTION as ELEV_ATTRIBUTION } from './data/elevation
 import { readBoundary } from './data/upload.js';
 import { buildModel, printObjects, pauseHeights } from './geom/model.js';
 import { createScene, landcoverCanvas, layerSwatch, DEFAULT_LOOK } from './scene/scene.js';
-import { mountExtras, EXTRAS_KEYS } from './scene/extras.js';
+import { mountExtras, mountScaleRow, EXTRAS_KEYS, whyButton, whyBox, wireWhy } from './scene/extras.js';
 import { legendModel, subsurfaceCounts } from './scene/subsurface-info.js';
 import { contourCanvas } from './scene/contours.js';
 import { SURFACES, imageryCanvas } from './data/imagery.js';
@@ -35,17 +36,19 @@ const writeUrl = urlWriter(() => {
   const v = { site: state.site ? $('site-select').value || null : null };
   if (scene) {
     const a = scene.cameraAngles();
-    Object.assign(v, { style: scene.view.look, az: a.az, el: a.el });
+    Object.assign(v, { style: scene.view.look, az: a.az, el: a.el});
   }
   return v;
 });
 
 await loadStrings();
+setGeologyText(Object.fromEntries(GEOLOGY_TEXT_KEYS.map(k => [k, t(k)])));   // the geology legend's closing note
 state.layers = Object.fromEntries((await (await fetch('data/layers.json')).json()).layers.map(l => [l.id, l]));
 for (const id of ['power-and-place', 'residues', 'full', 'classic']) {
   state.presets[id] = await (await fetch(`data/presets/${id}.json`)).json();
-  $('preset').append(new Option(state.presets[id].name, id, id === 'power-and-place', id === 'power-and-place'));
+  $('preset').append(new Option(state.presets[id].name, id, id === 'power-and-place', id === 'power-and-place'));   // step 4, beside the 3MF
 }
+$('preset').addEventListener('change', () => studio?.update());   // Studio's "Print colours" follows the set
 
 // ---------------- Step 1: choose an area ----------------
 const picker = createPicker($('map'), {
@@ -111,7 +114,7 @@ async function chooseSite(entry) {
   if (p.location) picker.showPin(p.location, p.name);
   const row = (k, v) => v == null || v === '' ? '' : `<dt>${k}</dt><dd>${v}</dd>`;
   const by = p.reported_by ? ` (reported by ${esc(p.reported_by)})` : '';
-  const links = (p.sources || []).map(x => `<a href="${esc(x.url)}" rel="noopener" target="_blank">${esc(x.title)}</a>`).join('<br>');
+  const links = (p.sources || []).filter(x => !/^APRS map of proposed/.test(x.title)).map(x => `<a href="${esc(x.url)}" rel="noopener" target="_blank">${esc(x.title)}</a>`).join('<br>');
   $('site-facts').hidden = false;
   $('site-facts').innerHTML = `<strong>${esc(p.name)}</strong><dl>
     ${row('Developer', p.developer ? esc(p.developer) + by : null)}
@@ -173,7 +176,7 @@ $('options').onsubmit = async e => {
     status.textContent = t('build.loading.elevation');
     const elev = await loadElevation(state.bbox, state.bundle);
     status.textContent = t('build.loading.features');
-    const raw = state.bundle?.osm || await fetchOSM(state.bbox, host => { status.textContent = `${t('build.loading.features')} (${host})`; });
+    const raw = state.bundle?.osm || await fetchOSM(state.bbox, s => { status.textContent = featureStatus(s); });
     const osm = parseOSM(raw);
     status.textContent = t('build.loading.geometry');
     await new Promise(r => setTimeout(r, 30));
@@ -213,11 +216,23 @@ function showPreview() {
     studio = mountStudio($('studio'), scene, {
       caption: () => captionLines({ name: state.name, exaggeration: exaggerationText(), sources: sourcesText(), legend: boundaryLegend() }),
       filename: () => `${slug()}-${new Date().toISOString().slice(0, 10)}`,
-      printColours: printColourMap, fontCSS: fontFaceCSS,
+      printColours: printColourMap, fontCSS: fontFaceCSS, layerList: () => $('layer-list'),
       alt: () => draftAlt({ name: state.name, report: state.model.model.report, exaggeration: exaggerationText(), surface: SURFACES[state.surface].label.toLowerCase() }),
       onChange: () => { refreshCaption(); writeUrl(); paintSwatches(); },
+      onGeology: on => { $('geology-panel').hidden = $('export-geology').hidden = !on; },
     });
     scene.controls.addEventListener('change', writeUrl);
+    // Background sits under Surface; the image and animation controls go to
+    // the download section (step 4). The studio keeps them wired.
+    const bg = studio.part('bg'); bg.id = 'bg';
+    const bgHead = document.createElement('h3'); bgHead.innerHTML = '<label for="bg">Background</label>';
+    $('surface-note').after(bgHead, bg); studio.part('bgSet').remove();
+    $('export-media').append(studio.part('grabSet'), studio.part('animSet'));
+    // Geology legend: its own section under the layers;
+    // the legend and cross-section exports: step 4.
+    $('geology-slot').append(studio.part('geoPanel'));
+    $('export-legend').append(studio.part('keyExport'));
+    $('export-geology').append(studio.part('geoExport'));
   }
   // Every new model starts on the land-cover surface in the Guthrie look.
   state.surface = 'landcover'; $('surface').value = 'landcover'; $('surface-note').textContent = '';
@@ -226,20 +241,23 @@ function showPreview() {
   colours.railDisused = state.layers.rail.colour_screen_disused;
   state.drape = landcoverCanvas(model.grid, osm.features);
   scene.setModel({ layers: model.layers, colours, grid: model.grid, landcover: state.drape, drapeKind: 'landcover', vectors: model.vectors, screen: model.screen, seed: siteSeed(),
-    heights: model.heights, relief: reliefOf(model, opts) });
+    heights: model.heights, relief: reliefOf(model, opts), waterFill: model.waterFill });
   const ul = $('layer-list'); ul.textContent = '';
   const shown = ['terrain', 'water', 'buildings', 'roads', 'rail', 'power', 'residues', 'receptors'];
   for (const id of shown) {
-    const L = state.layers[id];
+    const L = screenLayer(id);
     const li = document.createElement('li');
-    li.innerHTML = `<label class="check"><input type="checkbox" checked data-layer="${id}"><span class="swatch" data-swatch="${id}" data-screen="${L.colour_screen}" style="background:${layerSwatch(id, scene.view.look, L.colour_screen)}"></span>${L.name}</label>
-      <details><summary>${t('preview.why')}</summary><p>${L.why}</p></details>`;
+    li.innerHTML = `<label class="check"><input type="checkbox" checked data-layer="${id}"><span class="swatch" data-swatch="${id}" data-screen="${L.colour_screen}" style="background:${layerSwatch(id, scene.view.look, L.colour_screen)}"></span>${L.name}${whyButton(t('preview.why'))}</label>
+      ${whyBox(`<p>${L.why}</p>`)}`;
     ul.append(li);
   }
   ul.querySelectorAll('input').forEach(i => { i.onchange = () => scene.setVisible(i.dataset.layer, i.checked); });
+  wireWhy(ul);
   // Site extras from the bundle: 3D props, geology walls, pits (screen only; shared with the offline viewer).
   mountExtras(ul, scene, { props: state.bundle?.props, subsurface: state.bundle?.subsurface, grid: model.grid, heights: model.heights,
-    zExag: opts.zExag, seed: siteSeed(), text: t, onChange: () => { refreshCaption(); studio.renderLegend(); } });
+    zExag: opts.zExag, seed: siteSeed(), text: t, treeSlot: studio.part('modelSet'), onChange: () => { refreshCaption(); studio.renderLegend(); },
+    context: state.bundle?.context || null, bbox: state.bundle?.bbox || null, relief: reliefOf(model, opts) });
+  mountScaleRow(ul, scene, { text: t });
   studio.refreshGeology();
   const counts = model.report.counts;
   studio.update();
@@ -254,6 +272,13 @@ function showPreview() {
   $('pauses').textContent = 'Single-colour printers: pause to change filament at ' +
     pauseHeights(model, opts.base).map(p => `${p.zMm} mm (${p.changeTo})`).join(', ') + '.';
   $('preview').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+}
+
+// A layer as the screen names it. The power layer is "Electricity infrastructure"
+// on screen (with turbines and pylons); layers.json keeps "Power" for the print files.
+function screenLayer(id) {
+  const L = state.layers[id];
+  return id === 'power' ? { ...L, name: t('layer.electricity'), why: `${L.why} ${t('layer.electricity.why')}` } : L;
 }
 
 // What the Anthropogenic relief needs to turn the height grid back into metres.
@@ -323,13 +348,13 @@ async function applySurface(id) {
       note.textContent = '';
     } else if (id === 'contours') {
       const c = contourCanvas(model.grid, state.model.elev);
-      scene.setDrape(state.drape = c.canvas);
+      scene.setDrape(state.drape = c.canvas, 'contours');
       note.textContent = `Contours every ${c.interval} m; heavier line every ${c.indexInterval} m. Drawn from the elevation data used for the model.`;
     } else {
       note.textContent = 'Loading satellite imagery from EOX…';
       const img = await imageryCanvas(id, state.bbox, model.grid);
       if (state.surface !== id || state.model?.model !== model) return;   // the choice changed while loading
-      scene.setDrape(state.drape = img);
+      scene.setDrape(state.drape = img, id);
       note.textContent = SURFACES[id].note;
     }
   } catch (err) {
@@ -383,17 +408,19 @@ $('dl-viewer').onclick = async () => {
   try {
     const colours = Object.fromEntries(Object.values(state.layers).map(l => [l.id, l.colour_screen]));
     colours.railDisused = state.layers.rail.colour_screen_disused;
+    const hasProps = !!(state.bundle?.props?.turbines?.length || state.bundle?.props?.supports?.length);
     const shown = ['terrain', 'water', 'buildings', 'roads', 'rail', 'power', 'residues', 'receptors']
-      .filter(id => model.layers[id]?.indices.length);
-    const legend = shown.map(id => ({ id, name: state.layers[id].name, colour: state.layers[id].colour_screen, why: state.layers[id].why }));
+      .filter(id => model.layers[id]?.indices.length || (id === 'power' && hasProps));
+    const legend = shown.map(id => { const L = screenLayer(id); return { id, name: L.name, colour: L.colour_screen, why: L.why }; });
     const { w, h } = bboxSizeKm(state.bbox);
     const caption = captionLines({ name: state.name, exaggeration: t('caption.exag', { x: opts.zExag }), sources: sourcesText(), legend: boundaryLegend() });
     const blob = await buildViewer({
       model, legend, colours, printColours: printColourMap(), caption, zExag: opts.zExag, slug: slug(),
-      seed: siteSeed(), view: { look: scene.view.look, brushwork: scene.view.brushwork, relief: scene.view.relief, crowns: scene.view.crowns },
+      seed: siteSeed(), view: { look: scene.view.look, brushwork: scene.view.brushwork, relief: scene.view.relief, crowns: scene.view.crowns, mist: { ...scene.view.mist }, contours: scene.view.contours },
       relief: reliefOf(model, opts),
       props: state.bundle?.props || null, subsurface: state.bundle?.subsurface || null,
-      text: Object.fromEntries(EXTRAS_KEYS.map(k => [k, t(k)])),
+      context: state.bundle?.context ? { ...state.bundle.context, model_bbox: state.bundle.bbox } : null,
+      text: Object.fromEntries([...EXTRAS_KEYS, ...GEOLOGY_TEXT_KEYS].map(k => [k, t(k)])),
       sub: `${state.bbox.minLat.toFixed(3)}–${state.bbox.maxLat.toFixed(3)}°N, ${Math.abs(state.bbox.maxLon).toFixed(3)}–${Math.abs(state.bbox.minLon).toFixed(3)}°W · ${w.toFixed(1)} × ${h.toFixed(1)} km · from the ${opts.printSize} mm print model`,
       drape: state.drape, drapeKind: state.surface === 'landcover' ? 'landcover' : state.surface,
       alt: draftAlt({ name: state.name, report: model.report, exaggeration: t('caption.exag', { x: opts.zExag }), surface: SURFACES[state.surface].label.toLowerCase() }),
@@ -450,3 +477,12 @@ Object.defineProperty(window, "__studio", { get: () => studio });
 Object.defineProperty(window, "__scene", { get: () => scene });
 Object.defineProperty(window, "__studio", { get: () => studio });
 window.__picker = picker;
+
+// "Fetching map features… 42% (host)", or the MB received when the server
+// sends no length (common for Overpass), or "waiting" while the query runs.
+function featureStatus({ host, phase, received, fraction }) {
+  const base = t('build.loading.features');
+  if (phase === 'waiting') return `${base} ${t('build.loading.waiting', { host })}`;
+  if (fraction != null) return `${base} ${Math.floor(fraction * 100)}% (${host})`;
+  return `${base} ${t('build.loading.received', { mb: (received / 1048576).toFixed(1) })} (${host})`;
+}

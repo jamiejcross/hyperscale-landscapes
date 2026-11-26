@@ -3,6 +3,10 @@
 // the top, so a single crop rarely removes both.
 
 // legend: an optional line explaining marks drawn on the model (e.g. the red line).
+// A caption may also carry `key`: legend items (scene/legend.js), drawn as a
+// band between the image and the caption when the studio's legend is ticked.
+import { keyBand } from './legend.js';
+
 export function captionLines({ name, exaggeration, sources, legend = null, date = new Date() }) {
   const d = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   return {
@@ -47,7 +51,8 @@ function layout(W, caption) {
   const discInline = pad + tw + m.measureText(disc).width < W - pad;
   const bandH = pad * 2 + Math.round(titleFs * 1.25) + lh * (legendLines.length + srcLines.length + footLines.length + (discInline ? 0 : 1));
   const topH = Math.round(fs * 1.8);
-  return { fs, pad, lh, titleFs, legendLines, srcLines, footLines, tw, disc, discInline, bandH, topH };
+  const key = caption.key?.length ? keyBand(caption.key, W, { fs: Math.max(11, Math.round(fs * 0.9)) }) : null;
+  return { fs, pad, lh, titleFs, legendLines, srcLines, footLines, tw, disc, discInline, bandH: bandH + (key ? key.height : 0), topH, key, keyH: key ? key.height : 0 };
 }
 
 // Total height the caption bands add to an image W pixels wide.
@@ -55,7 +60,7 @@ export function captionHeight(W, caption) { const L = layout(W, caption); return
 
 export function withCaption(render, caption, { dark = false } = {}) {
   const W = render.width;
-  const { fs, pad, lh, titleFs, legendLines, srcLines, footLines, tw, disc, discInline, bandH, topH } = layout(W, caption);
+  const { fs, pad, lh, titleFs, legendLines, srcLines, footLines, tw, disc, discInline, bandH, topH, key, keyH } = layout(W, caption);
 
   const out = document.createElement('canvas');
   out.width = W; out.height = topH + render.height + bandH;
@@ -63,11 +68,13 @@ export function withCaption(render, caption, { dark = false } = {}) {
   const bg = dark ? '#000000' : '#ffffff', fg = dark ? '#ffffff' : '#000000', muted = dark ? '#b3b3b3' : '#5c5c5c';
   g.fillStyle = bg; g.fillRect(0, 0, W, out.height);
   g.drawImage(render, 0, topH);
+  if (key) key.draw(g, 0, topH + render.height, { fg: dark ? '#ffffff' : '#000000', muted: dark ? '#b3b3b3' : '#5c5c5c' });
 
   // Bottom band: a heavy rule, then title and disclosure on one line,
   // then sources, then footer.
-  g.fillStyle = fg; g.fillRect(0, topH + render.height, W, Math.max(3, Math.round(fs / 4)));
-  let y = topH + render.height + pad + titleFs;
+  const ruleY = topH + render.height + keyH;
+  g.fillStyle = fg; g.fillRect(0, ruleY, W, Math.max(3, Math.round(fs / 4)));
+  let y = ruleY + pad + titleFs;
   g.fillStyle = fg; g.font = font(titleFs, 700); g.fillText(caption.title, pad, y);
   g.font = font(fs, 700);
   if (discInline) g.fillText(disc, pad + tw, y);

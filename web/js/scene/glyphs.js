@@ -6,6 +6,7 @@
 // times 1.3 for legibility (the caption says so); turbines at hub height plus
 // rotor radius from the data, or 125 m, flagged as assumed.
 import * as THREE from 'three';
+import { spanPoints } from './props-math.js';
 
 const ART = {
   pylon: { w: 128, h: 256, draw(c, w, h, ink, C) {
@@ -46,9 +47,11 @@ const ART = {
 };
 // Where the artwork's base sits in its texture (fraction of height from the bottom).
 const FOOT = { pylon: 6 / 256, pole: 6 / 256, turbine: 6 / 384 };
+// Where the wires hang from (fraction of the glyph's height): the upper cross-arm.
+const ARM = { pylon: 0.79, pole: 0.85 };
 
-// points: from glyphPoints(); zAt(x, y): the displayed ground height (mm).
-export function createGlyphs({ points, zAt, ink, C, anisotropy = 8 }) {
+// points, wires: from glyphPoints(); zAt(x, y): the displayed ground height (mm).
+export function createGlyphs({ points, wires = [], zAt, ink, C, anisotropy = 8 }) {
   const group = new THREE.Group(); group.name = 'glyphs';
   const tex = {}, mats = {}, byKind = { pylon: [], pole: [], turbine: [] };
   for (const [kind, A] of Object.entries(ART)) {
@@ -71,6 +74,19 @@ export function createGlyphs({ points, zAt, ink, C, anisotropy = 8 }) {
     sh.position.set(p.x + p.hMm * 0.08, p.y + p.hMm * 0.08, z + 0.03); sh.renderOrder = 1;
     group.add(sh, sp); byKind[p.kind].push(sp, sh);
   }
+  // Wires between the supports' cross-arms, sagging 2% of the span (drawn, not measured).
+  let wireMesh = null;
+  if (wires.length) {
+    const top = p => [p.x, p.y, zAt(p.x, p.y) + p.hMm * ARM[p.kind]], pos = [];
+    for (const [i, j] of wires) {
+      const q = spanPoints(top(points[i]), top(points[j]));
+      for (let k = 1; k < q.length; k++) pos.push(...q[k - 1], ...q[k]);
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    wireMesh = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: ink, transparent: true, opacity: 0.7, fog: true }));
+    wireMesh.name = 'glyph-wires'; wireMesh.renderOrder = 2;
+    group.add(wireMesh); byKind.pole.push(wireMesh);
+  }
   // pylons and poles share the "pylons" toggle in the layer key
   function setVisible(kind, on) {
     for (const k of kind === 'pylons' ? ['pylon', 'pole'] : kind === 'turbines' ? ['turbine'] : []) for (const o of byKind[k]) o.visible = on;
@@ -79,6 +95,7 @@ export function createGlyphs({ points, zAt, ink, C, anisotropy = 8 }) {
     for (const t of Object.values(tex)) t.dispose();
     for (const m of Object.values(mats)) m.dispose();
     shadowMat.dispose(); disc.dispose();
+    if (wireMesh) { wireMesh.geometry.dispose(); wireMesh.material.dispose(); }
     group.clear();
   }
   return { group, setVisible, dispose };

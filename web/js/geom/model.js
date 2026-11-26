@@ -649,11 +649,18 @@ export function buildModel({ bbox, elev, osm, opts }) {
   // ---- Water levels: sea and lochs are level; rivers sit below their banks ----
   const zTop = Float32Array.from(H.z);
   const W = waterLevels(grid, masks.water, seaCells, osm.water, H, zAt, opts, report);
+  // Screen only: the height each cut vertex would have with its channel filled
+  // (the ground, or the water's level where that is higher: sea and lochs),
+  // NaN elsewhere. The stylised looks paint water on a level surface with it.
+  const waterFill = new Float32Array(nx * grid.ny).fill(NaN);
   {
     // Cut the terrain under water so the water fills a hollow, flush at the shore.
     const all = vertexAllIn(grid, masks.water);
     const floorMin = MM.floorMin + (opts.labels ? MM.engrave : 0);
-    for (let v = 0; v < all.length; v++) if (all[v]) zTop[v] = Math.max(Math.min(zTop[v], W[v] - MM.waterDepth), floorMin);
+    for (let v = 0; v < all.length; v++) if (all[v]) {
+      zTop[v] = Math.max(Math.min(zTop[v], W[v] - MM.waterDepth), floorMin);
+      waterFill[v] = Math.max(H.z[v], W[v], zTop[v]);
+    }
   }
 
   // ---- Land ----
@@ -722,7 +729,7 @@ export function buildModel({ bbox, elev, osm, opts }) {
   report.counts = { buildings: bl.length, receptors: rl.length, roads: nRoads, pegs: pegMeshes.filter(Boolean).length };
   report.grid = { cols: nx, rows: grid.ny, cellMm: +grid.dx.toFixed(3) };
   report.elevation = { minM: H.elevMin, maxM: H.elevMax };
-  return { grid, layers, report, heights: H.z, vectors, screen };
+  return { grid, layers, report, heights: H.z, vectors, screen, waterFill };
 }
 
 function clamp(v, a, b) { return Math.min(Math.max(v, a), b); }

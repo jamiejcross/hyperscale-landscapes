@@ -24,6 +24,12 @@
   ul { list-style: none; margin: 0; padding: 0; }
   li { margin: 0; padding: 4px 0; border-bottom: 1px solid #e6e6e6; }
   details { color: var(--grey); font-size: 11.5px; margin-left: 22px; }
+  .why { color: var(--grey); font-size: 11.5px; margin-left: 22px; }
+  .why p { margin: 4px 0; }
+  .why-btn { border: 0; background: none; padding: 0 3px; margin: 0; cursor: pointer; color: var(--grey); font: inherit; line-height: 1; }
+  .why-btn::before { content: '▾'; }
+  .why-btn[aria-expanded="true"]::before { content: '▴'; }
+  .why-btn:hover, .why-btn:focus-visible { color: var(--ink); }
   .swatch { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; }
   .check { display: flex; gap: 6px; align-items: center; cursor: pointer; margin: 3px 0; }
   input[type=checkbox], input[type=range] { accent-color: var(--spot); }
@@ -37,6 +43,7 @@
     border-radius: 0; padding: 5px 9px; cursor: pointer; }
   button:hover { background: var(--ink); color: #fff; }
   button.primary { background: var(--ink); color: #fff; }
+  button[aria-pressed="true"] { background: var(--ink); color: #fff; }
   button.primary:hover { background: #fff; color: var(--ink); }
   select { font-weight: 400; max-width: 100%; }
   .hint { color: var(--grey); font-size: 11px; }
@@ -52,6 +59,7 @@
   .geo-row { display: flex; gap: 7px; align-items: flex-start; font-size: 11.5px; line-height: 1.3; margin: 4px 0; }
   .geo-row img, .geo-row svg { flex: none; margin-top: 1px; }
   .geo-legend .hint { margin: 4px 0; }
+  @media (max-width: 700px) { #view .scalebar { bottom: auto !important; top: 10px; } }   /* the panel takes the bottom on phones */
   @media (max-width: 700px) { #panel { width: auto; right: 0; top: auto; max-height: 45%; border-right: 0; border-top: 1px solid var(--rule); } }
 </style>
 <!--IMPORTMAP-->

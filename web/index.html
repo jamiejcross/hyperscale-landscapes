@@ -23,6 +23,8 @@
 <header class="site">
   <h1 data-i18n="app.title">Hyperscale Landscapes</h1>
   <p data-i18n="app.tagline"></p>
+  <img class="logo" src="img/ai-planetary-resources.webp" width="2000" height="281" alt="AI uses Human Labour and Planetary Resources">
+  <a class="cc" href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="license"><img src="img/cc-by-nc-sa.svg" width="88" height="31" alt="Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International licence"></a>
 </header>
 
 <main id="main">
@@ -32,9 +34,10 @@
       <div class="pick-controls">
         <fieldset>
           <legend data-i18n="pick.sites"></legend>
-          <label for="site-select" class="visually-hidden">Choose a curated site</label>
+          <label for="site-select" class="visually-hidden">Choose a Scottish hyperscale data centre site</label>
           <select id="site-select"><option value="">Choose a site…</option></select>
           <p class="hint" data-i18n="pick.sites.help"></p>
+          <p class="hint"><a href="https://www.google.com/maps/d/viewer?mid=1iGmWc4tSHrLNwDRCFz86dLgBFWWw-Kg" rel="noopener" target="_blank" data-i18n="pick.sites.aprs"></a></p>
           <div id="site-facts" class="site-facts" aria-live="polite" hidden></div>
         </fieldset>
         <form id="search" class="row" role="search">
@@ -76,11 +79,9 @@
     <h2 id="size-h"><span class="num" aria-hidden="true">2</span><span data-i18n="step.size"></span></h2>
     <form id="options" class="options">
       <label><span data-i18n="size.print"></span>
-        <select name="printSize"><option value="150" selected>150 mm</option><option value="200">200 mm</option><option value="120">120 mm</option></select></label>
+        <select name="printSize"><option value="200" selected>200 mm</option><option value="150">150 mm</option><option value="120">120 mm</option></select></label>
       <label><span data-i18n="size.exag"></span>
         <select name="zExag"><option value="1">×1 (true)</option><option value="1.5">×1.5</option><option value="2" selected>×2</option><option value="3">×3</option></select></label>
-      <label><span data-i18n="size.preset"></span>
-        <select name="preset" id="preset"></select></label>
       <p class="hint" id="exag-note"></p>
       <button id="build" class="primary" data-i18n="build.button" disabled></button>
       <p id="build-status" class="status" role="status" aria-live="polite"></p>
@@ -89,21 +90,33 @@
 
   <section class="step" id="preview" aria-labelledby="preview-h" hidden>
     <h2 id="preview-h"><span class="num" aria-hidden="true">3</span><span data-i18n="step.preview"></span></h2>
-    <div class="preview-grid">
-      <div id="view" class="view"></div>
-      <aside class="layers">
-        <h3 data-i18n="preview.layers"></h3>
-        <ul id="layer-list"></ul>
-        <h3><label for="surface">Surface</label></h3>
-        <select id="surface"></select>
-        <p id="surface-note" class="hint" aria-live="polite"></p>
-      </aside>
-    </div>
+    <div id="view" class="view"></div>
+    <details class="studio-wrap" id="layers-panel" open>
+      <summary>Layers, surface and background</summary>
+      <div class="layers layers-panel">
+        <div>
+          <h3 data-i18n="preview.layers"></h3>
+          <ul id="layer-list"></ul>
+        </div>
+        <div>
+          <h3><label for="surface">Surface</label></h3>
+          <select id="surface"></select>
+          <p id="surface-note" class="hint" aria-live="polite"></p>
+        </div>
+      </div>
+    </details>
+    <details class="studio-wrap" id="geology-panel" open hidden>
+      <summary>Geology legend</summary>
+      <div id="geology-slot"></div>
+    </details>
+    <details class="studio-wrap" id="data-notes">
+      <summary>Data notes</summary>
+      <p id="caption" class="caption"></p>
+    </details>
     <details class="studio-wrap" open>
-      <summary>Studio: camera, light and images</summary>
+      <summary>Studio: style, camera, light and model</summary>
       <div id="studio"></div>
     </details>
-    <p id="caption" class="caption"></p>
     <details class="studio-wrap" id="section-panel">
       <summary>Cross-section</summary>
       <p class="hint">Draw a line across the area on the map, for example from a village through the site to a substation. The profile shows the ground, buildings at their heights, the proposed building at its stated height, and what the line crosses.</p>
@@ -124,15 +137,25 @@
 
   <section class="step" id="export" aria-labelledby="export-h" hidden>
     <h2 id="export-h"><span class="num" aria-hidden="true">4</span><span data-i18n="step.export"></span></h2>
+    <label class="print-colours"><span data-i18n="size.preset"></span>
+      <select name="preset" id="preset" form="options"></select></label>
+    <p class="hint">How the 3MF is split into coloured parts, one per filament. The shape is the same in every set; Studio's <em>Print colours</em> shows the choice on screen.</p>
     <div class="inline downloads">
       <button type="button" id="dl-3mf" class="primary" data-i18n="export.3mf"></button>
       <button type="button" id="dl-stl" data-i18n="export.stl"></button>
+    </div>
+    <h3>Images and animations</h3>
+    <div id="export-media" class="studio export-media"></div>
+    <h3>Legend and geology</h3>
+    <div class="studio export-media">
+      <fieldset id="export-legend"><legend>Legend</legend></fieldset>
+      <fieldset id="export-geology" hidden><legend>Geology cross sections</legend></fieldset>
     </div>
     <h3>Digital artefacts</h3>
     <div class="inline downloads">
       <button type="button" id="dl-viewer">Interactive 3D viewer (HTML)</button>
     </div>
-    <p class="hint">A single file that opens in any browser, works offline, and can be emailed. It has the same controls as this preview. Still images: use <em>Save PNG</em> in the studio above.</p>
+    <p class="hint">A single file that opens in any browser, works offline, and can be emailed. It has the same controls as this preview.</p>
     <p id="viewer-info" class="hint" aria-live="polite"></p>
     <p class="hint" data-i18n="export.3mf.help"></p>
     <p class="note" data-i18n="export.lowres"></p>
@@ -142,6 +165,11 @@
 </main>
 
 <footer class="site">
+  <p class="logos">
+    <img src="img/ai-planetary-resources.webp" width="2000" height="281" alt="AI uses Human Labour and Planetary Resources">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="license"><img src="img/cc-by-nc-sa.svg" width="88" height="31" alt="Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International licence"></a>
+  </p>
+  <p data-i18n="footer.licence"></p>
   <p><span data-i18n="footer.attr"></span> · <a href="privacy.html" data-i18n="footer.privacy"></a> ·
      <a href="https://github.com/jamiejcross/hyperscale-landscapes/blob/main/DATA_LICENCES.md" data-i18n="footer.sources"></a> ·
      <a href="https://github.com/jamiejcross/hyperscale-landscapes" data-i18n="footer.code"></a></p>

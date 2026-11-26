@@ -52,8 +52,10 @@ a:hover { color: var(--spot); }
 header.site, main, footer.site { max-width: 1280px; margin: 0 auto; padding: 0 var(--gutter); }
 
 header.site { padding-top: 2.5rem; padding-bottom: 2rem; border-bottom: 1px solid var(--rule); }
-header.site h1 { font-size: clamp(2.5rem, 7vw, 5.5rem); font-weight: 700; line-height: .95; letter-spacing: -0.035em; margin: 0; max-width: 12ch; }
-header.site p { font-size: clamp(1.05rem, 1.8vw, 1.35rem); line-height: 1.3; margin: 1.25rem 0 0; max-width: 34ch; }
+header.site .logo { display: block; width: 100%; max-width: 20rem; height: auto; margin: 1.5rem 0 0; }   /* half size, below the subtitle */
+header.site h1 { font-size: clamp(1.5rem, 7vw, 5.5rem); font-weight: 700; line-height: .95; letter-spacing: -0.035em; margin: 0; white-space: nowrap; }   /* one line */
+header.site p { font-size: clamp(1.05rem, 1.8vw, 1.35rem); line-height: 1.3; margin: 1.25rem 0 0; }
+@media (min-width: 48rem) { header.site p { white-space: nowrap; } }   /* one line; phones may wrap */
 
 /* Each step: a numeral column and a content column, separated by a rule. */
 .step { display: grid; grid-template-columns: 7rem var(--col); column-gap: var(--gutter);
@@ -62,7 +64,7 @@ header.site p { font-size: clamp(1.05rem, 1.8vw, 1.35rem); line-height: 1.3; mar
   align-items: baseline; margin: 0 0 1.5rem; font-size: clamp(1.6rem, 3vw, 2.4rem); font-weight: 700; letter-spacing: -0.02em; line-height: 1.05; }
 .step > h2 .num { font-size: clamp(3.5rem, 8vw, 6.5rem); line-height: .8; color: var(--spot); letter-spacing: -0.05em; }
 .step > :not(h2) { grid-column: 2; }
-.step h3 { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin: 1.5rem 0 .5rem; }
+.step h3 { font-size: .9rem; font-weight: 700; letter-spacing: 0; margin: 1.5rem 0 .5rem; }
 .hint { color: var(--grey); font-size: .875rem; line-height: 1.4; margin: .35rem 0; max-width: var(--measure); }
 .note { border-left: 4px solid var(--spot); padding-left: .75rem; max-width: var(--measure); }
 .status { min-height: 1.45em; font-weight: 700; }
@@ -70,7 +72,7 @@ header.site p { font-size: clamp(1.05rem, 1.8vw, 1.35rem); line-height: 1.3; mar
 
 /* ---- controls ---- */
 fieldset { border: 0; border-top: 1px solid var(--rule); margin: 0 0 1.25rem; padding: .6rem 0 0; min-width: 0; }
-legend { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 0 .5rem 0 0; }
+legend { font-size: .9rem; font-weight: 700; letter-spacing: 0; padding: 0 .5rem 0 0; }
 label { display: block; margin: .45rem 0; font-size: .95rem; }
 input, select, button { font: inherit; color: inherit; }
 input[type=text], input[type=search], input[type=number], select {
@@ -96,7 +98,12 @@ input[type=range], input[type=checkbox] { accent-color: var(--ink); }
 .coords { display: grid; grid-template-columns: repeat(2, 1fr); gap: .25rem .75rem; }
 .coords input { width: 100%; }
 .coords button { grid-column: 1 / -1; }
-.site-facts { font-size: .9rem; border-top: 4px solid var(--spot); padding-top: .5rem; margin-top: 1rem; }
+.site-facts { font-size: .9rem; border-top: 4px solid var(--spot); padding-top: .9rem; margin-top: 1.5rem; }
+/* step 1 breathing room: the site list, its note, the facts and the next control */
+#site-select { margin-bottom: .5rem; }
+.pick-controls > fieldset, .pick-controls > form, .pick-controls > .row, .pick-controls > details { margin-bottom: 2rem; }
+.pick-controls > fieldset { padding-top: .9rem; }
+.site-facts p { margin: .6rem 0; }
 .site-facts strong { font-size: 1.15rem; letter-spacing: -0.01em; }
 .site-facts dl { display: grid; grid-template-columns: auto 1fr; gap: .15rem .9rem; margin: .5rem 0; }
 .site-facts dt { color: var(--grey); }
@@ -104,7 +111,9 @@ input[type=range], input[type=checkbox] { accent-color: var(--ink); }
 
 /* ---- step 2 ---- */
 .options { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0 2rem; align-items: start; }
-.options > label span { display: block; font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .25rem; }
+.print-colours { display: block; margin: 1rem 0 .25rem; }
+.print-colours span { display: block; font-size: .9rem; font-weight: 700; margin-bottom: .25rem; }
+.options > label span { display: block; font-size: .9rem; font-weight: 700; letter-spacing: 0; margin-bottom: .25rem; }
 .options select, .options input { width: 100%; }
 .options .insert, .options .primary, .options .status, .options .hint { grid-column: 1 / -1; }
 .options .insert { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0 2rem; }
@@ -113,15 +122,24 @@ input[type=range], input[type=checkbox] { accent-color: var(--ink); }
 label.file input { display: block; margin-top: .25rem; }
 
 /* ---- step 3 ---- */
-.preview-grid { display: grid; grid-template-columns: var(--col) minmax(14rem, 17rem); gap: 2rem; }
+/* the preview fills the column; layers, surface and background sit below it, in their own open/close section */
+.layers-panel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(14rem, 17rem); gap: 2rem; margin-top: .5rem; }
+#layer-list { columns: 2 16rem; column-gap: 2rem; }
+#layer-list > li { break-inside: avoid; }
 .view { position: relative; aspect-ratio: 16 / 10; border: 1px solid var(--ink); overflow: hidden; background: #c9d9e4; }
 .view canvas { width: 100%; height: 100%; display: block; }
 .layers ul { list-style: none; padding: 0; margin: 0 0 1rem; }
 .layers li { margin-bottom: .35rem; padding-bottom: .35rem; border-bottom: 1px solid var(--faint); }
 .layers .swatch { display: inline-block; width: .85em; height: .85em; vertical-align: -.08em; margin-right: .4em; }
 .layers details { font-size: .85rem; color: var(--grey); margin-left: 1.6rem; }
+.layers .why { font-size: .85rem; color: var(--grey); margin-left: 1.6rem; }
+.layers .why p { margin: .3rem 0; }
+.why-btn { border: 0; background: none; padding: 0 .2rem; margin: 0; cursor: pointer; color: var(--grey); font: inherit; line-height: 1; }
+.why-btn::before { content: '▾'; }
+.why-btn[aria-expanded="true"]::before { content: '▴'; }
+.why-btn:hover, .why-btn:focus-visible { color: var(--ink); }
 .layers summary { cursor: pointer; }
-#surface { width: 100%; }
+#surface, #bg { width: 100%; }
 .check { display: flex; gap: .45rem; align-items: center; }
 .caption { font-size: .85rem; color: var(--grey); max-width: var(--measure); margin-top: 1rem; }
 .studio-wrap { margin-top: 2rem; border-top: 1px solid var(--rule); padding-top: .75rem; }
@@ -141,12 +159,16 @@ label.file input { display: block; margin-top: .25rem; }
 
 footer.site { padding-top: 1.5rem; padding-bottom: 3rem; font-size: .85rem; color: var(--grey); }
 footer.site p { margin: 0; max-width: none; }
+header.site .cc { display: inline-block; margin-top: .75rem; }
+header.site .cc img, footer.site .logos a img { display: block; width: 88px; height: 31px; }
+footer.site .logos { display: flex; flex-wrap: wrap; align-items: center; gap: 1.25rem; margin-bottom: 1rem; }
+footer.site .logos > img { width: 100%; max-width: 14rem; height: auto; }
 
 @media (max-width: 860px) {
   .step { grid-template-columns: var(--col); }
   .step > h2 { grid-template-columns: 4.5rem var(--col); }
   .step > :not(h2) { grid-column: 1; }
-  .pick-grid, .preview-grid { grid-template-columns: var(--col); }
+  .pick-grid, .layers-panel { grid-template-columns: var(--col); }
   .map { min-height: 340px; }
   .downloads button { width: 100%; }
 }
@@ -161,3 +183,9 @@ footer.site p { margin: 0; max-width: none; }
 .geo-row { display: flex; gap: 7px; align-items: flex-start; font-size: 11.5px; line-height: 1.3; margin: 4px 0; }
 .geo-row img, .geo-row svg { flex: none; margin-top: 1px; }
 .geo-legend .hint { margin: 4px 0; }
+/* the geology legend under the preview: two columns, the fieldset's own frame dropped */
+#geology-slot fieldset { border: 0; padding: 0; margin: .5rem 0 0; }
+#geology-slot fieldset > legend { display: none; }
+.geo-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0 2rem; }
+.geo-cols .geo-row { font-size: .85rem; }
+.geo-cols h3 { font-size: .8rem; }

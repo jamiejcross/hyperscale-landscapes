@@ -167,14 +167,7 @@ export function paintCarto(canvas, o) {
     drawCrowns(g, plan.crowns, { X, Y, pxPerM, C });
   }
   // 5. water, lineless (the sea from the height data, lochs and waterways from OSM)
-  if (on('water')) {
-    if (o.sea) { g.save(); g.imageSmoothingQuality = 'high'; g.drawImage(o.sea, 0, 0, W, H); g.restore(); }
-    g.fillStyle = g.strokeStyle = C.water; g.lineCap = g.lineJoin = 'round';
-    for (const l of V.lakes || []) { g.beginPath(); ringPath(l.rings); g.fill('evenodd'); }
-    for (const w of V.waterways || []) {
-      g.beginPath(); linePath(w.p); g.lineWidth = (/^(river|canal)$/.test(w.k) ? C.riverM : C.streamM) * pxPerM; g.stroke();
-    }
-  }
+  if (on('water')) paintWater(g, { vectors: V, sea: o.sea, Wmm, mmPerM, colour: C.water, riverM: C.riverM, streamM: C.streamM });
   // 6. routes: crisp, cased
   g.lineCap = g.lineJoin = 'round';
   const major = /^(motorway|trunk|primary|secondary)/;
@@ -189,11 +182,7 @@ export function paintCarto(canvas, o) {
     for (const r of V.railDisused || []) { g.beginPath(); linePath(r.p); g.stroke(); }
     g.restore();
   }
-  if (on('power')) {
-    g.save(); g.strokeStyle = ink; g.globalAlpha = C.powerAlpha;
-    for (const l of V.powerLines || []) { g.beginPath(); linePath(l.p); g.lineWidth = C.powerWidth[l.k === 'line' ? 0 : 1] * s; g.stroke(); }
-    g.restore();
-  }
+  // (power lines: not painted on the ground; glyphs.js strings wires between the pylon tops)
   // 7. residues: rust fill, 45° hatch and an edge
   if (on('residues')) for (const f of V.residues || []) {
     const outline = () => { g.beginPath(); if (f.disc) g.arc(X(f.disc[0]), Y(f.disc[1]), f.disc[2] / 2 * k, 0, Math.PI * 2); else ringPath(f.rings); };
@@ -270,6 +259,28 @@ function drawCrowns(g, crowns, { X, Y, pxPerM, C }) {
   }
 }
 
+// Water, lineless, onto a drape (Anthropogenic, and Guthrie and Field with
+// painted water): the sea mask (canvas or null), lochs and ponds (vectors.lakes)
+// filled, rivers and canals at riverM and other waterways at streamM metres wide.
+export function paintWater(g, { vectors: V = {}, sea = null, Wmm, mmPerM, colour, riverM = 6, streamM = 3.2 }) {
+  const W = g.canvas.width, H = g.canvas.height, k = W / Wmm, pxPerM = k * mmPerM;
+  const X = x => x * k, Y = y => H - y * k;
+  g.save();
+  if (sea) { g.imageSmoothingQuality = 'high'; g.drawImage(sea, 0, 0, W, H); }
+  g.fillStyle = g.strokeStyle = colour; g.lineCap = g.lineJoin = 'round';
+  for (const l of V.lakes || []) {
+    g.beginPath();
+    for (const r of l.rings) { for (let i = 0; i < r.length; i += 2) (i ? g.lineTo : g.moveTo).call(g, X(r[i]), Y(r[i + 1])); g.closePath(); }
+    g.fill('evenodd');
+  }
+  for (const w of V.waterways || []) {
+    g.beginPath();
+    for (let i = 0; i < w.p.length; i += 2) (i ? g.lineTo : g.moveTo).call(g, X(w.p[i]), Y(w.p[i + 1]));
+    g.lineWidth = (/^(river|canal)$/.test(w.k) ? riverM : streamM) * pxPerM; g.stroke();
+  }
+  g.restore();
+}
+
 // Sea mask (alpha, north up) from a height sampler: water colour where the
 // ground is at or below 0 m. pxPerM: resolution. Null when there is no sea.
 export function seaCanvas(sampleM, wM, hM, colour, pxPerM = 0.5) {
@@ -316,5 +327,43 @@ export function glyphPoints({ props, vectors, mmPerM, Wmm, Hmm, C }) {
   }
   const counts = { pylon: 0, pole: 0, turbine: 0 };
   for (const p of out) counts[p.kind]++;
-  return { points: out, counts, assumed };
+  // Wires: consecutive vertices of each power line that both stand on a pylon or pole.
+  const lines = sup || tb ? (props?.lines || []).map(L => L.xy.map(([x, y]) => [x * mmPerM, y * mmPerM])) : (vectors?.powerLines || []).map(l => l.p);
+  const wires = glyphWires(out, lines, Math.max(0.05, 2 * mmPerM));
+  return { points: out, counts, assumed, wires };
+}
+
+// Pairs of indices into `points` (pylons and poles only) joined by a span of
+// one of `lines` (each a list of [x, y] mm). A vertex counts as on a support
+// within `tol` mm. Spans whose ends are not both supports are left out.
+export function glyphWires(points, lines, tol) {
+  const cell = new Map(), key = (i, j) => `${i},${j}`;
+  points.forEach((p, i) => {
+    if (p.kind === 'turbine') return;
+    const k = key(Math.floor(p.x / tol), Math.floor(p.y / tol));
+    if (!cell.has(k)) cell.set(k, []);
+    cell.get(k).push(i);
+  });
+  const find = (x, y) => {
+    const ci = Math.floor(x / tol), cj = Math.floor(y / tol);
+    let best = -1, bd = tol * tol;
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const i of cell.get(key(ci + a, cj + b)) || []) {
+      const d = (points[i].x - x) ** 2 + (points[i].y - y) ** 2;
+      if (d <= bd) { bd = d; best = i; }
+    }
+    return best;
+  };
+  const out = [], seen = new Set();
+  for (const L of lines) {
+    let prev = -1;
+    for (const [x, y] of L) {
+      const i = find(x, y);
+      if (i >= 0 && prev >= 0 && i !== prev) {
+        const k = prev < i ? `${prev}-${i}` : `${i}-${prev}`;
+        if (!seen.has(k)) { seen.add(k); out.push([prev, i]); }
+      }
+      prev = i;
+    }
+  }
+  return out;
 }

@@ -131,47 +131,92 @@ export function wallsSVG({ geology, look, caption, name, pitsShown = { coal: tru
 }
 
 
+// Interface wording for the legend's closing note (keys geology.note.* in
+// data/i18n), set by the app and the offline viewer from their strings.
+let TX = {};
+export const GEOLOGY_TEXT_KEYS = ['geology.note.head', 'geology.note.data', 'geology.note.assumed', 'geology.note.schematic', 'geology.note.site',
+  'geology.note.plan', 'geology.note.plan.mine', 'geology.note.boreholes', 'geology.note.boreholes.deepest', 'geology.note.coal', 'geology.note.quarry',
+  'geology.note.unknown', 'geology.note.hidden', 'geology.note.pits'];
+export function setGeologyText(strings) { TX = strings || {}; }
+const tx = (k, vars = {}) => Object.entries(vars).reduce((s, [a, v]) => s.replaceAll(`{${a}}`, v), TX[k] ?? k);
+
 // The legend rows, generated from the bundle: { head } | { swatch: canvas,
 // text } | { mark: 'coal'|'unknown'|'quarry'|'borehole'|'panel', text } |
 // { note }. Shared by the export and the studio's legend panel.
-export function legendItems({ geology, look, pitsShown = { coal: true, unknown: true, quarry: false } }) {
+// The note on what is data and what is drawn (wording: geology.note.* in
+// data/i18n), filled in for this site: { title, data, assumed, schematic, on_this_site }.
+export function dataNote(opts) { return legendItems(opts, true); }
+
+export function legendItems({ geology, look, pitsShown = { coal: true, unknown: true, quarry: false } }, wantNote = false) {
+  let note = null;
   const G = geology, sub = G.sub, LG = legendModel(sub, { Wm: G.Wm, Hm: G.Hm });
-  const items = [];             // { head } | { swatch (canvas), text } | { mark, text } | { note }
+  const items = [];   // rows are short (two lines at most); the detail goes to the note at the end
   const sw = cv => cv;
+  // BGS labels are "Formation — lithology"; a row shows the formation alone
+  // unless two rows share it.
+  const short = list => list.map(e => {
+    const name = e.label.split(' — ')[0];
+    return list.filter(o => o.label.split(' — ')[0] === name).length > 1 ? e.label : name;
+  });
   if (LG.bedrock.length) {
-    items.push({ head: 'Bedrock mapped by BGS: position along each wall is DATA; contacts carried straight down (ASSUMED)' });
-    for (const e of LG.bedrock) items.push({ swatch: sw(G.swatch(e.unit, look)), text: e.label });
+    items.push({ head: 'Bedrock' });
+    const rows = short(LG.bedrock);
+    LG.bedrock.forEach((e, i) => items.push({ swatch: sw(G.swatch(e.unit, look)), text: rows[i] }));
   }
   if (LG.sheets.length) {
-    items.push({ head: `Sheets: drawn level at NOMINAL thickness (ASSUMED: ${LG.sheetRanges.join(', ')})` });
-    for (const e of LG.sheets) items.push({ swatch: sw(G.swatch(e.unit, look)), text: `${e.label} (drawn ${e.thickness} m)` });
+    items.push({ head: 'Sheets' });
+    const rows = short(LG.sheets);
+    LG.sheets.forEach((e, i) => items.push({ swatch: sw(G.swatch(e.unit, look)), text: rows[i] }));
   }
   if (LG.cover.length) {
-    items.push({ head: 'Superficial and artificial deposits: mapped extent (DATA), NOMINAL thickness (ASSUMED)' });
-    for (const e of LG.cover) items.push({ swatch: sw(G.swatch(e.unit, look, { cover: true })), text: `${e.label} (drawn ${e.thickness} m)` });
+    items.push({ head: 'Superficial and artificial deposits' });
+    for (const e of LG.cover) items.push({ swatch: sw(G.swatch(e.unit, look, { cover: true })), text: e.label });
   }
   items.push({ head: 'Coal and records' });
-  if (LG.coal) items.push({ swatch: sw(G.coalSwatch(look)), text: `Coal-bearing ground: coal-named formations${LG.opencast ? ' and BGS opencast coal resource areas' : ''} (extent is DATA; seam number, depth and thickness are SCHEMATIC)` });
+  if (LG.coal) {
+    items.push({ swatch: sw(G.coalSwatch(look)), text: 'Coal-bearing ground' });
+  }
   const pan = G.panel;
-  if (pan) { const pl = LG.plans.find(p => p.catalogue === String(pan.plan)); items.push({ mark: 'panel', text: `Mine plan ${pan.plan}${pl ? `: ${pl.mine}${pl.year ? `, abandoned ${pl.year}` : ''}` : ''}: seams named on the plan (names are DATA; order and depths not shown)` }); }
+  if (pan) items.push({ mark: 'panel', text: `Mine plan ${pan.plan}` });
+  // the site's own records, for the note at the end
+  const site = [];
+  if (pan) {
+    const pl = LG.plans.find(p => p.catalogue === String(pan.plan));
+    site.push(pl ? tx('geology.note.plan.mine', { plan: pan.plan, mine: `${pl.mine}${pl.year ? `, abandoned ${pl.year}` : ''}` }) : tx('geology.note.plan', { plan: pan.plan }));
+  }
   if (LG.boreholes.length) {
-    const deep = LG.boreholes.filter(b => b.depth >= 10).sort((a, b) => b.depth - a.depth);
-    const listed = deep.slice(0, 6).map(b => `${b.ref} (${b.year || 'year not recorded'}, ${+b.depth.toFixed(1)} m)`).join('; ');
-    items.push({ mark: 'borehole', text: `BGS boreholes within 50 m of a wall, drawn to their recorded depth: ${LG.boreholes.length}${deep.length ? `; labelled where 10 m or deeper and there is room, deepest first: ${listed}${deep.length > 6 ? `; and ${deep.length - 6} more` : ''}` : ''}. Logs not read.` });
+    const deepest = [...LG.boreholes].sort((a, b) => b.depth - a.depth)[0];
+    items.push({ mark: 'borehole', text: `BGS boreholes (${LG.boreholes.length})` });
+    site.push(deepest.depth >= 10 ? tx('geology.note.boreholes.deepest', { n: LG.boreholes.length, ref: deepest.ref, depth: +deepest.depth.toFixed(1) })
+      : tx('geology.note.boreholes', { n: LG.boreholes.length }));
   }
-  const PIT = { coal: ['coal', 'Coal mine (BritPits'], unknown: ['unknown', 'Closed mine or quarry, type unknown (BritPits'], quarry: ['quarry', 'Quarry (BritPits'] };
-  for (const [cls, [mark, label]] of Object.entries(PIT)) {
+  // historic coal mines, historic quarries, then type unknown (the layer list's order)
+  const PIT = { coal: 'Historic coal mine (BritPits)', quarry: 'Historic quarry (BritPits)', unknown: 'Mine or quarry, type unknown (BritPits)' };
+  for (const [cls, label] of Object.entries(PIT)) {
     const names = LG.pits[cls]; if (!names.length) continue;
-    items.push({ mark, text: `${label}${cls === 'coal' && LG.plans.length ? `; mine plans ${LG.plans.map(p => p.catalogue).join(', ')}` : ''}): ${names.join(', ')}${pitsShown[cls] ? '' : ' (not shown on the model)'}` });
+    items.push({ mark: cls, text: label });
+    const list = names.join(', ');
+    site.push(tx(`geology.note.${cls}`, { names: pitsShown[cls] ? list : tx('geology.note.hidden', { list }) }));
   }
-  if (LG.pits.coal.length + LG.pits.unknown.length + LG.pits.quarry.length) items.push({ note: 'Pit squares are 50 m symbols at the recorded point, not footprints or hazard zones.' });
-  items.push({ head: 'What is data and what is drawn' });
-  for (const k of ['DATA', 'ASSUMED', 'SCHEMATIC']) if (LG.labels[k]?.length) items.push({ note: `${k}: ${LG.labels[k].join('; ')}.` });
-  if (!LG.madeGround) items.push({ note: 'No artificial (made) ground is mapped along these edges.' });
-  const nt = nominalTable(sub);
-  if (nt.length) items.push({ note: `Nominal thicknesses (m): ${nt.map(([k, v]) => `${k} ${v}`).join(', ')}.` });
+  const anyPits = LG.pits.coal.length + LG.pits.unknown.length + LG.pits.quarry.length;
 
-  return items;
+  // What is data and what is drawn: one synthesised note (wording in data/i18n),
+  // with this site's thicknesses and records.
+  const nominal = Object.fromEntries(nominalTable(sub));
+  const coverT = Object.keys(sub?.nominal_thickness_m?.superficial || {})
+    .filter(k => LG.cover.some(e => e.label.toLowerCase().includes(k.replace(/_/g, ' '))))
+    .map(k => `${k.replace(/_/g, ' ')} ${nominal[k]} m`);
+  const thicknesses = [...(LG.sheets.length ? LG.sheetRanges : []), ...coverT];
+  // Not shown in the legend (JC, 25 Nov 2026): kept for the Sources (JSON) download.
+  note = {
+    title: tx('geology.note.head'),
+    data: tx('geology.note.data'),
+    assumed: thicknesses.length ? tx('geology.note.assumed', { thicknesses: thicknesses.join(', ') }) : null,
+    schematic: LG.coal || pan ? tx('geology.note.schematic') : null,
+    on_this_site: site.length ? `${tx('geology.note.site', { items: site.join('; ') })}${anyPits ? ` ${tx('geology.note.pits')}` : ''}` : null,
+  };
+
+  return wantNote ? note : items;
 }
 
 // Small symbols for legend rows without a unit swatch.

@@ -17,8 +17,14 @@ optional:
   * ``subsurface``: BGS geology along the walls, boreholes, pits and mine plans
     (providers/subsurface.py), marked ``nonCommercial``.
 
+Schema @4 (25 Nov 2026) adds an optional ``context`` section: coarse terrain
+and the main infrastructure in a band round the model area, for the
+screen-only context apron (context.py). @2 and @3 bundles stay readable.
+
     python -m hyperscale_landscapes.bake auchtertool-cato
-    python -m hyperscale_landscapes.bake --reuse auchtertool-cato   # keep the bundle's OSM and elevation
+    python -m hyperscale_landscapes.bake --reuse auchtertool-cato     # keep the bundle's OSM and elevation
+    python -m hyperscale_landscapes.bake --context auchtertool-cato   # add or refresh only the context section
+    python -m hyperscale_landscapes.bake --context-power auchtertool-cato   # only context.power (cached OSM)
 """
 from __future__ import annotations
 
@@ -42,7 +48,7 @@ TERRARIUM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}
 ZOOM = 14
 MAX_BUNDLE_BYTES = 5_000_000
 LIDAR_RES_M = 4.0
-SCHEMA = "hyperscale-landscapes/site-bundle@3"
+SCHEMA = "hyperscale-landscapes/site-bundle@4"
 M_PER_DEG_LAT = 111_320.0          # as web/js/geo.js
 # One tree: x, y (uint16, from the bbox SW corner, in TREE_XY_UNIT), h (uint16 dm),
 # archetype (uint8), source (uint8), crown radius (uint8 dm, capped at 25.5 m).
@@ -81,7 +87,7 @@ def bake(site_id: str, reuse: bool = False) -> dict:
         if bundle.get("bbox") != bb:
             raise SystemExit(f"{site_id}: the bundle's area differs from the site's; rebake without --reuse")
         bundle["schema"] = SCHEMA
-        for k in ("props", "subsurface"):
+        for k in ("props", "subsurface", "context"):
             bundle.pop(k, None)
         lidar = bundle["elevation"].get("lidar")
     else:
@@ -109,7 +115,64 @@ def bake(site_id: str, reuse: bool = False) -> dict:
     base_bytes = len(gzip.compress(json.dumps(bundle, separators=(",", ":")).encode(), 9))
     bundle["props"] = props_section(site_id, site, bb, bundle["osm"]["elements"])
     bundle["subsurface"] = subsurface_section(site, bb)
+    from .context import context_section
+    bundle["context"] = context_section(site, bundle)
     data = _write(out, bundle)
+    _index(sites, site_id, out, bundle)
+    return {"file": str(out), "bytes": len(data), "added_bytes": len(data) - base_bytes,
+            "trees": bundle["props"]["trees"]["count"], "turbines": len(bundle["props"]["turbines"]),
+            "supports": len(bundle["props"]["supports"]), "elevation": lidar["source"] if lidar else "terrarium",
+            "elements": len(bundle["osm"].get("elements", []))}
+
+
+def bake_context(site_id: str) -> dict:
+    """Add or refresh only the @4 context section. Every other section of the
+    bundle is kept exactly as it is (so the print model cannot change)."""
+    from .context import context_section
+    sites = data_dir() / "sites"
+    site = json.loads((sites / f"{site_id}.geojson").read_text())
+    out = sites / f"{site_id}.bundle.json.gz"
+    before = out.read_bytes()
+    bundle = json.loads(gzip.decompress(before))
+    if bundle.get("bbox") != site["properties"]["model_bbox"]:
+        raise SystemExit(f"{site_id}: the bundle's area differs from the site's; rebake in full")
+    bundle.pop("context", None)
+    base = len(gzip.compress(json.dumps(bundle, separators=(",", ":")).encode(), 9))
+    bundle["schema"] = SCHEMA
+    bundle["context"] = c = context_section(site, bundle)
+    data = _write(out, bundle)
+    _index(sites, site_id, out, bundle)
+    e = c["elevation"]
+    kinds = {}
+    for el in c["osm"]["elements"]:
+        t = el["tags"]
+        k = next((x for x in ("building", "highway", "power", "railway", "waterway", "landuse", "natural", "man_made", "place") if x in t), "other")
+        kinds[k] = kinds.get(k, 0) + 1
+    return {"site": site_id, "bytes_before": len(before), "bytes_after": len(data), "added_bytes": len(data) - base,
+            "offset_m": e["offset_m"], "offset_spread_m": e["offset_spread_m"], "offset_against": e["offset_against"],
+            "grid": f'{e["w"]}x{e["h"]} @ {e["dx_m"]:.2f}x{e["dy_m"]:.2f} m', "elements": len(c["osm"]["elements"]),
+            "dropped_inside": c["osm"]["dropped_inside"], "kinds": kinds}
+
+
+def bake_context_power(site_id: str) -> dict:
+    """Add or refresh only context.power, from the cached context response
+    (fetched again only if the cache is gone). Everything else is kept."""
+    from .context import context_power, fetch_osm, grid_spec, padded_bbox, projection
+    sites = data_dir() / "sites"
+    out = sites / f"{site_id}.bundle.json.gz"
+    bundle = json.loads(gzip.decompress(out.read_bytes()))
+    c = bundle.get("context")
+    if not c:
+        raise SystemExit(f"{site_id}: no context section; run --context first")
+    bb = bundle["bbox"]
+    _, W, H = projection(bb)
+    osm = fetch_osm(padded_bbox(bb, grid_spec(W, H, c["pad_m"])))
+    c["power"] = context_power(osm, bb)
+    _write(out, bundle)
+    return {"site": site_id, **c["power"]["summary"]}
+
+
+def _index(sites, site_id, out, bundle):
     idx_path = sites / "index.json"
     idx = json.loads(idx_path.read_text())
     for s in idx["sites"]:
@@ -117,10 +180,6 @@ def bake(site_id: str, reuse: bool = False) -> dict:
             s["bundle"] = out.name
             s["bundle_fetched"] = bundle["fetched"]
     idx_path.write_text(json.dumps(idx, indent=2, ensure_ascii=False) + "\n")
-    return {"file": str(out), "bytes": len(data), "added_bytes": len(data) - base_bytes,
-            "trees": bundle["props"]["trees"]["count"], "turbines": len(bundle["props"]["turbines"]),
-            "supports": len(bundle["props"]["supports"]), "elevation": lidar["source"] if lidar else "terrarium",
-            "elements": len(bundle["osm"].get("elements", []))}
 
 
 # ---------------------------------------------------------------- @3 sections
@@ -257,6 +316,9 @@ def lidar_grid(bb: dict) -> dict | None:
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    reuse = "--reuse" in args
+    reuse, context_only, power_only = "--reuse" in args, "--context" in args, "--context-power" in args
     for sid in [a for a in args if not a.startswith("--")] or ["auchtertool-cato"]:
-        print(bake(sid, reuse=reuse), flush=True)
+        if power_only:
+            print(json.dumps(bake_context_power(sid)), flush=True)
+        else:
+            print(json.dumps(bake_context(sid)) if context_only else bake(sid, reuse=reuse), flush=True)

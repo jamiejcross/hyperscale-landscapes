@@ -25,7 +25,9 @@ const LOOK_STYLE = {
 // sub: the bundle's subsurface section; walls: the terrain-sides geometry
 // (non-indexed, unscaled model mm); grid: model grid; zExag: the model's
 // terrain exaggeration; palettes: PALETTES; evidence: EVIDENCE colours.
-export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink: inkDefault = '#221d18' }) {
+// labels: draw the coal-ground and borehole labels on the walls (off by
+// default since 25 Nov 2026; the data and the drawing code stay).
+export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink: inkDefault = '#221d18', labels = false }) {
   const W = sub?.walls;
   if (!W || !walls) return null;
   const pos = walls.attributes.position.array;
@@ -40,6 +42,7 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
 
   const mmPerM = grid.mmPerM, Wm = grid.Wmm / mmPerM, Hm = grid.Hmm / mmPerM;
   const textures = {}, materials = {};
+  let labelsOn = !!labels, currentLook = null;
 
   // textScale: how much wider than on the model each texel will be shown,
   // relative to its height (1 on the model; the unfolded-walls diagram uses
@@ -152,6 +155,7 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
 
       // coal labels (on top of everything in the section)
       for (const r of coalRuns) {
+        if (!labelsOn) break;
         c.font = `bold 22px ${FONT}`;
         const tw = Math.max(c.measureText(r.label).width, (c.font = `17px ${FONT}`, c.measureText('seam positions schematic').width)) + 16;
         const lx = Math.max(r.a + 8, Math.min(r.b - tw * FX(k) - 8, r.a + 18)), ly = Math.min(bottom - 60, r.y);
@@ -173,7 +177,7 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
     // 1 km of a wall that has a coal run; once per site.
     const panel = seamPanel();
     lastPanel = panel && { side: SIDES[panel.k], pit: panel.pit.name, plan: panel.plan.catalogue, d: Math.round(panel.d), x: panel.run.panelX, y: panel.run.panelY };
-    if (panel) {
+    if (panel && labelsOn) {              // a wall label: drawn only when wall labels are on
       const { k, run, plan, pit } = panel, D = sideDraw[k];
       const mine = (plan.mine_name || pit.name).toLowerCase().replace(/\b\w/g, ch => ch.toUpperCase());
       const title = `Mine plan ${plan.catalogue}: ${mine}${plan.year_abandoned ? `, abandoned ${plan.year_abandoned}` : ''}`;
@@ -214,7 +218,7 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
       c.lineWidth = 5; c.strokeStyle = RED; c.stroke();
       c.lineCap = 'butt';
       c.fillStyle = RED; c.beginPath(); c.arc(x, y1, 7, 0, 7); c.fill();
-      if (bh.length_m < 10) continue;                    // label the deeper ones only
+      if (bh.length_m < 10 || !labelsOn) continue;      // label the deeper ones only, when labels are on
       const lines = [`BGS borehole ${bh.ref}`, `${bh.name || ''}${bh.year ? `, ${bh.year}` : ''}`.replace(/^, /, ''),
         `${+bh.length_m.toFixed(1)} m deep (${bh.ags ? 'AGS log' : 'scanned log, not read'})`].filter(Boolean);
       c.font = `bold 18px ${FONT}`; const w = Math.max(...lines.map(l => c.measureText(l).width)) + 14;
@@ -305,14 +309,24 @@ export function createGeology({ sub, walls, grid, zExag, palettes, evidence, ink
     }
     col.needsUpdate = true;
   }
-  function setLook(look) { mesh.material = material(look); }
+  function setLook(look) { currentLook = look; mesh.material = material(look); }
+  // Wall labels on or off: repaint (the textures are cached per look).
+  function setLabels(on) {
+    if (!!on === labelsOn) return;
+    labelsOn = !!on;
+    for (const m of Object.values(materials)) m.dispose();
+    for (const t of Object.values(textures)) t.dispose();
+    for (const k of Object.keys(materials)) delete materials[k];
+    for (const k of Object.keys(textures)) delete textures[k];
+    if (currentLook) setLook(currentLook);
+  }
   function dispose() {
     for (const m of Object.values(materials)) m.dispose();
     for (const t of Object.values(textures)) t.dispose();
     geo.deleteAttribute('uv'); geo.deleteAttribute('color'); geo.dispose();   // position/normal belong to the walls
     mesh.removeFromParent();
   }
-  return { mesh, setLook, shade, dispose, atlas, swatch, coalSwatch, sub, surf, zmin, zmax, zExag, mmPerM, Wm, Hm, CW, SH,
+  return { mesh, setLook, setLabels, get labels() { return labelsOn; }, shade, dispose, atlas, swatch, coalSwatch, sub, surf, zmin, zmax, zExag, mmPerM, Wm, Hm, CW, SH,
     get panel() { return lastPanel; }, attribution: sub.attribution, nonCommercial: !!sub.nonCommercial };
 }
 

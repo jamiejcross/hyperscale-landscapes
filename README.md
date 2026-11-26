@@ -38,6 +38,16 @@ draw an area, and preview it in 3D. From there you can:
   browser, works offline, and can be emailed;
 - download a **print file** for a 3D printer.
 
+Round each curated site the preview can show about 1.6 km beyond the model.
+**Landscape Context** is the land, with the main roads, railways, water,
+buildings and place names, running on from the model's edge and fading with
+distance. **Energy Context** is the electricity network: pylons, poles and
+overhead lines. Both are on screen only and never part of the print. While
+either is on, the camera stays above the ground and the model's soil sides and
+geology walls are switched off; turn both off to see the block and its geology.
+
+![Auchtertool with the Landscape and Energy Context on](docs/img/auchtertool-context.png)
+
 The preview offers a land-cover map or open satellite imagery (Sentinel-2,
 10 m) as the surface. It all runs in
 your browser. The browser's print files are lower resolution than the
@@ -99,7 +109,11 @@ base. The models are designed to print **without supports**.
 
 Map data © OpenStreetMap contributors (ODbL). Elevation, coastline and other
 sources are listed with their licences in [DATA_LICENCES.md](DATA_LICENCES.md).
-Curated site data is CC BY 4.0. The code is GPL-3.0-or-later.
+Curated site data is CC BY 4.0. The source code is GPL-3.0-or-later
+([LICENSE](LICENSE)). All exports and downloads are
+[CC BY-NC-SA 4.0](LICENCE-CC-BY-NC-SA-4.0.txt): this is a non-commercial
+research and educational project (University of Glasgow). See the terms of use at the top of
+[DATA_LICENCES.md](DATA_LICENCES.md).
 
 ## Credits
 

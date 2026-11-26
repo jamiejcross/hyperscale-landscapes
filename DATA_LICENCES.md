@@ -1,5 +1,25 @@
 # Data licences and attribution
 
+## Terms of use (26 Nov 2026)
+
+Hyperscale Landscapes is a non-commercial research and educational project
+(University of Glasgow). The source code is GPL-3.0-or-later ([LICENSE](LICENSE)).
+All exports and downloads (images, animations, offline viewers, print files,
+cross-sections and manifests) are
+[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) (licence
+text: [LICENCE-CC-BY-NC-SA-4.0.txt](LICENCE-CC-BY-NC-SA-4.0.txt)). Every source
+is used under the terms of its own licence, with the attribution it requires.
+Nothing here is offered for commercial use. All exports and downloads are bound
+by non-commercial and share-alike terms for use in research, criticism and
+education, within the UK fair dealing exceptions (CDPA 1988 ss. 29, 30, 32).
+Outputs that contain non-commercial material (BGS 50k geology, EOX 2018–2025
+imagery) carry an NC notice, and recipients are bound by it.
+
+Third-party software and fonts bundled with the app (below) keep their own
+licences; GPL-3.0 covers the project's own code and CC BY-NC-SA its exports and downloads.
+
+## Sources
+
 Every export embeds the attribution for the sources it actually used (see
 the `provenance` block of each manifest). The **Status** column records whether the
 licence wording has been checked against the publisher's own licence page.
@@ -7,9 +27,9 @@ Sources marked *to verify* must be checked before the first public release.
 
 | Source | Used for | Licence | Attribution text | Status |
 |---|---|---|---|---|
-| OpenStreetMap (Overpass API) | buildings, roads, rail, water, power, residues, receptors, land cover | ODbL 1.0 | © OpenStreetMap contributors | verified |
+| OpenStreetMap (Overpass API) | buildings, roads, rail, water, power, residues, receptors, land cover; the **context apron** (curated sites): main roads, rail, power lines, pylons and poles (`context.power`), water, pipelines, buildings, landuse and place names within 1.6 km of the model, from a padded-bbox query (`context` section of each bundle) | ODbL 1.0 | © OpenStreetMap contributors | verified |
 | SRTM 1″ via AWS Terrain Tiles | elevation (fallback) | Public domain (NASA/USGS) | Elevation: NASA/USGS SRTM | to verify |
-| Copernicus DEM GLO-30 | elevation (global default) | Copernicus DEM licence | Copernicus DEM GLO-30 © DLR e.V. 2010–2014 and © Airbus Defence and Space GmbH 2014–2018, provided under COPERNICUS by the European Union and ESA | to verify |
+| Copernicus DEM GLO-30 | elevation (global default); terrain of the **context apron** round all 27 curated sites (screen only, never printed; offset to meet the model's own terrain at its edge) | Copernicus DEM licence | Copernicus DEM GLO-30 © DLR e.V. 2010–2014 and © Airbus Defence and Space GmbH 2014–2018, provided under COPERNICUS by the European Union and ESA | to verify |
 | Scottish Public Sector LiDAR (DTM), via the public `srsp-open-data` bucket (Scottish Government / JNCC) | elevation in Scotland: Python tier, and curated-site bundles in the browser | OGL v3.0 (the Remote Sensing Portal states OGL v3 unless a dataset says otherwise; the one stated exception is the Phase 2 LAZ point clouds, which we do not use) | Elevation: Scottish Government LiDAR. Contains public sector information licensed under the Open Government Licence v3.0 | licence checked 24 Nov 2026; per-programme copyright lines now recorded (see Trees and canopy below, and `PROGRAMME_CAPTURE` in providers/lidar.py); national programme 2025 line **to verify** |
 | GSHHG (Wessel & Smith) | coastline | LGPL 3.0 | Coastline: GSHHG (Wessel & Smith) | to verify |
 | AWS Terrain Tiles (Mapzen / tilezen) | elevation (browser tier) | composite: SRTM and GMTED2010 (public domain, USGS), ETOPO1 (public domain, NOAA), UK Environment Agency LiDAR (OGL v3) | Elevation: Mapzen Terrain Tiles (SRTM and GMTED2010 courtesy of the U.S. Geological Survey; ETOPO1, NOAA; UK: © Environment Agency 2015) | to verify: which source covers Scotland (the joerd attribution page does not say) |

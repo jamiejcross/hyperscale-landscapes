@@ -22,3 +22,4 @@ cache/
 
 # Third-party source exports (contain the publisher's own text; re-export to regenerate)
 tools/sources/*.kml
+data/sites/docs/
